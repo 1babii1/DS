@@ -1,0 +1,65 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{3B7E37C2-3E7C-4187-B105-04BEBDC0E608}"
+	ProjectSection(SolutionItems) = preProject
+		Directory.Build.props = Directory.Build.props
+		.editorconfig = .editorconfig
+		docker-compose.yml = docker-compose.yml
+		.gitignore = .gitignore
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryService.Domain", "DirectoryService.Domain\DirectoryService.Domain.csproj", "{3A423431-4156-4FC6-B711-2BB4DFEEC637}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared", "Shared\Shared.csproj", "{1DA64A9E-1071-4270-B4E9-777F84C9809E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryService", "DirectoryService\DirectoryService.csproj", "{C97D3B34-3608-4C32-86BA-E2E69E94EAE6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryService.Infrastructure.Postgres", "DirectoryService.Infrastructure.Postgres\DirectoryService.Infrastructure.Postgres.csproj", "{AB45CED9-0063-4216-99AE-3E7141B220C0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryService.Application", "DirectoryService.Application\DirectoryService.Application.csproj", "{35ADFBE0-F97E-43F9-B3F2-4AD33EFC67FA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryService.Contracts", "DirectoryService.Contracts\DirectoryService.Contracts.csproj", "{3F209ED6-0C9D-4956-98C4-595473000BA8}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{00D55BC5-4526-48F7-A2B7-AE45FC4282A0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DirectoryService.IntegrationTests", "DirectoryService.IntegrationTests\DirectoryService.IntegrationTests.csproj", "{536D8D5A-E8AB-4C1D-9955-370350BEF796}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3A423431-4156-4FC6-B711-2BB4DFEEC637}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3A423431-4156-4FC6-B711-2BB4DFEEC637}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3A423431-4156-4FC6-B711-2BB4DFEEC637}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3A423431-4156-4FC6-B711-2BB4DFEEC637}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1DA64A9E-1071-4270-B4E9-777F84C9809E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1DA64A9E-1071-4270-B4E9-777F84C9809E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1DA64A9E-1071-4270-B4E9-777F84C9809E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1DA64A9E-1071-4270-B4E9-777F84C9809E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C97D3B34-3608-4C32-86BA-E2E69E94EAE6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C97D3B34-3608-4C32-86BA-E2E69E94EAE6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C97D3B34-3608-4C32-86BA-E2E69E94EAE6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C97D3B34-3608-4C32-86BA-E2E69E94EAE6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AB45CED9-0063-4216-99AE-3E7141B220C0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AB45CED9-0063-4216-99AE-3E7141B220C0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AB45CED9-0063-4216-99AE-3E7141B220C0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AB45CED9-0063-4216-99AE-3E7141B220C0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{35ADFBE0-F97E-43F9-B3F2-4AD33EFC67FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{35ADFBE0-F97E-43F9-B3F2-4AD33EFC67FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{35ADFBE0-F97E-43F9-B3F2-4AD33EFC67FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{35ADFBE0-F97E-43F9-B3F2-4AD33EFC67FA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3F209ED6-0C9D-4956-98C4-595473000BA8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3F209ED6-0C9D-4956-98C4-595473000BA8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3F209ED6-0C9D-4956-98C4-595473000BA8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3F209ED6-0C9D-4956-98C4-595473000BA8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{536D8D5A-E8AB-4C1D-9955-370350BEF796}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{536D8D5A-E8AB-4C1D-9955-370350BEF796}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{536D8D5A-E8AB-4C1D-9955-370350BEF796}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{536D8D5A-E8AB-4C1D-9955-370350BEF796}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{536D8D5A-E8AB-4C1D-9955-370350BEF796} = {00D55BC5-4526-48F7-A2B7-AE45FC4282A0}
+	EndGlobalSection
+EndGlobal
