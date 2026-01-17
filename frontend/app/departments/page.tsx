@@ -2,6 +2,7 @@
 
 import { departmentsApi } from '@/entities/departments/api/departments.api'
 import { ParentDepartment } from '@/entities/departments/types/department.types'
+import { CreateDepartment } from '@/entities/departments/ui/create-department-dialog'
 import DepartmentCard from '@/entities/departments/ui/department.card'
 import { useQuery } from '@tanstack/react-query'
 import React from 'react'
@@ -30,6 +31,7 @@ export default function DepartmentsPage(): React.JSX.Element {
 	return (
 		<div className='flex flex-col gap-5 max-w-7xl mx-auto'>
 			<h1>Departments</h1>
+			<CreateDepartment />
 			{error ? (
 				'Ошибка при получении департаментов'
 			) : (

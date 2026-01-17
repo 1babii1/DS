@@ -6,6 +6,8 @@ public static class GetKey
 {
     public static class DepartmentKey
     {
+        public static string BySearch(string search) => $"departmentBySearch:{search}";
+
         public static string ById(DepartmentId departmentId) => $"department:{departmentId}";
 
         public static List<string> ById(Guid[] departmentId) => departmentId.Select(id => $"department:{id}").ToList();
@@ -29,6 +31,7 @@ public static class GetKey
 
     public static class LocationKey
     {
+        public static string BySearch(string search) => $"locationBySearch:{search}";
     }
 
     public static class PositionKey

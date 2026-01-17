@@ -93,6 +93,38 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
         }
     }
 
+    public async Task<UnitResult<Error>> GetByNameAndIdentifier(
+        DepartmentName name,
+        DepartmentIdentifier identifier,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var department = await _dbContext.Departments
+                .Where(d => d.Name == name && d.Identifier == identifier)
+                .FirstOrDefaultAsync(cancellationToken: cancellationToken);
+            if (department != null)
+            {
+                _logger.LogError("Department already exists");
+                return Error.NotFound("department.get", "Department already exists");
+            }
+
+            return UnitResult.Success<Error>();
+        }
+        catch (NpgsqlException ex)
+        {
+            _logger.LogError(ex, "Database error getting department by name and identifier: {DepartmentName}",
+                string.Join(", ", name));
+            return Error.Failure("department.get", "Database error");
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Error getting departments by name and identifier");
+
+            return Error.Failure("departments.get", "Fail to get departments by name and identifier");
+        }
+    }
+
     public async Task<Result<Domain.Departments.Departments, Error>> GetByIdIncludeLocations(
         DepartmentId departmentId,
         CancellationToken cancellationToken)

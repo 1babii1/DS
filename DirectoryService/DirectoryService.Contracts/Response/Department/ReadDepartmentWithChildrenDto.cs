@@ -20,5 +20,7 @@ public record ReadDepartmentWithChildrenDto
 
     public DateTime UpdatedAt { get; init; }
 
+    public bool HasMoreChildren { get; init; }
+
     public List<ReadDepartmentWithChildrenDto> Children { get; init; } = [];
 }
