@@ -1,9 +1,12 @@
 import { axiosInstance } from '@/shared/api/axiosInstance'
 import {
+	CreateDepartmentRequest,
 	Department,
 	GetChildrenLazyParams,
+	GetDepartmentBySearchParams,
 	GetParentDepartmentsParams,
-	ParentDepartment
+	ParentDepartment,
+	UpdateParentRequest
 } from '../types/department.types'
 
 export const departmentsApi = {
@@ -46,11 +49,47 @@ export const departmentsApi = {
 			.catch(() => [])
 		return response
 	},
-	CreateDepartmernt: async (data: Partial<Department>) => {
-		const response = await axiosInstance
-			.post<Department>('http://localhost:5129/department', data)
-			.then(res => res.data)
-			.catch(() => null)
+	CreateDepartment: async (data: CreateDepartmentRequest) => {
+		const transformedData = {
+			request: {
+				name: { value: data.name },
+				identifier: { value: data.identifier },
+				parentDepartmentId: data.parentDepartmentId
+					? { value: data.parentDepartmentId }
+					: null,
+				depth: data.depth ?? 0,
+				locationsIds: data.locationsIds.map(id => ({ value: id })),
+				departmentId: null
+			}
+		}
+		const response = await axiosInstance.post<Department>(
+			'http://localhost:5129/api/departments',
+			transformedData
+		)
+
 		return response
-	}
+	},
+	GetDepartmentBySearch: async (params: GetDepartmentBySearchParams) => {
+		const response = await axiosInstance
+			.get<Department[]>('http://localhost:5129/search', {
+				params: {
+					search: params.search,
+					page: params.page ?? 1,
+					size: params.size ?? 10
+				}
+			})
+			.then(res => res.data)
+			.catch(() => [])
+		return response
+	},
+	DeleteDepartment: async (id: string) =>
+		await axiosInstance.delete(
+			`http://localhost:5129/api/departments/${id}`
+		),
+
+	UpdateParent: async (data: UpdateParentRequest) =>
+		await axiosInstance.put(
+			`http://localhost:5129/api/departments/${data.departmentId}`,
+			data.parentDepartmentId
+		)
 }

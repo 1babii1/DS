@@ -123,6 +123,14 @@ public class CreateDepartmentHandler
 
         DepartmentIdentifier departmentIdentifier = departmentIdentifierResult.Value;
 
+        // Проверка на повторение имени и идентификатора
+        var checkNameAndIdentifier = await _departmentRepository.GetByNameAndIdentifier(departmentName, departmentIdentifier, cancellationToken);
+        if (checkNameAndIdentifier.IsFailure)
+        {
+            _logger.LogError("DepartmentName and DepartmentIdentifier already exists");
+            return checkNameAndIdentifier.Error;
+        }
+
         var department = departmentFromDB is null
             ? Departments.CreateParent(departmentName, departmentIdentifier, request.LocationsIds,
                 request.DepartmentId)

@@ -49,4 +49,9 @@ public interface IDepartmentRepository
     Task<Result<IEnumerable<DepartmentId>, Error>> GetDepartmentsIds(
         IEnumerable<DepartmentId> departmentIds,
         CancellationToken cancellationToken);
+
+    Task<UnitResult<Error>> GetByNameAndIdentifier(
+        DepartmentName name,
+        DepartmentIdentifier identifier,
+        CancellationToken cancellationToken);
 }

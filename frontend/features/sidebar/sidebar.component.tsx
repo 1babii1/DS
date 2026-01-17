@@ -11,7 +11,7 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 	SidebarTrigger
-} from '@/components/ui/sidebar'
+} from '@/shared/components/ui/sidebar'
 import Link from 'next/link'
 
 export default function SidebarComponent() {

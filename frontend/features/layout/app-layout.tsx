@@ -1,7 +1,8 @@
 'use client'
 
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+import { SidebarProvider, SidebarTrigger } from '@/shared/components/ui/sidebar'
 import { QueryClientProvider } from '@tanstack/react-query'
+import { Toaster } from 'sonner'
 import React from 'react'
 import SidebarComponent from '../sidebar/sidebar.component'
 import { queryClient } from '@/shared/api/query-client'
@@ -13,6 +14,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 		<div className='bg-gray-500'>
 			<QueryClientProvider client={queryClient}>
 				<SidebarProvider open={isOpen} onOpenChange={setIsOpen}>
+					<Toaster position='top-right' richColors />
 					<div>
 						<aside className='overflow-hidden border-r border-gray-200 bg-white dark:bg-gray-800 dark:border-gray-700'>
 							<SidebarComponent />

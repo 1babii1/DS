@@ -99,9 +99,15 @@ builder.Services.AddScoped<GetChildrenLazyHandler>();
 
 builder.Services.AddScoped<SoftDeleteDepartmentHandler>();
 
+builder.Services.AddScoped<GetDepartmentByIdHandler>();
+
+builder.Services.AddScoped<GetDepartmentsBySearchHandler>();
+
+builder.Services.AddScoped<GetLocationBySearchHandler>();
+
 builder.Services.AddStackExchangeRedisCache(setup =>
 {
-    setup.Configuration = "localhost:6379";
+    setup.Configuration = "redis:6379";
 });
 
 builder.Services.AddHybridCache(options => options.DefaultEntryOptions = new HybridCacheEntryOptions

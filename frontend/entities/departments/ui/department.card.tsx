@@ -6,9 +6,9 @@ import {
 	CardFooter,
 	CardHeader,
 	CardTitle
-} from '@/components/ui/card'
+} from '@/shared/components/ui/card'
 import { ParentDepartment } from '@/entities/departments/types/department.types'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/shared/components/ui/button'
 import Link from 'next/link'
 
 type DepartmentCardProps = {
