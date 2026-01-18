@@ -64,7 +64,7 @@ public class DepartmentController : ControllerBase
     [HttpGet("/search")]
     public async Task<ActionResult<List<DepartmentBySearch>?>> GetDepartmentsBySearch(
         [FromQuery] GetDepartmentsBySearchRequest request,
-        [FromServices] GetDepartmentsBySearchHandler handler,
+        [FromServices] GetDepartmentsWithFiltersHandler handler,
         CancellationToken cancellationToken) =>
         await handler.Handle(request, cancellationToken);
 

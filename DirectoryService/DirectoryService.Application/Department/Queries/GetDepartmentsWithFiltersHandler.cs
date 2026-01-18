@@ -22,15 +22,15 @@ public class GetDepartmentsBySearchValidation : AbstractValidator<GetDepartments
     }
 }
 
-public class GetDepartmentsBySearchHandler
+public class GetDepartmentsWithFiltersHandler
 {
     private readonly GetDepartmentsBySearchValidation _validator;
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly HybridCache _cache;
-    private readonly ILogger<GetDepartmentsBySearchHandler> _logger;
+    private readonly ILogger<GetDepartmentsWithFiltersHandler> _logger;
 
-    public GetDepartmentsBySearchHandler(GetDepartmentsBySearchValidation validator, IDbConnectionFactory connectionFactory,
-        HybridCache cache, ILogger<GetDepartmentsBySearchHandler> logger)
+    public GetDepartmentsWithFiltersHandler(GetDepartmentsBySearchValidation validator, IDbConnectionFactory connectionFactory,
+        HybridCache cache, ILogger<GetDepartmentsWithFiltersHandler> logger)
     {
         _validator = validator;
         _connectionFactory = connectionFactory;
@@ -77,14 +77,16 @@ public class GetDepartmentsBySearchHandler
                    d.path,
                    d.depth
             FROM departments d
-            WHERE d.name ILIKE '%' || @search || '%' 
+            WHERE d.name ILIKE '%' || @search || '%'
             OR d.identifier ILIKE '%' || @search || '%'
             ORDER BY d.created_at
             LIMIT @pageSize OFFSET @offset
             """,
             param: new
             {
-                search = bySearchRequest.Search, pageSize = bySearchRequest.Size, offset = (bySearchRequest.Page - 1) * bySearchRequest.Size,
+                search = bySearchRequest.Search,
+                pageSize = bySearchRequest.Size,
+                offset = (bySearchRequest.Page - 1) * bySearchRequest.Size,
             });
 
         return departments.ToList();

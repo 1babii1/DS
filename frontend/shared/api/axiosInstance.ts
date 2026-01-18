@@ -3,6 +3,7 @@ import { Envelope } from './envelop'
 import { EnvelopeError } from './errors'
 
 export const axiosInstance = axios.create({
+	baseURL: 'http://localhost:5129/',
 	headers: {
 		'Content-Type': 'application/json'
 	}

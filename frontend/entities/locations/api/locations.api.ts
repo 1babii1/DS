@@ -4,7 +4,7 @@ import { GetLocationsParams, Location } from '../types/location-types'
 export const locationsApi = {
 	GetLocations: async (params: GetLocationsParams) => {
 		const response = await axiosInstance
-			.get<Location[]>('http://localhost:5129/lication/search', {
+			.get<Location[]>('lication/search', {
 				params: {
 					search: params.search,
 					page: params.page ?? 1,

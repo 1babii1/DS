@@ -26,6 +26,6 @@ public class LocationController : ControllerBase
     [HttpGet("/lication/search")]
     public async Task<ActionResult<List<ReadLocationDto>?>> GetLocationBySearch(
         [FromQuery] GetLocationBySearchRequest request,
-        [FromServices] GetLocationBySearchHandler handler,
+        [FromServices] GetLocationWithFiltersHandler handler,
         CancellationToken cancellationToken) => await handler.Handle(request, cancellationToken);
 }

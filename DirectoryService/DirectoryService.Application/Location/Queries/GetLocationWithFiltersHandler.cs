@@ -22,15 +22,15 @@ public class GetLocationBySearchValidation : AbstractValidator<GetLocationBySear
     }
 }
 
-public class GetLocationBySearchHandler
+public class GetLocationWithFiltersHandler
 {
     private readonly GetLocationBySearchValidation _validator;
     private readonly IDbConnectionFactory _connectionFactory;
     private readonly HybridCache _cache;
-    private readonly ILogger<GetLocationBySearchHandler> _logger;
+    private readonly ILogger<GetLocationWithFiltersHandler> _logger;
 
-    public GetLocationBySearchHandler(GetLocationBySearchValidation validator, IDbConnectionFactory connectionFactory,
-        HybridCache cache, ILogger<GetLocationBySearchHandler> logger)
+    public GetLocationWithFiltersHandler(GetLocationBySearchValidation validator, IDbConnectionFactory connectionFactory,
+        HybridCache cache, ILogger<GetLocationWithFiltersHandler> logger)
     {
         _validator = validator;
         _connectionFactory = connectionFactory;
@@ -76,13 +76,15 @@ public class GetLocationBySearchHandler
                    l.created_at,
                    l.updated_at
             FROM locations l
-            WHERE l.name ILIKE '%' || @search || '%' 
+            WHERE l.name ILIKE '%' || @search || '%'
             ORDER BY l.created_at
             LIMIT @pageSize OFFSET @offset
             """,
             param: new
             {
-                search = bySearchRequest.Search, pageSize = bySearchRequest.Size, offset = (bySearchRequest.Page - 1) * bySearchRequest.Size,
+                search = bySearchRequest.Search,
+                pageSize = bySearchRequest.Size,
+                offset = (bySearchRequest.Page - 1) * bySearchRequest.Size,
             });
 
         return locations.ToList();

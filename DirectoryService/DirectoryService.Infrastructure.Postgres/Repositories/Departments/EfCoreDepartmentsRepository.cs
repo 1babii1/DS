@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Linq.Expressions;
+using System.Text.Json;
 using CSharpFunctionalExtensions;
 using Dapper;
 using DirectoryService.Application.Database;
@@ -93,16 +94,12 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
         }
     }
 
-    public async Task<UnitResult<Error>> GetByNameAndIdentifier(
-        DepartmentName name,
-        DepartmentIdentifier identifier,
-        CancellationToken cancellationToken)
+    public async Task<UnitResult<Error>> GetBy(Expression<Func<Domain.Departments.Departments, bool>> predicate, CancellationToken cancellationToken)
     {
         try
         {
-            var department = await _dbContext.Departments
-                .Where(d => d.Name == name && d.Identifier == identifier)
-                .FirstOrDefaultAsync(cancellationToken: cancellationToken);
+            var department = await _dbContext.Departments.FirstOrDefaultAsync(predicate, cancellationToken: cancellationToken);
+
             if (department != null)
             {
                 _logger.LogError("Department already exists");
@@ -113,8 +110,7 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
         }
         catch (NpgsqlException ex)
         {
-            _logger.LogError(ex, "Database error getting department by name and identifier: {DepartmentName}",
-                string.Join(", ", name));
+            _logger.LogError(ex, "Database error getting department by name and identifier:");
             return Error.Failure("department.get", "Database error");
         }
         catch (Exception e)
@@ -200,8 +196,8 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
         CancellationToken cancellationToken = default)
     {
         const string dapperSql = """
-                                 SELECT * FROM departments 
-                                 WHERE path <@ @path::ltree 
+                                 SELECT * FROM departments
+                                 WHERE path <@ @path::ltree
                                  ORDER BY depth
                                  """;
 
@@ -242,7 +238,7 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
     UPDATE departments SET parent_id = {newParentId.Value} WHERE path = {oldPath.Value}::ltree");
 
         await _dbContext.Database.ExecuteSqlInterpolatedAsync($@"
-    UPDATE departments 
+    UPDATE departments
     SET path = {newParentPath.Value}::ltree || subpath(path, nlevel({oldPath.Value}::ltree)-1),
         depth = depth - {depth}
     WHERE path <@ {oldPath.Value}::ltree AND id != {currentId.Value}");

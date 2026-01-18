@@ -12,21 +12,21 @@ import {
 export const departmentsApi = {
 	getDepartmentsTopPosition: async () => {
 		const response = await axiosInstance
-			.get<Department[]>('http://localhost:5129/top-positions')
+			.get<Department[]>('top-positions')
 			.then(res => res.data)
 			.catch(() => [])
 		return response
 	},
 	getDepartment: async (id: string) => {
 		const response = await axiosInstance
-			.get<ParentDepartment>(`http://localhost:5129/department/${id}`)
+			.get<ParentDepartment>(`department/${id}`)
 			.then(res => res.data)
 			.catch(() => null)
 		return response
 	},
 	getParentDepartments: async (params?: GetParentDepartmentsParams) => {
 		const response = await axiosInstance
-			.get<ParentDepartment[]>('http://localhost:5129/roots', {
+			.get<ParentDepartment[]>('roots', {
 				params: {
 					page: params?.page ?? 1,
 					size: params?.size ?? 20,
@@ -39,7 +39,7 @@ export const departmentsApi = {
 	},
 	getChildrenLazy: async (id: string, params?: GetChildrenLazyParams) => {
 		const response = await axiosInstance
-			.get<ParentDepartment[]>(`http://localhost:5129/${id}/children`, {
+			.get<ParentDepartment[]>(`${id}/children`, {
 				params: {
 					page: params?.page ?? 1,
 					size: params?.size ?? 20
@@ -63,7 +63,7 @@ export const departmentsApi = {
 			}
 		}
 		const response = await axiosInstance.post<Department>(
-			'http://localhost:5129/api/departments',
+			'api/departments',
 			transformedData
 		)
 
@@ -71,7 +71,7 @@ export const departmentsApi = {
 	},
 	GetDepartmentBySearch: async (params: GetDepartmentBySearchParams) => {
 		const response = await axiosInstance
-			.get<Department[]>('http://localhost:5129/search', {
+			.get<Department[]>('search', {
 				params: {
 					search: params.search,
 					page: params.page ?? 1,
@@ -83,13 +83,11 @@ export const departmentsApi = {
 		return response
 	},
 	DeleteDepartment: async (id: string) =>
-		await axiosInstance.delete(
-			`http://localhost:5129/api/departments/${id}`
-		),
+		await axiosInstance.delete(`api/departments/${id}`),
 
 	UpdateParent: async (data: UpdateParentRequest) =>
 		await axiosInstance.put(
-			`http://localhost:5129/api/departments/${data.departmentId}`,
+			`api/departments/${data.departmentId}`,
 			data.parentDepartmentId
 		)
 }

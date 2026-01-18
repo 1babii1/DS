@@ -101,9 +101,9 @@ builder.Services.AddScoped<SoftDeleteDepartmentHandler>();
 
 builder.Services.AddScoped<GetDepartmentByIdHandler>();
 
-builder.Services.AddScoped<GetDepartmentsBySearchHandler>();
+builder.Services.AddScoped<GetDepartmentsWithFiltersHandler>();
 
-builder.Services.AddScoped<GetLocationBySearchHandler>();
+builder.Services.AddScoped<GetLocationWithFiltersHandler>();
 
 builder.Services.AddStackExchangeRedisCache(setup =>
 {
@@ -112,7 +112,8 @@ builder.Services.AddStackExchangeRedisCache(setup =>
 
 builder.Services.AddHybridCache(options => options.DefaultEntryOptions = new HybridCacheEntryOptions
 {
-    LocalCacheExpiration = TimeSpan.FromMinutes(5), Expiration = TimeSpan.FromMinutes(30),
+    LocalCacheExpiration = TimeSpan.FromMinutes(5),
+    Expiration = TimeSpan.FromMinutes(30),
 });
 
 var app = builder.Build();

@@ -52,72 +52,8 @@ export default function UpdateParentForm({
 	return (
 		<form>
 			<FieldGroup>
-				<form.Field name='departmentId'>
-					{field => {
-						const isInvalid =
-							field.state.meta.isTouched &&
-							!field.state.meta.isValid
-						return (
-							<Field>
-								<FieldLabel>
-									<Label>Parent Department</Label>
-								</FieldLabel>
-								<SearchPopover
-									isLoading={false}
-									isFetching={isDepartmentsFetching}
-									items={departments}
-									searchValue={departmentSearch}
-									onSearchChange={setDepartmentSearch}
-									placeholder='Search departments...'
-									isSingleSelect={true}
-									trigger={
-										<Button
-											variant='outline'
-											className='w-full justify-between'
-										>
-											{field.state.value
-												? departments.find(
-														d =>
-															d.id ===
-															field.state.value
-													)?.name || field.state.value
-												: 'Select department...'}
-											{isDepartmentsFetching && (
-												<Loader2 className='ml-2 h-4 w-4 animate-spin' />
-											)}
-										</Button>
-									}
-									onSelect={(dept: DepartmentFetchForm) =>
-										field.handleChange(dept.id)
-									}
-									renderItem={(dept: DepartmentFetchForm) => (
-										<>
-											<Check
-												className={cn(
-													'mr-2 h-4 w-4',
-													field.state.value ===
-														dept.id
-														? 'opacity-100'
-														: 'opacity-0'
-												)}
-											/>
-											{dept.name}
-										</>
-									)}
-									getItemId={(dept: DepartmentFetchForm) =>
-										dept.id
-									}
-									emptyMessage='No departments found.'
-								/>
-							</Field>
-						)
-					}}
-				</form.Field>
 				<form.Field name='parentDepartmentId'>
 					{field => {
-						const isInvalid =
-							field.state.meta.isTouched &&
-							!field.state.meta.isValid
 						return (
 							<Field>
 								<FieldLabel>
