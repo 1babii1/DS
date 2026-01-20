@@ -6,8 +6,10 @@ import {
 	GetDepartmentBySearchParams,
 	GetParentDepartmentsParams,
 	ParentDepartment,
+	PoginationResponse,
 	UpdateParentRequest
 } from '../types/department.types'
+import { infiniteQueryOptions } from '@tanstack/react-query'
 
 export const departmentsApi = {
 	getDepartmentsTopPosition: async () => {
@@ -39,14 +41,13 @@ export const departmentsApi = {
 	},
 	getChildrenLazy: async (id: string, params?: GetChildrenLazyParams) => {
 		const response = await axiosInstance
-			.get<ParentDepartment[]>(`${id}/children`, {
+			.get<PoginationResponse<ParentDepartment>>(`${id}/children`, {
 				params: {
-					page: params?.page ?? 1,
-					size: params?.size ?? 20
+					Page: params?.page ?? 1,
+					PageSize: params?.size ?? 20
 				}
 			})
 			.then(res => res.data)
-			.catch(() => [])
 		return response
 	},
 	CreateDepartment: async (data: CreateDepartmentRequest) => {

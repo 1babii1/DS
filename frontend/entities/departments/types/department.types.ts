@@ -10,6 +10,13 @@ export type Department = {
 	updatedAt: Date
 }
 
+export type PoginationResponse<T> = {
+	items: T[]
+	totalCount: number
+	nextPageExists: boolean
+	page: number
+}
+
 export type ParentDepartment = {
 	id: string
 	parentId: string

@@ -12,7 +12,7 @@ public static class GetKey
 
         public static List<string> ById(Guid[] departmentId) => departmentId.Select(id => $"department:{id}").ToList();
 
-        public static string Children(Guid parentId) => $"departmentChildren:{parentId}";
+        public static string Children(Guid parentId, int? page, int? size) => $"departmentChildren:{parentId}:{page}:{size}";
 
         public static string ByLocation(Guid[]? locationIds = null, string? search = null)
         {

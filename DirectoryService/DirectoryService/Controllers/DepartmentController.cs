@@ -69,7 +69,7 @@ public class DepartmentController : ControllerBase
         await handler.Handle(request, cancellationToken);
 
     [HttpGet("/{parentId:guid}/children")]
-    public async Task<ActionResult<List<ReadDepartmentHierarchyDto>?>> GetChildrenLazy(
+    public async Task<ActionResult<PoginationResponse<ReadDepartmentHierarchyDto>?>> GetChildrenLazy(
         [FromRoute] Guid parentId,
         [FromQuery] GetChildrenLazyRequest request,
         [FromServices] GetChildrenLazyHandler handler,
