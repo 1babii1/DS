@@ -11,6 +11,7 @@ import { DepartmentChildren } from '@/entities/departments/ui/department-childre
 import ConfirmDelete from '@/features/departments/ui/confirm-delete'
 import Link from 'next/link'
 import UpdateParent from '@/entities/departments/ui/update-parent'
+import { generateKeyTSQueryDepartment } from '@/shared/cache/generate-key'
 
 export default function DepartmentPage() {
 	const params = useParams()
@@ -31,7 +32,7 @@ export default function DepartmentPage() {
 		error,
 		refetch
 	} = useQuery<ParentDepartment | null>({
-		queryKey: ['department', id],
+		queryKey: [generateKeyTSQueryDepartment.ById(id)],
 		queryFn: () => departmentsApi.getDepartment(id),
 		initialData: cachedDept, // Используем данные из кэша если они есть
 		staleTime: 1000 * 60 * 5 // 5 минут

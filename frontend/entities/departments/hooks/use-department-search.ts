@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { DepartmentFetchForm } from '../types/department.types'
 import { departmentsApi } from '../api/departments.api'
 import { useEffect, useState } from 'react'
+import { generateKeyTSQueryDepartment } from '@/shared/cache/generate-key'
 
 interface Props {
 	departmentSearch: string
@@ -31,7 +32,7 @@ export function useDepartmentSearch({
 		data: departments = [] as DepartmentFetchForm[],
 		isFetching: isDepartmentsFetching
 	} = useQuery({
-		queryKey: ['departments', currentDepartmentId, debounceSearch],
+		queryKey: [generateKeyTSQueryDepartment.BySearch(debounceSearch)],
 		queryFn: () =>
 			departmentsApi.GetDepartmentBySearch({
 				search: debounceSearch,

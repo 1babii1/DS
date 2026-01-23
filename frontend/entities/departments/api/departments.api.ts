@@ -9,7 +9,8 @@ import {
 	PoginationResponse,
 	UpdateParentRequest
 } from '../types/department.types'
-import { infiniteQueryOptions } from '@tanstack/react-query'
+import { infiniteQueryOptions, useInfiniteQuery } from '@tanstack/react-query'
+import { generateKeyTSQueryDepartment } from '@/shared/cache/generate-key'
 
 export const departmentsApi = {
 	getDepartmentsTopPosition: async () => {
@@ -36,7 +37,6 @@ export const departmentsApi = {
 				}
 			})
 			.then(res => res.data)
-			.catch(() => [])
 		return response
 	},
 	getChildrenLazy: async (id: string, params?: GetChildrenLazyParams) => {
@@ -91,4 +91,48 @@ export const departmentsApi = {
 			`api/departments/${data.departmentId}`,
 			data.parentDepartmentId
 		)
+}
+
+export const departmentsOptions = {
+	getChildrenLazyInfiniteOptions: ({
+		pageSize,
+		departmentId,
+		showChildren,
+		page
+	}: {
+		pageSize: number
+		departmentId: string
+		showChildren: boolean
+		page?: number
+	}) => {
+		return infiniteQueryOptions({
+			queryKey: [
+				generateKeyTSQueryDepartment.Children(
+					departmentId,
+					page,
+					pageSize
+				)
+			],
+			queryFn: ({ pageParam }) => {
+				return departmentsApi.getChildrenLazy(departmentId, {
+					page: pageParam ?? page ?? 1,
+					size: pageSize ?? 20
+				})
+			},
+			enabled: showChildren,
+			initialPageParam: 1,
+			getNextPageParam: response => {
+				if (response && response.nextPageExists)
+					return response.page + 1
+				return undefined
+			},
+			select: data => ({
+				items: data.pages.flatMap(page => page.items),
+				totalCount: data.pages[0]?.totalCount ?? 0,
+				nextPageExists:
+					data.pages[data.pages.length - 1]?.nextPageExists ?? false,
+				page: data.pages
+			})
+		})
+	}
 }

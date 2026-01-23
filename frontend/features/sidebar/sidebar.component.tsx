@@ -25,6 +25,11 @@ export default function SidebarComponent() {
 			title: 'Departments',
 			url: '/departments',
 			icon: Inbox
+		},
+		{
+			title: 'Locations',
+			url: '/locations',
+			icon: Inbox
 		}
 	]
 	return (

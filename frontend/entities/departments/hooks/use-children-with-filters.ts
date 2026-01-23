@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { ParentDepartment, PoginationResponse } from '../types/department.types'
 import { departmentsApi } from '../api/departments.api'
+import { generateKeyTSQueryDepartment } from '@/shared/cache/generate-key'
 
 interface Props {
 	departmentId: string
@@ -20,7 +21,9 @@ export function useChildrenWithFilters({
 		isLoading: isLoadingChildren,
 		refetch
 	} = useQuery<PoginationResponse<ParentDepartment>>({
-		queryKey: ['children', departmentId],
+		queryKey: [
+			generateKeyTSQueryDepartment.Children(departmentId, page, size)
+		],
 		queryFn: () =>
 			departmentsApi.getChildrenLazy(departmentId, { page, size }),
 		enabled: showChildren,

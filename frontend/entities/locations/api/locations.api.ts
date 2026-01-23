@@ -4,15 +4,18 @@ import { GetLocationsParams, Location } from '../types/location-types'
 export const locationsApi = {
 	GetLocations: async (params: GetLocationsParams) => {
 		const response = await axiosInstance
-			.get<Location[]>('lication/search', {
+			.get<Location[]>('api/locations', {
 				params: {
-					search: params.search,
-					page: params.page ?? 1,
-					size: params.size ?? 10
+					IsActive: params.isActive,
+					DepartmentId: params.departmentId,
+					Search: params.search,
+					Page: params.page ?? 1,
+					Size: params.size ?? 10,
+					SortBy: params.sortBy ?? 'created_at',
+					SortDirection: params.sortDirection ?? 'ASC'
 				}
 			})
 			.then(res => res.data)
-			.catch(() => [])
 		return response
 	}
 }

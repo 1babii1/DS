@@ -32,6 +32,13 @@ public static class GetKey
     public static class LocationKey
     {
         public static string BySearch(string search) => $"locationBySearch:{search}";
+
+        public static string ById(Guid locationId) => $"location:{locationId}";
+
+        public static string ByDepartment(Guid departmentId) => $"locationByDepartment:{departmentId}";
+
+        public static string ByFilters(string? search, bool? isActive, int? page, int? size, string? sortBy, string? sortDirection)
+            => $"locationByFilters:{search}|{isActive}|{page}|{size}|{sortBy}|{sortDirection}";
     }
 
     public static class PositionKey

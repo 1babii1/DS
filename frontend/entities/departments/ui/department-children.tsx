@@ -2,7 +2,7 @@
 
 import { RefCallback, useCallback, useState } from 'react'
 import { Button } from '@/shared/components/ui/button'
-import DepartmentCard from '@/entities/departments/ui/department.card'
+import DepartmentCard from '@/entities/departments/ui/department-card'
 import { RefreshCcw } from 'lucide-react'
 import { useInfiniteChildren } from '../hooks/use-infinite-children'
 

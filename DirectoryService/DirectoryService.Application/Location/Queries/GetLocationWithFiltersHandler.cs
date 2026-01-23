@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace DirectoryService.Application.Location.Queries;
 
-public class GetLocationBySearchValidation : AbstractValidator<GetLocationBySearchRequest>
+public class GetLocationBySearchValidation : AbstractValidator<GetLocationWithFiltersRequest>
 {
     public GetLocationBySearchValidation()
     {
@@ -38,21 +38,21 @@ public class GetLocationWithFiltersHandler
         _logger = logger;
     }
 
-    public async Task<List<ReadLocationDto>> Handle(GetLocationBySearchRequest bySearchRequest, CancellationToken cancellationToken)
+    public async Task<List<ReadLocationDto>> Handle(GetLocationWithFiltersRequest request, CancellationToken cancellationToken)
     {
         // Валидация входных данных
-        ValidationResult validateResult = await _validator.ValidateAsync(bySearchRequest, cancellationToken);
+        ValidationResult validateResult = await _validator.ValidateAsync(request, cancellationToken);
         if (!validateResult.IsValid)
         {
             _logger.LogError("Failed to validate location search request");
             return [];
         }
 
-        _logger.LogInformation("Searching locations with search: {Search}", bySearchRequest.Search);
+        _logger.LogInformation("Searching locations with search: {Search}", request.Search);
 
         var locations = await _cache.GetOrCreateAsync(
-            key: GetKey.LocationKey.BySearch(bySearchRequest.Search),
-            factory: async _ => await GetLocations(bySearchRequest, cancellationToken),
+            key: GetKey.LocationKey.BySearch(request.Search),
+            factory: async _ => await GetLocations(request, cancellationToken),
             options: new() { LocalCacheExpiration = TimeSpan.FromMinutes(5), Expiration = TimeSpan.FromMinutes(30), },
             cancellationToken: cancellationToken);
 
@@ -60,7 +60,7 @@ public class GetLocationWithFiltersHandler
     }
 
     public async Task<List<ReadLocationDto>> GetLocations(
-        GetLocationBySearchRequest bySearchRequest,
+        GetLocationWithFiltersRequest request,
         CancellationToken cancellationToken)
     {
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
@@ -82,9 +82,9 @@ public class GetLocationWithFiltersHandler
             """,
             param: new
             {
-                search = bySearchRequest.Search,
-                pageSize = bySearchRequest.Size,
-                offset = (bySearchRequest.Page - 1) * bySearchRequest.Size,
+                search = request.Search,
+                pageSize = request.Size,
+                offset = (request.Page - 1) * request.Size,
             });
 
         return locations.ToList();

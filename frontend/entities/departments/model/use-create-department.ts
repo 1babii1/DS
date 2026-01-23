@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { departmentsApi } from '../api/departments.api'
 import { isEnvelopeError } from '@/shared/api/errors'
 import { toast } from 'sonner'
+import { generateKeyTSQueryDepartment } from '@/shared/cache/generate-key'
 
 export function useCreateDepartment() {
 	const queryClient = useQueryClient()
@@ -9,7 +10,9 @@ export function useCreateDepartment() {
 	const mutation = useMutation({
 		mutationFn: departmentsApi.CreateDepartment,
 		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: ['departments'] })
+			queryClient.invalidateQueries({
+				queryKey: [generateKeyTSQueryDepartment.All()]
+			})
 		},
 		onError: error => {
 			if (isEnvelopeError(error)) {

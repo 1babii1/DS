@@ -3,6 +3,7 @@ import { departmentsApi } from '../api/departments.api'
 import { isEnvelopeError } from '@/shared/api/errors'
 import { toast } from 'sonner'
 import { UpdateParentRequest } from '../types/department.types'
+import { generateKeyTSQueryDepartment } from '@/shared/cache/generate-key'
 
 export function UseUpdateParent({
 	departmentId,
@@ -14,7 +15,9 @@ export function UseUpdateParent({
 		mutationFn: () =>
 			departmentsApi.UpdateParent({ departmentId, parentDepartmentId }),
 		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: ['departments'] })
+			queryClient.invalidateQueries({
+				queryKey: [generateKeyTSQueryDepartment.All()]
+			})
 		},
 		onError: error => {
 			if (isEnvelopeError(error)) {

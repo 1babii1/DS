@@ -11,7 +11,11 @@ export interface Location {
 }
 
 export type GetLocationsParams = {
-	search: string
-	page?: number
-	size?: number
+	isActive?: string
+	departmentId?: string[]
+	search?: string
+	page?: string
+	size?: string
+	sortBy?: string
+	sortDirection?: string
 }

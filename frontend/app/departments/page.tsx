@@ -1,17 +1,12 @@
 'use client'
 
-import { departmentsApi } from '@/entities/departments/api/departments.api'
-import { ParentDepartment } from '@/entities/departments/types/department.types'
+import { useRootDepartments } from '@/entities/departments/hooks/use-root-departments'
 import { CreateDepartment } from '@/entities/departments/ui/create-department-dialog'
-import DepartmentCard from '@/entities/departments/ui/department.card'
-import { useQuery } from '@tanstack/react-query'
+import DepartmentCard from '@/entities/departments/ui/department-card'
 import React from 'react'
 
 export default function DepartmentsPage(): React.JSX.Element {
-	const { data, isLoading, isPending, error } = useQuery<ParentDepartment[]>({
-		queryFn: () => departmentsApi.getParentDepartments(),
-		queryKey: ['roots']
-	})
+	const { data, isLoading, isPending, error } = useRootDepartments()
 
 	if (isLoading) {
 		return (
