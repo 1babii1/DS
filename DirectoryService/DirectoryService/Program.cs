@@ -99,14 +99,21 @@ builder.Services.AddScoped<GetChildrenLazyHandler>();
 
 builder.Services.AddScoped<SoftDeleteDepartmentHandler>();
 
+builder.Services.AddScoped<GetDepartmentByIdHandler>();
+
+builder.Services.AddScoped<GetDepartmentsWithFiltersHandler>();
+
+builder.Services.AddScoped<GetLocationWithFiltersHandler>();
+
 builder.Services.AddStackExchangeRedisCache(setup =>
 {
-    setup.Configuration = "localhost:6379";
+    setup.Configuration = "redis:6379";
 });
 
 builder.Services.AddHybridCache(options => options.DefaultEntryOptions = new HybridCacheEntryOptions
 {
-    LocalCacheExpiration = TimeSpan.FromMinutes(5), Expiration = TimeSpan.FromMinutes(30),
+    LocalCacheExpiration = TimeSpan.FromMinutes(5),
+    Expiration = TimeSpan.FromMinutes(30),
 });
 
 var app = builder.Build();

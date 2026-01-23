@@ -123,6 +123,14 @@ public class CreateDepartmentHandler
 
         DepartmentIdentifier departmentIdentifier = departmentIdentifierResult.Value;
 
+        // Проверка на повторение имени и идентификатора
+        var checkNameAndIdentifier = await _departmentRepository.GetBy((d) => d.Name == departmentName && d.Identifier == departmentIdentifier, cancellationToken);
+        if (checkNameAndIdentifier.IsFailure)
+        {
+            _logger.LogError("DepartmentName and DepartmentIdentifier already exists");
+            return checkNameAndIdentifier.Error;
+        }
+
         var department = departmentFromDB is null
             ? Departments.CreateParent(departmentName, departmentIdentifier, request.LocationsIds,
                 request.DepartmentId)
@@ -167,7 +175,8 @@ public class CreateDepartmentHandler
                 value: department.Value,
                 options: new()
                 {
-                    LocalCacheExpiration = TimeSpan.FromMinutes(5), Expiration = TimeSpan.FromMinutes(30),
+                    LocalCacheExpiration = TimeSpan.FromMinutes(5),
+                    Expiration = TimeSpan.FromMinutes(30),
                 },
                 cancellationToken: cancellationToken);
 

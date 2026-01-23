@@ -22,4 +22,10 @@ public class LocationController : ControllerBase
         [FromQuery] GetLocationByDepartmentRequest request,
         [FromServices] GetLocationByDepartmentHandle handler,
         CancellationToken cancellationToken) => await handler.Handle(request, cancellationToken);
+
+    [HttpGet("/locations/search")]
+    public async Task<ActionResult<List<ReadLocationDto>?>> GetLocationBySearch(
+        [FromQuery] GetLocationWithFiltersRequest request,
+        [FromServices] GetLocationWithFiltersHandler handler,
+        CancellationToken cancellationToken) => await handler.Handle(request, cancellationToken);
 }

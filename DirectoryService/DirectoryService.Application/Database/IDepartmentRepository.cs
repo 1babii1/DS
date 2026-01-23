@@ -1,4 +1,5 @@
-﻿using CSharpFunctionalExtensions;
+﻿using System.Linq.Expressions;
+using CSharpFunctionalExtensions;
 using DirectoryService.Contracts.Response.Department;
 using DirectoryService.Domain.DepartmentLocations;
 using DirectoryService.Domain.Departments;
@@ -20,11 +21,11 @@ public interface IDepartmentRepository
         IReadOnlyList<DepartmentId> departmentIds,
         CancellationToken cancellationToken);
 
-    Task<Result<Domain.Departments.Departments, Error>> GetById(
+    Task<Result<Departments, Error>> GetById(
         DepartmentId departmentId,
         CancellationToken cancellationToken);
 
-    Task<Result<Domain.Departments.Departments, Error>> GetByIdWithLock(
+    Task<Result<Departments, Error>> GetByIdWithLock(
         DepartmentId departmentIdId,
         CancellationToken cancellationToken);
 
@@ -49,4 +50,6 @@ public interface IDepartmentRepository
     Task<Result<IEnumerable<DepartmentId>, Error>> GetDepartmentsIds(
         IEnumerable<DepartmentId> departmentIds,
         CancellationToken cancellationToken);
+
+    Task<UnitResult<Error>> GetBy(Expression<Func<Departments, bool>> predicate, CancellationToken cancellationToken);
 }

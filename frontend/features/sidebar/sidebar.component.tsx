@@ -11,7 +11,7 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 	SidebarTrigger
-} from '@/components/ui/sidebar'
+} from '@/shared/components/ui/sidebar'
 import Link from 'next/link'
 
 export default function SidebarComponent() {
@@ -24,6 +24,11 @@ export default function SidebarComponent() {
 		{
 			title: 'Departments',
 			url: '/departments',
+			icon: Inbox
+		},
+		{
+			title: 'Locations',
+			url: '/locations',
 			icon: Inbox
 		}
 	]

@@ -10,11 +10,14 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://*:5129
+      - Redis__ConnectionString=redis:6379
     depends_on:
-      postgres: 
+      postgres:
         condition: service_healthy
       directory_service_migrations:
         condition: service_completed_successfully
+      redis:
+        condition: service_started
 
   directory_service_migrations:
     container_name: directory_service_migrations
@@ -23,13 +26,14 @@ services:
       context: .
       dockerfile: Dockerfile
     depends_on:
-      postgres: 
+      postgres:
         condition: service_healthy
-    entrypoint: [
-      "/bin/sh",
-      "-c",
-      './efbundle --connection "Server=postgres;Port=5432;Database=directory_service_db;User Id=postgres;Password=postgres"'
-    ]
+    entrypoint:
+      [
+        "/bin/sh",
+        "-c",
+        './efbundle --connection "Server=postgres;Port=5432;Database=directory_service_db;User Id=postgres;Password=postgres"',
+      ]
 
   nginx:
     container_name: nginx
@@ -69,7 +73,7 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-  
+
   seq:
     container_name: seq
     image: datalust/seq:latest
@@ -86,3 +90,4 @@ volumes:
   postgres_data:
   seq_data:
   redis_data:
+

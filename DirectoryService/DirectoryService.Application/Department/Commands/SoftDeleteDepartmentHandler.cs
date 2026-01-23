@@ -130,7 +130,6 @@ public class SoftDeleteDepartmentHandler
             return commitResult.Error;
         }
 
-
         // Удаление из кэша
         await _cache.RemoveAsync(key: GetKey.DepartmentKey.ById(department.Value.Id), cancellationToken);
 

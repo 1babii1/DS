@@ -1,29 +1,35 @@
 import { axiosInstance } from '@/shared/api/axiosInstance'
 import {
+	CreateDepartmentRequest,
 	Department,
 	GetChildrenLazyParams,
+	GetDepartmentBySearchParams,
 	GetParentDepartmentsParams,
-	ParentDepartment
+	ParentDepartment,
+	PoginationResponse,
+	UpdateParentRequest
 } from '../types/department.types'
+import { infiniteQueryOptions, useInfiniteQuery } from '@tanstack/react-query'
+import { generateKeyTSQueryDepartment } from '@/shared/cache/generate-key'
 
 export const departmentsApi = {
 	getDepartmentsTopPosition: async () => {
 		const response = await axiosInstance
-			.get<Department[]>('http://localhost:5129/top-positions')
+			.get<Department[]>('top-positions')
 			.then(res => res.data)
 			.catch(() => [])
 		return response
 	},
 	getDepartment: async (id: string) => {
 		const response = await axiosInstance
-			.get<ParentDepartment>(`http://localhost:5129/department/${id}`)
+			.get<ParentDepartment>(`department/${id}`)
 			.then(res => res.data)
 			.catch(() => null)
 		return response
 	},
 	getParentDepartments: async (params?: GetParentDepartmentsParams) => {
 		const response = await axiosInstance
-			.get<ParentDepartment[]>('http://localhost:5129/roots', {
+			.get<ParentDepartment[]>('roots', {
 				params: {
 					page: params?.page ?? 1,
 					size: params?.size ?? 20,
@@ -31,26 +37,102 @@ export const departmentsApi = {
 				}
 			})
 			.then(res => res.data)
-			.catch(() => [])
 		return response
 	},
 	getChildrenLazy: async (id: string, params?: GetChildrenLazyParams) => {
 		const response = await axiosInstance
-			.get<ParentDepartment[]>(`http://localhost:5129/${id}/children`, {
+			.get<PoginationResponse<ParentDepartment>>(`${id}/children`, {
 				params: {
-					page: params?.page ?? 1,
-					size: params?.size ?? 20
+					Page: params?.page ?? 1,
+					PageSize: params?.size ?? 20
+				}
+			})
+			.then(res => res.data)
+		return response
+	},
+	CreateDepartment: async (data: CreateDepartmentRequest) => {
+		const transformedData = {
+			request: {
+				name: { value: data.name },
+				identifier: { value: data.identifier },
+				parentDepartmentId: data.parentDepartmentId
+					? { value: data.parentDepartmentId }
+					: null,
+				depth: data.depth ?? 0,
+				locationsIds: data.locationsIds.map(id => ({ value: id })),
+				departmentId: null
+			}
+		}
+		const response = await axiosInstance.post<Department>(
+			'api/departments',
+			transformedData
+		)
+
+		return response
+	},
+	GetDepartmentBySearch: async (params: GetDepartmentBySearchParams) => {
+		const response = await axiosInstance
+			.get<Department[]>('search', {
+				params: {
+					search: params.search,
+					page: params.page ?? 1,
+					size: params.size ?? 10
 				}
 			})
 			.then(res => res.data)
 			.catch(() => [])
 		return response
 	},
-	CreateDepartmernt: async (data: Partial<Department>) => {
-		const response = await axiosInstance
-			.post<Department>('http://localhost:5129/department', data)
-			.then(res => res.data)
-			.catch(() => null)
-		return response
+	DeleteDepartment: async (id: string) =>
+		await axiosInstance.delete(`api/departments/${id}`),
+
+	UpdateParent: async (data: UpdateParentRequest) =>
+		await axiosInstance.put(
+			`api/departments/${data.departmentId}`,
+			data.parentDepartmentId
+		)
+}
+
+export const departmentsOptions = {
+	getChildrenLazyInfiniteOptions: ({
+		pageSize,
+		departmentId,
+		showChildren,
+		page
+	}: {
+		pageSize: number
+		departmentId: string
+		showChildren: boolean
+		page?: number
+	}) => {
+		return infiniteQueryOptions({
+			queryKey: [
+				generateKeyTSQueryDepartment.Children(
+					departmentId,
+					page,
+					pageSize
+				)
+			],
+			queryFn: ({ pageParam }) => {
+				return departmentsApi.getChildrenLazy(departmentId, {
+					page: pageParam ?? page ?? 1,
+					size: pageSize ?? 20
+				})
+			},
+			enabled: showChildren,
+			initialPageParam: 1,
+			getNextPageParam: response => {
+				if (response && response.nextPageExists)
+					return response.page + 1
+				return undefined
+			},
+			select: data => ({
+				items: data.pages.flatMap(page => page.items),
+				totalCount: data.pages[0]?.totalCount ?? 0,
+				nextPageExists:
+					data.pages[data.pages.length - 1]?.nextPageExists ?? false,
+				page: data.pages
+			})
+		})
 	}
 }

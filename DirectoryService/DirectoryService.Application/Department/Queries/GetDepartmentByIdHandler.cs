@@ -60,9 +60,11 @@ public class GetDepartmentByIdHandler
         GetDepartmentByIdRequest request,
         CancellationToken cancellationToken)
     {
+        DepartmentId departmentId = DepartmentId.FromValue(request.DepartmentId);
+
         var department = await _readDbContext.DepartmentsRead
             .Include(d => d.DepartmentsChildrenList)
-            .Where(d => d.Id == DepartmentId.FromValue(request.DepartmentId))
+            .Where(d => d.Id == departmentId)
             .Select(d => new ReadDepartmentWithChildrenDto
             {
                 Id = d.Id.Value,
@@ -74,6 +76,19 @@ public class GetDepartmentByIdHandler
                 IsActive = d.IsActive,
                 CreatedAt = d.CreatedAt,
                 UpdatedAt = d.UpdatedAt,
+                HasMoreChildren = _readDbContext.DepartmentsRead.Any(c => c.ParentId == d.Id),
+                Children = d.DepartmentsChildrenList.Select(c => new ReadDepartmentWithChildrenDto
+                {
+                    Id = c.Id.Value,
+                    ParentId = c.ParentId!.Value,
+                    Name = c.Name.Value,
+                    Identifier = c.Identifier.Value,
+                    Path = c.Path.Value,
+                    Depth = c.Depth,
+                    IsActive = c.IsActive,
+                    CreatedAt = c.CreatedAt,
+                    UpdatedAt = c.UpdatedAt,
+                }).ToList(),
             })
             .FirstOrDefaultAsync(cancellationToken);
         if (department is null)

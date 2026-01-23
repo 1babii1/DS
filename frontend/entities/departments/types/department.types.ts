@@ -10,6 +10,13 @@ export type Department = {
 	updatedAt: Date
 }
 
+export type PoginationResponse<T> = {
+	items: T[]
+	totalCount: number
+	nextPageExists: boolean
+	page: number
+}
+
 export type ParentDepartment = {
 	id: string
 	parentId: string
@@ -33,4 +40,56 @@ export interface GetParentDepartmentsParams {
 export interface GetChildrenLazyParams {
 	page?: number
 	size?: number
+}
+
+export interface GetDepartmentBySearchParams {
+	search: string
+	page?: number
+	size?: number
+}
+
+export interface CreateDepartmentRequest {
+	name: string
+	identifier: string
+	parentDepartmentId?: string
+	depth?: number
+	locationsIds: string[]
+}
+
+export interface DepartmentForm {
+	name: string
+	identifier: string
+	parentDepartmentId?: string
+	depth?: number
+	locationsIds: string[]
+}
+
+export interface DepartmentFetchForm {
+	id: string
+	name: string
+	identifier?: string
+}
+
+export interface LocationForm {
+	id: string
+	name: string
+	city?: string
+}
+
+export type FormField<TForm, TField extends keyof TForm> = {
+	state: {
+		value: TForm[TField]
+		meta: {
+			errors: { message?: string | undefined }[]
+			isValid: boolean
+			isTouched: boolean
+		}
+	}
+	handleChange: (value: TForm[TField]) => void
+	handleBlur: () => void
+}
+
+export type UpdateParentRequest = {
+	departmentId: string
+	parentDepartmentId: string
 }

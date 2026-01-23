@@ -61,8 +61,15 @@ public class DepartmentController : ControllerBase
         CancellationToken cancellationToken) =>
         await handler.Handle(request, cancellationToken);
 
+    [HttpGet("/search")]
+    public async Task<ActionResult<List<DepartmentBySearch>?>> GetDepartmentsBySearch(
+        [FromQuery] GetDepartmentsBySearchRequest request,
+        [FromServices] GetDepartmentsWithFiltersHandler handler,
+        CancellationToken cancellationToken) =>
+        await handler.Handle(request, cancellationToken);
+
     [HttpGet("/{parentId:guid}/children")]
-    public async Task<ActionResult<List<ReadDepartmentHierarchyDto>?>> GetChildrenLazy(
+    public async Task<ActionResult<PoginationResponse<ReadDepartmentHierarchyDto>?>> GetChildrenLazy(
         [FromRoute] Guid parentId,
         [FromQuery] GetChildrenLazyRequest request,
         [FromServices] GetChildrenLazyHandler handler,
