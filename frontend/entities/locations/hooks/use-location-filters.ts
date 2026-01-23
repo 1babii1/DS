@@ -13,13 +13,13 @@ export function useLocationsFilters() {
 				generateKeyTSQueryLocation.ByFilters(
 					filters.search,
 					filters.sortBy,
-					filters.pageSize,
+					filters.size,
 					filters.isActive,
 					filters.departmentId,
 					filters.sortDirection
 				)
 			],
-			queryFn: () => locationsApi.GetLocations(filters),
+			queryFn: () => locationsApi.GetLocationsWithFilters(filters),
 			staleTime: 5 * 60 * 1000
 		}
 	)

@@ -2,7 +2,7 @@ import { axiosInstance } from '@/shared/api/axiosInstance'
 import { GetLocationsParams, Location } from '../types/location-types'
 
 export const locationsApi = {
-	GetLocations: async (params: GetLocationsParams) => {
+	GetLocationsWithFilters: async (params: GetLocationsParams) => {
 		const response = await axiosInstance
 			.get<Location[]>('api/locations', {
 				params: {
@@ -10,7 +10,7 @@ export const locationsApi = {
 					DepartmentId: params.departmentId,
 					Search: params.search,
 					Page: params.page ?? 1,
-					Size: params.size ?? 10,
+					PageSize: params.size ?? 10,
 					SortBy: params.sortBy ?? 'created_at',
 					SortDirection: params.sortDirection ?? 'ASC'
 				}

@@ -4,8 +4,9 @@ import { persist } from 'zustand/middleware'
 interface FiltersState {
 	isActive: string
 	departmentId: string[]
+	departmentSearch: string
 	search: string
-	pageSize: string
+	size: string
 	sortBy: string
 	sortDirection: string
 	setFilters: (filters: Partial<FiltersState>) => void
@@ -20,15 +21,17 @@ export const useLocationFilters = create<FiltersState>()(
 			_hasHydrated: false,
 			isActive: '',
 			departmentId: [],
+			departmentSearch: '',
 			search: '',
-			pageSize: '20',
+			size: '20',
 			sortBy: 'name',
 			sortDirection: 'ASC',
 			setFilters: filters => set(state => ({ ...state, ...filters })),
 			resetFilters: () =>
 				set({
 					search: '',
-					pageSize: '20',
+					size: '20',
+					departmentSearch: '',
 					sortBy: 'name',
 					sortDirection: 'ASC',
 					isActive: undefined,

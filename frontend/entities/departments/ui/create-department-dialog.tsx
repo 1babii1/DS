@@ -92,8 +92,8 @@ export function CreateDepartment({
 	const [locationSearch, setLocationSearch] = useState('')
 	const { locations, isLocationsFetching } = useLocationSearch({
 		locationSearch,
-		page: 1,
-		size: 20
+		page: '1',
+		size: '20'
 	})
 
 	return (

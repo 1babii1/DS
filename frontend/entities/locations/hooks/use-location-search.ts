@@ -5,8 +5,8 @@ import { locationsApi } from '../api/locations.api'
 
 interface Props {
 	locationSearch: string
-	page?: number
-	size?: number
+	page?: string
+	size?: string
 	debounceMs?: number
 }
 
@@ -31,10 +31,10 @@ export function useLocationSearch({
 	} = useQuery({
 		queryKey: ['locations', debounceSearch],
 		queryFn: () =>
-			locationsApi.GetLocations({
+			locationsApi.GetLocationsWithFilters({
 				search: debounceSearch,
-				page: page ?? 1,
-				size: size ?? 20
+				page: page ?? '1',
+				size: size ?? '20'
 			}),
 		enabled: !!debounceSearch,
 		staleTime: 0
