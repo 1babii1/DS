@@ -18,7 +18,7 @@ public class DepartmentController : ControllerBase
         CreateDepartmentCommand request, CancellationToken cancellationToken) =>
         await handler.Handle(request, cancellationToken);
 
-    [HttpPatch("/locations")]
+    [HttpPatch("locations")]
     public async Task<EndpointResult<DepartmentId>> UpdateLocations(
         [FromServices] UpdateDepartmentLocationsHadler handler,
         UpdateDepartmentLocationsCommand request, CancellationToken cancellationToken) =>
@@ -34,34 +34,34 @@ public class DepartmentController : ControllerBase
         return await handler.Handle(command, cancellationToken);
     }
 
-    [HttpGet("/department/{departmentId:guid}")]
+    [HttpGet("department/{departmentId:guid}")]
     public async Task<ActionResult<ReadDepartmentWithChildrenDto?>> GetDepartmentById(
         [FromRoute] Guid departmentId,
         [FromServices] GetDepartmentByIdHandler handler,
         CancellationToken cancellationToken) =>
         await handler.Handle(new GetDepartmentByIdRequest(departmentId), cancellationToken);
 
-    [HttpGet("/department/location")]
+    [HttpGet("department/location")]
     public async Task<ActionResult<List<ReadDepartmentDto>?>> GetDepartmentByLocation(
         [FromQuery] GetDepartmentByLocationRequest request,
         [FromServices] GetDepartmentByLocationHandler handler,
         CancellationToken cancellationToken) =>
         await handler.Handle(request, cancellationToken);
 
-    [HttpGet("/top-positions")]
+    [HttpGet("top-positions")]
     public async Task<ActionResult<List<ReadDepartmentsTopDto>?>> GetDepartmentsTopForPositions(
         [FromServices] GetDepartmentsTopByPositionsHandler handler,
         CancellationToken cancellationToken) =>
         await handler.Handle(cancellationToken);
 
-    [HttpGet("/roots")]
+    [HttpGet("roots")]
     public async Task<ActionResult<List<ReadDepartmentHierarchyDto>?>> GetRootDepartments(
         [FromQuery] GetParentDepartmentsRequest request,
         [FromServices] GetParentDepartmentsHandler handler,
         CancellationToken cancellationToken) =>
         await handler.Handle(request, cancellationToken);
 
-    [HttpGet("/{parentId:guid}/children")]
+    [HttpGet("{parentId:guid}/children")]
     public async Task<ActionResult<List<ReadDepartmentHierarchyDto>?>> GetChildrenLazy(
         [FromRoute] Guid parentId,
         [FromQuery] GetChildrenLazyRequest request,
