@@ -3,6 +3,7 @@ using DirectoryService.Application.Department.Queries;
 using DirectoryService.Contracts.Request.Department;
 using DirectoryService.Contracts.Response.Department;
 using DirectoryService.Domain.Departments.ValueObjects;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Shared.EndpointResults;
 
@@ -10,21 +11,25 @@ namespace DirectoryService.Controllers;
 
 [ApiController]
 [Route("api/departments")]
+[Authorize]
 public class DepartmentController : ControllerBase
 {
     [HttpPost]
+    [Authorize(Policy = "CanEdit")]
     public async Task<EndpointResult<Guid>> Create(
         [FromServices] CreateDepartmentHandler handler,
         CreateDepartmentCommand request, CancellationToken cancellationToken) =>
         await handler.Handle(request, cancellationToken);
 
     [HttpPatch("locations")]
+    [Authorize(Policy = "CanEdit")]
     public async Task<EndpointResult<DepartmentId>> UpdateLocations(
         [FromServices] UpdateDepartmentLocationsHadler handler,
         UpdateDepartmentLocationsCommand request, CancellationToken cancellationToken) =>
         await handler.Handle(request, cancellationToken);
 
     [HttpPut("{departmentId:guid}/parent")]
+    [Authorize(Policy = "CanEdit")]
     public async Task<EndpointResult<DepartmentId>> UpdateParent(
         [FromRoute] Guid departmentId,
         [FromServices] UpdateParentDepartmentHandler handler,
@@ -73,6 +78,7 @@ public class DepartmentController : ControllerBase
     }
 
     [HttpDelete("{departmentId:guid}")]
+    [Authorize(Policy = "CanEdit")]
     public async Task<EndpointResult<DepartmentId>> SoftDeleteDepartments(
         [FromRoute] SoftDeleteDepartmentRequest request,
         [FromServices] SoftDeleteDepartmentHandler handler,

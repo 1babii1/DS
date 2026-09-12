@@ -3,4 +3,5 @@
 CREATE EXTENSION IF NOT EXISTS ltree;
 
 CREATE SCHEMA IF NOT EXISTS directory;
--- AuthService (phase 1), EmployeeService (phase 2), AuditService (phase 3) add their own schemas here as they land.
+CREATE SCHEMA IF NOT EXISTS auth;
+-- EmployeeService (phase 2), AuditService (phase 3) add their own schemas here as they land.
