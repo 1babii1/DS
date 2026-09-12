@@ -1,0 +1,50 @@
+using AuditService.Infrastructure;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Serilog;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+
+builder.Host.UseSerilog((context, _, configuration) =>
+    configuration.ReadFrom.Configuration(context.Configuration));
+
+builder.Services.AddControllers();
+builder.Services.AddOpenApi();
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.MapInboundClaims = false;
+        options.MetadataAddress = builder.Configuration["Auth:MetadataAddress"];
+        options.RequireHttpsMetadata = builder.Environment.IsProduction();
+        options.TokenValidationParameters.ValidIssuer = builder.Configuration["Auth:Issuer"];
+        options.TokenValidationParameters.ValidateAudience = false;
+        options.TokenValidationParameters.RoleClaimType = "role";
+        options.TokenValidationParameters.NameClaimType = "name";
+    });
+
+builder.Services.AddAuthorization();
+
+builder.Services.AddAuditInfrastructure(builder.Configuration);
+
+var app = builder.Build();
+
+app.UseSerilogRequestLogging();
+
+app.MapOpenApi("/openapi/v1/swagger.json");
+app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1/swagger.json", "AuditService"));
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.Run();
+
+namespace AuditService.Web
+{
+    public partial class Program;
+}

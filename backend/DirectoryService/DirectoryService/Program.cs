@@ -20,6 +20,7 @@ using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Shared;
+using Shared.Outbox;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -99,6 +100,9 @@ builder.Services.AddSingleton<IDbConnectionFactory, NpgsqlConnectionFactory>();
 Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
 
 builder.Services.AddScoped<ITransactionManager, TransactionManager>();
+
+builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
+builder.Services.AddOutboxPublisher<DirectoryServiceDbContext>(builder.Configuration, "directory.events");
 
 builder.Services.AddScoped<ILocationsRepository, EfCoreLocationsRepository>();
 

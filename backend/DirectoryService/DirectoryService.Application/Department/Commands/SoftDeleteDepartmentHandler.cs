@@ -1,6 +1,7 @@
 ﻿using CSharpFunctionalExtensions;
 using DirectoryService.Application.Cache;
 using DirectoryService.Application.Database;
+using DirectoryService.Application.IntegrationEvents;
 using DirectoryService.Application.Validation;
 using DirectoryService.Contracts.Request.Department;
 using DirectoryService.Domain.Departments.ValueObjects;
@@ -28,12 +29,13 @@ public class SoftDeleteDepartmentHandler
     private readonly ILogger<SoftDeleteDepartmentHandler> _logger;
     private readonly SoftDeleteDepartmentValidation _validation;
     private readonly HybridCache _cache;
+    private readonly IOutboxWriter _outboxWriter;
 
     public SoftDeleteDepartmentHandler(
         IDepartmentRepository departmentRepository, ILocationsRepository locationsRepository,
         IPositionRepository positionRepository,
         ITransactionManager transactionManager, ILogger<SoftDeleteDepartmentHandler> logger,
-        SoftDeleteDepartmentValidation validation, HybridCache cache)
+        SoftDeleteDepartmentValidation validation, HybridCache cache, IOutboxWriter outboxWriter)
     {
         _departmentRepository = departmentRepository;
         _locationsRepository = locationsRepository;
@@ -42,6 +44,7 @@ public class SoftDeleteDepartmentHandler
         _logger = logger;
         _validation = validation;
         _cache = cache;
+        _outboxWriter = outboxWriter;
     }
 
     public async Task<Result<DepartmentId, Error>> Handle(
@@ -120,6 +123,11 @@ public class SoftDeleteDepartmentHandler
                 position.Delete();
             }
         }
+
+        _outboxWriter.Enqueue(
+            DepartmentEventTypes.Deleted,
+            department.Value.Id.Value.ToString(),
+            new DepartmentDeletedEvent(department.Value.Id.Value));
 
         await _transactionManager.SaveChangesAsync(cancellationToken);
         var commitResult = transactionScope.Commit();

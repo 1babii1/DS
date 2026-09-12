@@ -1,5 +1,6 @@
 using AuthService.Domain;
 using AuthService.Web.Contracts;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
@@ -54,6 +55,7 @@ public class AccountController(UserManager<Account> userManager, SignInManager<A
     }
 
     [HttpPost("logout")]
+    [Authorize(AuthenticationSchemes = "Identity.Application")]
     public async Task<IActionResult> Logout()
     {
         await signInManager.SignOutAsync();
