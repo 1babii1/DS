@@ -12,6 +12,7 @@ using DirectoryService.Infrastructure.Postgres.Repositories.Locations;
 using DirectoryService.Infrastructure.Postgres.Repositories.Positions;
 using DirectoryService.Middleware;
 using FluentValidation;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Options;
@@ -45,6 +46,22 @@ builder.Services.AddCors(options =>
 builder.Services.AddControllers();
 
 builder.Services.AddHttpLogging();
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.MapInboundClaims = false;
+        options.MetadataAddress = builder.Configuration["Auth:MetadataAddress"];
+        options.RequireHttpsMetadata = builder.Environment.IsProduction();
+        options.TokenValidationParameters.ValidIssuer = builder.Configuration["Auth:Issuer"];
+        options.TokenValidationParameters.ValidateAudience = false;
+        options.TokenValidationParameters.RoleClaimType = "role";
+        options.TokenValidationParameters.NameClaimType = "name";
+    });
+
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("CanEdit", policy => policy.RequireRole("admin", "editor"));
 
 builder.Services.AddValidatorsFromAssemblyContaining<CreateDepartmentValidation>();
 
@@ -124,6 +141,9 @@ app.MapOpenApi("/openapi/v1/swagger.json");
 app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1/swagger.json", "DirectoryService"));
 
 app.UseCors();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 
