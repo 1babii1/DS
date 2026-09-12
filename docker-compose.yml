@@ -7,9 +7,9 @@ services:
       dockerfile: DirectoryService/Dockerfile
     ports:
       - "5129:5129"
+      - "5179:5179"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
-      - ASPNETCORE_URLS=http://*:5129
     depends_on:
       postgres: 
         condition: service_healthy
@@ -63,6 +63,42 @@ services:
       './efbundle --connection "Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=postgres;Search Path=auth,public"'
     ]
 
+  employee_service:
+    container_name: employee_service
+    restart: always
+    build:
+      context: ./backend
+      dockerfile: EmployeeService/Dockerfile
+    ports:
+      - "5131:5131"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+      - ASPNETCORE_URLS=http://*:5131
+    depends_on:
+      postgres:
+        condition: service_healthy
+      employee_service_migrations:
+        condition: service_completed_successfully
+      directory_service:
+        condition: service_started
+      auth_service:
+        condition: service_started
+
+  employee_service_migrations:
+    container_name: employee_service_migrations
+    restart: "no"
+    build:
+      context: ./backend
+      dockerfile: EmployeeService/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: [
+      "/bin/sh",
+      "-c",
+      './efbundle --connection "Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=postgres;Search Path=employee,public"'
+    ]
+
   nginx:
     container_name: nginx
     image: nginx:alpine
@@ -74,6 +110,7 @@ services:
     depends_on:
       - directory_service
       - auth_service
+      - employee_service
 
   postgres:
     container_name: postgres

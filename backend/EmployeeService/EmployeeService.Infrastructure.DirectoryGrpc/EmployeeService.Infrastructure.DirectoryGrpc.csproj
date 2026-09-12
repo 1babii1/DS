@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <ItemGroup>
+      <PackageReference Include="Grpc.Net.ClientFactory" />
+      <PackageReference Include="Google.Protobuf" />
+      <PackageReference Include="Grpc.Tools">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
+      <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <!-- Single-sourced from DirectoryService - it owns the contract it serves. -->
+      <Protobuf Include="..\..\DirectoryService\DirectoryService\Protos\directory.proto" GrpcServices="Client" Link="Protos\directory.proto" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\EmployeeService.Application\EmployeeService.Application.csproj" />
+    </ItemGroup>
+
+</Project>
