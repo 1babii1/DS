@@ -1,17 +1,17 @@
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
 EXPOSE 5129
 
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY . .
-WORKDIR "/src/DirectoryService"
+WORKDIR "/src/DirectoryService/DirectoryService"
 RUN dotnet restore "DirectoryService.csproj"
 
 # ✅ ПРАВИЛЬНЫЙ ПОРЯДОК: ENV ДО RUN dotnet ef
 ENV PATH="$PATH:/root/.dotnet/tools"
-RUN dotnet tool install --global dotnet-ef --version 9.0.0 || true
+RUN dotnet tool install --global dotnet-ef --version 10.0.5 || true
 
 # ✅ ОТДЕЛЬНЫЙ RUN для bundle
 RUN dotnet ef migrations bundle \
