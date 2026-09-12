@@ -1,6 +1,7 @@
 using EmployeeService.Application.Database;
 using EmployeeService.Domain;
 using Microsoft.EntityFrameworkCore;
+using Shared.Outbox;
 
 namespace EmployeeService.Infrastructure.Postgres;
 
@@ -27,6 +28,18 @@ public class EmployeeDbContext(DbContextOptions<EmployeeDbContext> options) : Db
 
             entity.HasIndex(e => e.DepartmentId);
             entity.HasIndex(e => e.Email).IsUnique();
+        });
+
+        builder.Entity<OutboxMessage>(entity =>
+        {
+            entity.ToTable("outbox_messages");
+            entity.HasKey(m => m.Id);
+
+            entity.Property(m => m.Type).HasMaxLength(200).IsRequired();
+            entity.Property(m => m.AggregateId).HasMaxLength(200).IsRequired();
+            entity.Property(m => m.Payload).HasColumnType("jsonb").IsRequired();
+
+            entity.HasIndex(m => m.ProcessedAt);
         });
     }
 }

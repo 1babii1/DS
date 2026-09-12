@@ -1,20 +1,15 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
-    <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-    </PropertyGroup>
-
-    <ItemGroup>
-      <Content Include="obj\rider.project.model.nuget.info" />
-    </ItemGroup>
+<Project Sdk="Microsoft.NET.Sdk">
 
     <ItemGroup>
       <PackageReference Include="CSharpFunctionalExtensions" />
       <PackageReference Include="Microsoft.AspNetCore.Http" />
       <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" />
       <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore" />
+      <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+      <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+      <PackageReference Include="Microsoft.Extensions.Options" />
+      <PackageReference Include="Confluent.Kafka" />
     </ItemGroup>
 
 </Project>

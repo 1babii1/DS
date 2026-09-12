@@ -2,6 +2,7 @@
 using DirectoryService.Application.Cache;
 using DirectoryService.Application.Database;
 using DirectoryService.Application.Department.Errors;
+using DirectoryService.Application.IntegrationEvents;
 using DirectoryService.Application.Validation;
 using DirectoryService.Contracts.Request.Department;
 using DirectoryService.Domain.DepartmentLocations;
@@ -49,10 +50,11 @@ public class CreateDepartmentHandler
     private readonly HybridCache _cache;
     private readonly CreateDepartmentValidation _validator;
     private readonly ILogger<CreateDepartmentHandler> _logger;
+    private readonly IOutboxWriter _outboxWriter;
 
     public CreateDepartmentHandler(IDepartmentRepository departmentRepository, CreateDepartmentValidation validator,
         ILogger<CreateDepartmentHandler> logger, ILocationsRepository locationRepository,
-        ITransactionManager transactionManager, HybridCache cache)
+        ITransactionManager transactionManager, HybridCache cache, IOutboxWriter outboxWriter)
     {
         _departmentRepository = departmentRepository;
         _validator = validator;
@@ -60,6 +62,7 @@ public class CreateDepartmentHandler
         _locationRepository = locationRepository;
         _transactionManager = transactionManager;
         _cache = cache;
+        _outboxWriter = outboxWriter;
     }
 
     public async Task<Result<Guid, Error>> Handle(
@@ -153,6 +156,15 @@ public class CreateDepartmentHandler
                 _logger.LogError("Failed to create department");
                 return result.Error;
             }
+
+            _outboxWriter.Enqueue(
+                DepartmentEventTypes.Created,
+                department.Value.Id.Value.ToString(),
+                new DepartmentCreatedEvent(
+                    department.Value.Id.Value,
+                    departmentName.Value,
+                    departmentIdentifier.Value,
+                    departmentFromDB?.Id.Value));
 
             var save = await _transactionManager.SaveChangesAsync(cancellationToken);
             if (save.IsFailure)

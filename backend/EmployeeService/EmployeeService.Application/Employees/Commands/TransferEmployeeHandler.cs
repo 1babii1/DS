@@ -2,6 +2,7 @@ using CSharpFunctionalExtensions;
 using EmployeeService.Application.Database;
 using EmployeeService.Application.Directory;
 using EmployeeService.Application.Employees.Errors;
+using EmployeeService.Application.IntegrationEvents;
 using Microsoft.Extensions.Logging;
 using Shared;
 
@@ -10,6 +11,7 @@ namespace EmployeeService.Application.Employees.Commands;
 public class TransferEmployeeHandler(
     IEmployeeRepository repository,
     IDirectoryLookupClient directoryLookupClient,
+    IOutboxWriter outboxWriter,
     ILogger<TransferEmployeeHandler> logger)
 {
     public async Task<UnitResult<Error>> Handle(TransferEmployeeCommand command, CancellationToken cancellationToken)
@@ -53,6 +55,11 @@ public class TransferEmployeeHandler(
         {
             return transferResult.Error;
         }
+
+        outboxWriter.Enqueue(
+            EmployeeEventTypes.Transferred,
+            command.EmployeeId.ToString(),
+            new EmployeeTransferredEvent(command.EmployeeId, command.DepartmentId, command.PositionId));
 
         await repository.Save(cancellationToken);
 
