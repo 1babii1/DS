@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="../Shared/Shared.csproj" />
+  <Project Path="EmployeeService.Application/EmployeeService.Application.csproj" />
+  <Project Path="EmployeeService.Contracts/EmployeeService.Contracts.csproj" />
+  <Project Path="EmployeeService.Domain/EmployeeService.Domain.csproj" />
+  <Project Path="EmployeeService.Infrastructure.DirectoryGrpc/EmployeeService.Infrastructure.DirectoryGrpc.csproj" />
+  <Project Path="EmployeeService.Infrastructure.Postgres/EmployeeService.Infrastructure.Postgres.csproj" />
+  <Project Path="EmployeeService.Web/EmployeeService.Web.csproj" />
+</Solution>

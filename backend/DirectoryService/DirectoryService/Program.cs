@@ -4,6 +4,7 @@ using DirectoryService.Application.Department.Queries;
 using DirectoryService.Application.Location.Commands;
 using DirectoryService.Application.Location.Queries;
 using DirectoryService.Application.Position;
+using DirectoryService.Grpc;
 using DirectoryService.Infrastructure.Postgres;
 using DirectoryService.Infrastructure.Postgres.Backgrounds;
 using DirectoryService.Infrastructure.Postgres.Database;
@@ -14,12 +15,27 @@ using DirectoryService.Middleware;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Shared;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Cleartext HTTP/1.1+HTTP/2 multiplexing on one Kestrel endpoint (no TLS, no ALPN) is
+// unreliable in practice - the server can reject h2c requests with HTTP_1_1_REQUIRED.
+// Separate ports instead: REST (via nginx) stays HTTP/1.1, gRPC (internal only, called
+// directly by other services like EmployeeService) gets its own HTTP/2-only endpoint.
+// Explicit Listen calls make Kestrel ignore ASPNETCORE_URLS entirely, so both ports are
+// controlled here.
+var restPort = builder.Configuration.GetValue("Kestrel:RestPort", 5129);
+var grpcPort = builder.Configuration.GetValue("Kestrel:GrpcPort", 5179);
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(restPort, listenOptions => listenOptions.Protocols = HttpProtocols.Http1);
+    options.ListenAnyIP(grpcPort, listenOptions => listenOptions.Protocols = HttpProtocols.Http2);
+});
 
 builder.Logging.ClearProviders();
 
@@ -44,6 +60,8 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddControllers();
+
+builder.Services.AddGrpc();
 
 builder.Services.AddHttpLogging();
 
@@ -146,6 +164,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapGrpcService<DirectoryLookupService>();
 
 app.Run();
 
