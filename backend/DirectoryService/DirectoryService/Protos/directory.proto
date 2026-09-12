@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+option csharp_namespace = "DirectoryService.Grpc";
+
+package directory;
+
+// Internal service-to-service contract. Only for synchronous lookups from
+// other services in the platform (e.g. EmployeeService validating a hire) -
+// never exposed through the public gateway.
+service DirectoryLookup {
+  rpc GetDepartment (GetDepartmentRequest) returns (DepartmentReply);
+  rpc GetPosition (GetPositionRequest) returns (PositionReply);
+  rpc ValidateAssignment (ValidateAssignmentRequest) returns (ValidateAssignmentReply);
+}
+
+message GetDepartmentRequest {
+  string department_id = 1;
+}
+
+message DepartmentReply {
+  bool found = 1;
+  string id = 2;
+  string name = 3;
+  bool is_active = 4;
+}
+
+message GetPositionRequest {
+  string position_id = 1;
+}
+
+message PositionReply {
+  bool found = 1;
+  string id = 2;
+  string name = 3;
+  bool is_active = 4;
+}
+
+message ValidateAssignmentRequest {
+  string department_id = 1;
+  string position_id = 2;
+}
+
+message ValidateAssignmentReply {
+  bool department_exists = 1;
+  bool department_active = 2;
+  bool position_exists = 3;
+  bool position_active = 4;
+  bool position_belongs_to_department = 5;
+  string department_name = 6;
+  string position_name = 7;
+}
