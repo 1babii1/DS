@@ -2,6 +2,7 @@ using CSharpFunctionalExtensions;
 using EmployeeService.Application.Database;
 using EmployeeService.Application.Directory;
 using EmployeeService.Application.Employees.Errors;
+using EmployeeService.Application.IntegrationEvents;
 using EmployeeService.Domain;
 using Microsoft.Extensions.Logging;
 using Shared;
@@ -11,6 +12,7 @@ namespace EmployeeService.Application.Employees.Commands;
 public class HireEmployeeHandler(
     IEmployeeRepository repository,
     IDirectoryLookupClient directoryLookupClient,
+    IOutboxWriter outboxWriter,
     ILogger<HireEmployeeHandler> logger)
 {
     public async Task<Result<Guid, Error>> Handle(HireEmployeeCommand command, CancellationToken cancellationToken)
@@ -69,6 +71,12 @@ public class HireEmployeeHandler(
 
         var employee = employeeResult.Value;
         await repository.Add(employee, cancellationToken);
+
+        outboxWriter.Enqueue(
+            EmployeeEventTypes.Hired,
+            employee.Id.ToString(),
+            new EmployeeHiredEvent(employee.Id, employee.FullName, employee.Email, employee.DepartmentId, employee.PositionId));
+
         await repository.Save(cancellationToken);
 
         return employee.Id;
