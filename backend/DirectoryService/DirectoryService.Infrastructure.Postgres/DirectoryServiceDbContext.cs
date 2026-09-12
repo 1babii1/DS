@@ -31,6 +31,7 @@ public class DirectoryServiceDbContext : DbContext, IReadDbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasDefaultSchema("directory");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DirectoryServiceDbContext).Assembly);
     }
 
