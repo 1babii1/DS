@@ -1,3 +1,4 @@
+using Shared.HealthChecks;
 using Shared.Middlewares;
 using Shared.Cors;
 using AuthService.Application;
@@ -26,6 +27,8 @@ builder.Services.AddInfrastructurePostgres(builder.Configuration);
 builder.Services.AddIdentityServices();
 builder.Services.AddOpenIddictServer(builder.Environment, builder.Configuration);
 
+builder.Services.AddDatabaseHealthCheck<AuthDbContext>();
+
 var app = builder.Build();
 
 app.UseRequestCorrelationId();
@@ -42,6 +45,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapDefaultHealthChecks();
 
 await OpenIddictSeeder.SeedAsync(app.Services);
 

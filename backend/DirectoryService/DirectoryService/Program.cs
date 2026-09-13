@@ -1,3 +1,4 @@
+using Shared.HealthChecks;
 using Shared.Middlewares;
 using Shared.Cors;
 using DirectoryService.Application.Database;
@@ -162,6 +163,8 @@ builder.Services.AddHybridCache(options => options.DefaultEntryOptions = new Hyb
     LocalCacheExpiration = TimeSpan.FromMinutes(5), Expiration = TimeSpan.FromMinutes(30),
 });
 
+builder.Services.AddDatabaseHealthCheck<DirectoryServiceDbContext>();
+
 var app = builder.Build();
 
 app.UseRequestCorrelationId();
@@ -184,6 +187,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapDefaultHealthChecks();
 app.MapGrpcService<DirectoryLookupService>();
 
 app.Run();
