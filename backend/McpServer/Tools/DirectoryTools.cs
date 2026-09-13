@@ -17,13 +17,14 @@ public sealed class DirectoryTools(
     [Description("Semantic search for departments by meaning (e.g. \"teams working on payments\"), not exact text match. Returns id, name, identifier and a similarity score (0-1, higher is closer).")]
     public async Task<IReadOnlyList<DepartmentSearchResult>> SearchDepartments(
         [Description("Free-text description of what you're looking for")] string query,
-        [Description("Max results to return (1-50)")] int limit = 10)
+        [Description("Max results to return (1-50)")] int limit = 10,
+        CancellationToken cancellationToken = default)
     {
         limit = Math.Clamp(limit, 1, 50);
-        var vector = await embeddingClient.EmbedAsync(embeddingOptions.Value.Model, query, CancellationToken.None);
+        var vector = await embeddingClient.EmbedAsync(embeddingOptions.Value.Model, query, cancellationToken);
 
         await using var connection = dataSource.CreateConnection();
-        await connection.OpenAsync();
+        await connection.OpenAsync(cancellationToken);
 
         await using var command = connection.CreateCommand();
         command.CommandText = """
@@ -38,8 +39,8 @@ public sealed class DirectoryTools(
         command.Parameters.Add(new NpgsqlParameter { Value = limit });
 
         var results = new List<DepartmentSearchResult>();
-        await using var reader = await command.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
         {
             results.Add(new DepartmentSearchResult(
                 reader.GetGuid(0),
@@ -54,9 +55,11 @@ public sealed class DirectoryTools(
     [McpServerTool(Name = "get_department_tree")]
     [Description("Returns a department and all of its descendants using the org structure hierarchy. Pass no id to list top-level (root) departments only.")]
     public async Task<IReadOnlyList<DepartmentNode>> GetDepartmentTree(
-        [Description("Department id to root the subtree at; omit for the top-level departments")] Guid? departmentId = null)
+        [Description("Department id to root the subtree at; omit for the top-level departments")] Guid? departmentId = null,
+        CancellationToken cancellationToken = default)
     {
         await using var connection = dataSource.CreateConnection();
+        await connection.OpenAsync(cancellationToken);
 
         if (departmentId is null)
         {
@@ -66,7 +69,8 @@ public sealed class DirectoryTools(
                 where is_active and parent_id is null
                 order by name
                 """;
-            var roots = await connection.QueryAsync<DepartmentNode>(rootsSql);
+            var roots = await connection.QueryAsync<DepartmentNode>(
+                new CommandDefinition(rootsSql, cancellationToken: cancellationToken));
             return roots.ToList();
         }
 
@@ -77,16 +81,19 @@ public sealed class DirectoryTools(
               and d.path <@ (select path from directory.departments where id = @departmentId)
             order by d.depth, d.name
             """;
-        var subtree = await connection.QueryAsync<DepartmentNode>(subtreeSql, new { departmentId });
+        var subtree = await connection.QueryAsync<DepartmentNode>(
+            new CommandDefinition(subtreeSql, new { departmentId }, cancellationToken: cancellationToken));
         return subtree.ToList();
     }
 
     [McpServerTool(Name = "get_employee")]
     [Description("Looks up a single employee by id.")]
     public async Task<EmployeeDetails?> GetEmployee(
-        [Description("Employee id")] Guid employeeId)
+        [Description("Employee id")] Guid employeeId,
+        CancellationToken cancellationToken = default)
     {
         await using var connection = dataSource.CreateConnection();
+        await connection.OpenAsync(cancellationToken);
         const string sql = """
             select "Id" as Id, "FullName" as FullName, "Email" as Email,
                    "DepartmentId" as DepartmentId, "DepartmentName" as DepartmentName,
@@ -95,15 +102,18 @@ public sealed class DirectoryTools(
             from employee.employees
             where "Id" = @employeeId
             """;
-        return await connection.QuerySingleOrDefaultAsync<EmployeeDetails>(sql, new { employeeId });
+        return await connection.QuerySingleOrDefaultAsync<EmployeeDetails>(
+            new CommandDefinition(sql, new { employeeId }, cancellationToken: cancellationToken));
     }
 
     [McpServerTool(Name = "list_employees_by_department")]
     [Description("Lists employees currently assigned to a department.")]
     public async Task<IReadOnlyList<EmployeeDetails>> ListEmployeesByDepartment(
-        [Description("Department id")] Guid departmentId)
+        [Description("Department id")] Guid departmentId,
+        CancellationToken cancellationToken = default)
     {
         await using var connection = dataSource.CreateConnection();
+        await connection.OpenAsync(cancellationToken);
         const string sql = """
             select "Id" as Id, "FullName" as FullName, "Email" as Email,
                    "DepartmentId" as DepartmentId, "DepartmentName" as DepartmentName,
@@ -113,7 +123,8 @@ public sealed class DirectoryTools(
             where "DepartmentId" = @departmentId
             order by "FullName"
             """;
-        var employees = await connection.QueryAsync<EmployeeDetails>(sql, new { departmentId });
+        var employees = await connection.QueryAsync<EmployeeDetails>(
+            new CommandDefinition(sql, new { departmentId }, cancellationToken: cancellationToken));
         return employees.ToList();
     }
 }

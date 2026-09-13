@@ -45,7 +45,7 @@ public class GetLocationsHandler(IDbConnectionFactory connectionFactory)
 
         var where = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : string.Empty;
 
-        var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
+        using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
 
         var total = await connection.ExecuteScalarAsync<int>(
             new CommandDefinition(
