@@ -143,8 +143,10 @@ namespace DirectoryService.Application.Department.Commands
             transactionScope.Commit();
 
             // Удаление из кэша
-            await _cache.RemoveAsync(
-                keys: GetKey.DepartmentKey.ById([newParentDepId.Value, currentDepId.Value]), cancellationToken);
+            await _cache.RemoveOrIgnoreAsync(
+                _logger,
+                keys: GetKey.DepartmentKey.ById([newParentDepId.Value, currentDepId.Value]),
+                cancellationToken);
 
             return newParentDepId;
         }

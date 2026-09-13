@@ -166,7 +166,8 @@ public class CreateDepartmentHandler
             _logger.LogInformation("Department {DepartmentId} created", department.Value.Id.Value);
 
             // Добавление в кэш
-            await _cache.SetAsync(
+            await _cache.SetOrIgnoreAsync(
+                _logger,
                 key: GetKey.DepartmentKey.ById(department.Value.Id),
                 value: department.Value,
                 options: new()
