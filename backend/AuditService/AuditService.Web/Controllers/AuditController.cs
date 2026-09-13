@@ -22,6 +22,24 @@ public record AuditEntryDto(
     DateTime OccurredAt,
     DateTime ReceivedAt);
 
+/// <param name="Id">Идентификатор записи.</param>
+/// <param name="MessageId">Идентификатор исходного сообщения из outbox.</param>
+/// <param name="Topic">Kafka-топик, на котором сообщение получено.</param>
+/// <param name="MessageKey">Ключ сообщения (aggregate id producer'а).</param>
+/// <param name="Payload">Тело сообщения в том виде, в каком его отправил producer.</param>
+/// <param name="Error">Текст последней ошибки обработки.</param>
+/// <param name="AttemptCount">Сколько раз consumer пытался обработать сообщение до отказа.</param>
+/// <param name="FailedAt">Момент, когда сообщение было окончательно признано необрабатываемым.</param>
+public record DeadLetterDto(
+    Guid Id,
+    Guid MessageId,
+    string Topic,
+    string MessageKey,
+    string Payload,
+    string Error,
+    int AttemptCount,
+    DateTime FailedAt);
+
 [ApiController]
 [Route("api/audit")]
 [Authorize]
@@ -71,5 +89,44 @@ public class AuditController(AuditDbContext dbContext) : ControllerBase
             .ToListAsync(cancellationToken);
 
         return new PagedResponse<AuditEntryDto>(entries, currentPage, size, total);
+    }
+
+    /// <summary>
+    /// Сообщения, которые consumer не смог обработать после всех попыток. Без этого
+    /// эндпоинта их существование было бы видно только в критических логах - здесь
+    /// они остаются доступны для разбора и ручного повторного воспроизведения.
+    /// </summary>
+    [HttpGet("dead-letters")]
+    public async Task<ActionResult<PagedResponse<DeadLetterDto>>> ListDeadLetters(
+        [FromQuery] int? page,
+        [FromQuery] int? pageSize,
+        CancellationToken cancellationToken)
+    {
+        var (currentPage, size) = PagedResponse<DeadLetterDto>.Normalize(page, pageSize);
+
+        var query = dbContext.DeadLetters.AsNoTracking();
+
+        var total = await query.CountAsync(cancellationToken);
+        if (total == 0)
+        {
+            return PagedResponse<DeadLetterDto>.Empty(currentPage, size);
+        }
+
+        var entries = await query
+            .OrderByDescending(e => e.FailedAt)
+            .Skip((currentPage - 1) * size)
+            .Take(size)
+            .Select(e => new DeadLetterDto(
+                e.Id,
+                e.MessageId,
+                e.Topic,
+                e.MessageKey,
+                e.Payload,
+                e.Error,
+                e.AttemptCount,
+                e.FailedAt))
+            .ToListAsync(cancellationToken);
+
+        return new PagedResponse<DeadLetterDto>(entries, currentPage, size, total);
     }
 }
