@@ -1,4 +1,8 @@
 ﻿using DirectoryService.Application.Position;
+using Shared;
+using DirectoryService.Contracts.Response.Position;
+using DirectoryService.Contracts.Request.Position;
+using DirectoryService.Application.Position.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Shared.EndpointResults;
@@ -15,4 +19,16 @@ public class PositionController : ControllerBase
     public async Task<EndpointResult<Guid>> Create(
         [FromServices] CreatePositionHandle handler,
         CreatePositionCommand request, CancellationToken cancellationToken) => await handler.Handle(request, cancellationToken);
+
+    /// <summary>
+    /// Каталог позиций с привязанными департаментами. Сортировка: активные первыми,
+    /// затем по имени. Размер страницы ограничен <see cref="PagedResponse{T}.MaxSize"/>.
+    /// </summary>
+    [HttpGet]
+    [ProducesResponseType<PagedResponse<ReadPositionDto>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<PagedResponse<ReadPositionDto>>> GetPositions(
+        [FromQuery] GetPositionsRequest request,
+        [FromServices] GetPositionsHandler handler,
+        CancellationToken cancellationToken) =>
+        await handler.Handle(request, cancellationToken);
 }
