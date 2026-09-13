@@ -25,9 +25,14 @@ public class HireEmployeeHandler(
                 command.PositionId,
                 cancellationToken);
         }
-        catch (Exception ex)
+        catch (DirectoryLookupException ex) when (ex.Failure == DirectoryLookupFailure.Unauthorized)
         {
-            logger.LogWarning(ex, "DirectoryService gRPC call failed while hiring {Email}", command.Email);
+            logger.LogError(ex, "DirectoryService rejected credentials while hiring {Email}", command.Email);
+            return EmployeeErrors.DirectoryUnauthorized();
+        }
+        catch (DirectoryLookupException ex)
+        {
+            logger.LogWarning(ex, "DirectoryService unavailable while hiring {Email}", command.Email);
             return EmployeeErrors.DirectoryUnavailable();
         }
 

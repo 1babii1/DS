@@ -22,7 +22,7 @@ public partial record DepartmentIdentifier
 
         string trimmed = value.Trim();
 
-        if (trimmed.Length is < LenghtConstants.LENGTH3 or > LenghtConstants.LENGTH150)
+        if (trimmed.Length is < LengthConstants.MinTextLength or > LengthConstants.MaxDepartmentIdentifierLength)
             return Error.Validation("length.is.invalid", "Department identifier must be between 3 and 150 characters");
         if (!LatinRegex().IsMatch(trimmed))
         {

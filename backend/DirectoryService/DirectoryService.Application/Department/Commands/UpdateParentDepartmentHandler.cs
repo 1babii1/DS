@@ -49,6 +49,15 @@ namespace DirectoryService.Application.Department.Commands
             UpdateParentDepartmentCommand requestCommand,
             CancellationToken cancellationToken)
         {
+            // Валидация до открытия транзакции: иначе соединение из пула занято на всё
+            // время обработки запроса, который мог отсеяться на пустом идентификаторе.
+            ValidationResult validateResult = await _validator.ValidateAsync(requestCommand);
+            if (!validateResult.IsValid)
+            {
+                _logger.LogWarning("Invalid re-parent request for department {DepartmentId}", requestCommand.DepartmentId);
+                return validateResult.ToError();
+            }
+
             var transactionScopeResult =
                 await _transactionManager.BeginTransactionAsync(cancellationToken);
 
@@ -57,24 +66,16 @@ namespace DirectoryService.Application.Department.Commands
                 return transactionScopeResult.Error;
             }
 
+            // Выход без Commit откатывает транзакцию при Dispose, поэтому явные Rollback
+            // на каждой ветке не нужны.
             using var transactionScope = transactionScopeResult.Value;
-
-            // Валидация входных данных
-            ValidationResult validateResult = await _validator.ValidateAsync(requestCommand);
-            if (!validateResult.IsValid)
-            {
-                transactionScope.Rollback();
-                _logger.LogError("Failed to validate department");
-                return validateResult.ToError();
-            }
 
             // Проверка id
             var newParentDepId = DepartmentId.FromValue(requestCommand.Request.parentDepartmentId);
             var currentDepId = DepartmentId.FromValue(requestCommand.DepartmentId);
             if (newParentDepId == currentDepId)
             {
-                transactionScope.Rollback();
-                _logger.LogError("department id is match");
+                _logger.LogWarning("Department {DepartmentId} cannot be its own parent", currentDepId.Value);
                 return Error.Validation("department.id.is.match", "You cannot designate yourself as a parent");
             }
 
@@ -82,16 +83,14 @@ namespace DirectoryService.Application.Department.Commands
             var newParentDep = await _departmentRepository.GetByIdWithLock(newParentDepId, cancellationToken);
             if (newParentDep.IsFailure)
             {
-                transactionScope.Rollback();
-                _logger.LogError("could not be found");
+                _logger.LogWarning("New parent {ParentId} not found", newParentDepId.Value);
                 return newParentDep.Error;
             }
 
             var currentDep = await _departmentRepository.GetByIdWithLock(currentDepId, cancellationToken);
             if (currentDep.IsFailure)
             {
-                transactionScope.Rollback();
-                _logger.LogError("could not be found");
+                _logger.LogWarning("Department {DepartmentId} not found", currentDepId.Value);
                 return currentDep.Error;
             }
 
@@ -99,7 +98,6 @@ namespace DirectoryService.Application.Department.Commands
                 await _departmentRepository.LockChildrenByPath(newParentDep.Value.Path, cancellationToken);
             if (lockChildren.IsFailure)
             {
-                transactionScope.Rollback();
                 _logger.LogError(
                     "Failed to lock subtree of {ParentPath} while moving {DepartmentId}",
                     newParentDep.Value.Path.Value,
@@ -114,7 +112,6 @@ namespace DirectoryService.Application.Department.Commands
             var currentPath = currentDep.Value.Path.Value;
             if (newParentPath == currentPath || newParentPath.StartsWith(currentPath + "."))
             {
-                transactionScope.Rollback();
                 _logger.LogWarning(
                     "Refused to move {DepartmentId} under its own descendant {ParentId}",
                     currentDepId.Value,
@@ -132,16 +129,14 @@ namespace DirectoryService.Application.Department.Commands
                 cancellationToken);
             if (updateParent.IsFailure)
             {
-                transactionScope.Rollback();
-                _logger.LogError("failed");
+                _logger.LogError("Failed to rewrite hierarchy for {DepartmentId}", currentDepId.Value);
                 return updateParent.Error;
             }
 
             var save = await _transactionManager.SaveChangesAsync(cancellationToken);
             if (save.IsFailure)
             {
-                transactionScope.Rollback();
-                _logger.LogError("failed");
+                _logger.LogError("Failed to save re-parent of {DepartmentId}", currentDepId.Value);
                 return save.Error;
             }
 

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using DirectoryService.Application.Database;
 using DirectoryService.Domain.Departments.ValueObjects;
 using DirectoryService.Domain.Positions.ValueObjects;
@@ -6,6 +7,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DirectoryService.Grpc;
 
+// Internal-only, but still authenticated: the port is not reachable from outside the
+// compose network, and that is a deployment detail, not an authorization boundary.
+[Authorize]
 public class DirectoryLookupService(IReadDbContext readDbContext) : DirectoryLookup.DirectoryLookupBase
 {
     public override async Task<DepartmentReply> GetDepartment(GetDepartmentRequest request, ServerCallContext context)

@@ -18,11 +18,15 @@ public static class DependencyInjectionExtensions
         var address = configuration["Directory:GrpcAddress"]
             ?? throw new InvalidOperationException("Configuration 'Directory:GrpcAddress' is not set.");
 
+        services.AddHttpContextAccessor();
+        services.AddTransient<TokenForwardingHandler>();
+
         services
             .AddGrpcClient<DirectoryLookup.DirectoryLookupClient>(options =>
             {
                 options.Address = new Uri(address);
             })
+            .AddHttpMessageHandler<TokenForwardingHandler>()
             // Retries and circuit-breaking on a call that crosses a network boundary:
             // DirectoryService being briefly unavailable shouldn't fail every hire attempt outright.
             .AddResilienceHandler("directory-grpc", builder =>

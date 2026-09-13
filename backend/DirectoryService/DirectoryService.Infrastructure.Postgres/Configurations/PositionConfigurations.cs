@@ -22,12 +22,12 @@ public class PositionConfigurations : IEntityTypeConfiguration<Position>
         builder.Property(p => p.Name)
             .HasConversion(p => p.Value, name => PositionName.Create(name).Value)
             .IsRequired()
-            .HasMaxLength(LenghtConstants.LENGTH100)
+            .HasMaxLength(LengthConstants.MaxPositionNameLength)
             .HasColumnName("name");
 
         builder.Property(p => p.Description)
             .HasConversion(p => p!.Value, description => PositionDescription.Create(description).Value)
-            .HasMaxLength(LenghtConstants.LENGTH1000)
+            .HasMaxLength(LengthConstants.MaxPositionDescriptionLength)
             .HasColumnName("description");
 
         builder.Property(p => p.IsActive)

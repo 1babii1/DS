@@ -6,6 +6,7 @@ using DirectoryService.Application.Department.Queries;
 using DirectoryService.Application.Location.Commands;
 using DirectoryService.Application.Location.Queries;
 using DirectoryService.Application.Position;
+using DirectoryService.Application.Position.Queries;
 using DirectoryService.Grpc;
 using DirectoryService.Infrastructure.Postgres;
 using DirectoryService.Infrastructure.Postgres.Backgrounds;
@@ -55,6 +56,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddFrameworkCors(builder.Configuration);
 
 builder.Services.AddControllers();
+builder.Services.AddEnvelopeModelStateValidation();
 
 builder.Services.AddGrpc();
 
@@ -112,12 +114,10 @@ builder.Services.AddScoped<SearchDepartmentsSemanticHandler>();
 
 builder.Services.AddScoped<ILocationsRepository, EfCoreLocationsRepository>();
 
-// builder.Services.AddScoped<ILocationsRepository, NpgsqlLocationsRepository>();
 builder.Services.AddScoped<IPositionRepository, EfCorePositionRepository>();
 
 builder.Services.AddScoped<IDepartmentRepository, EfCoreDepartmentsRepository>();
 
-// builder.Services.AddScoped<IReadDbContext, DirectoryServiceDbContext>();
 builder.Services.AddScoped<CreateLocationHandle>();
 
 builder.Services.AddScoped<CreatePositionHandle>();
@@ -131,6 +131,10 @@ builder.Services.AddScoped<UpdateParentDepartmentHandler>();
 builder.Services.AddScoped<GetLocationByIdHandle>();
 
 builder.Services.AddScoped<GetLocationByDepartmentHandle>();
+
+builder.Services.AddScoped<GetLocationsHandler>();
+
+builder.Services.AddScoped<GetPositionsHandler>();
 
 builder.Services.AddScoped<GetDepartmentByIdHandler>();
 

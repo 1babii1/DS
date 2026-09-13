@@ -52,13 +52,28 @@ public class EmployeeController : ControllerBase
         CancellationToken cancellationToken) =>
         Ok(await handler.Handle(departmentId, cancellationToken));
 
-    private IActionResult ToProblem(Error error) => error.Type switch
+    // 503 отдаётся только при реальной недоступности зависимости. Раньше сюда попадала
+    // любая неклассифицированная ошибка, включая отказ авторизации, из-за чего клиент
+    // видел "сервис недоступен" там, где стоило чинить права.
+    private IActionResult ToProblem(Error error)
     {
-        ErrorType.NOT_FOUND => NotFound(error.Messages),
-        ErrorType.VALIDATION => BadRequest(error.Messages),
-        ErrorType.CONFLICT => Conflict(error.Messages),
-        _ => Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: error.Messages.FirstOrDefault()?.Message),
-    };
+        if (error.Messages.Any(m => m.Code == "employee.directory.unavailable"))
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, Envelope.Fail(error));
+        }
+
+        var status = error.Type switch
+        {
+            ErrorType.NOT_FOUND => StatusCodes.Status404NotFound,
+            ErrorType.VALIDATION => StatusCodes.Status400BadRequest,
+            ErrorType.CONFLICT => StatusCodes.Status409Conflict,
+            ErrorType.AUTHENTICATION => StatusCodes.Status401Unauthorized,
+            ErrorType.AUTHORIZATION => StatusCodes.Status403Forbidden,
+            _ => StatusCodes.Status500InternalServerError,
+        };
+
+        return StatusCode(status, Envelope.Fail(error));
+    }
 }
 
 public record TransferEmployeeRequest(Guid DepartmentId, Guid PositionId);

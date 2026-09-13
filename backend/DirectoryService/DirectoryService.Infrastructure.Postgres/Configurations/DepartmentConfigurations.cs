@@ -23,14 +23,14 @@ public class DepartmentConfigurations : IEntityTypeConfiguration<Departments>
             .Property(d => d.Name)
             .HasConversion(d => d.Value, name => DepartmentName.Create(name).Value)
             .IsRequired()
-            .HasMaxLength(LenghtConstants.LENGTH150)
+            .HasMaxLength(LengthConstants.MaxDepartmentNameLength)
             .HasColumnName("name");
 
         builder
             .Property(d => d.Identifier)
             .HasConversion(d => d.Value, identifier => DepartmentIdentifier.Create(identifier).Value)
             .IsRequired()
-            .HasMaxLength(LenghtConstants.LENGTH150)
+            .HasMaxLength(LengthConstants.MaxDepartmentIdentifierLength)
             .HasColumnName("identifier");
 
         builder.Property(d => d.Path)

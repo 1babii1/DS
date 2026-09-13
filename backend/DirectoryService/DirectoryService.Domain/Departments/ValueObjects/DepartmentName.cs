@@ -20,7 +20,7 @@ public record DepartmentName
 
         string trimmed = value.Trim();
 
-        if(trimmed.Length is < LenghtConstants.LENGTH3 or > LenghtConstants.LENGTH150)
+        if(trimmed.Length is < LengthConstants.MinTextLength or > LengthConstants.MaxDepartmentNameLength)
             return Error.Validation("length.is.invalid", "Department name must be between 3 and 150 characters");
 
         DepartmentName name = new(trimmed);

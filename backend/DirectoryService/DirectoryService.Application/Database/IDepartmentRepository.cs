@@ -10,8 +10,6 @@ namespace DirectoryService.Application.Database;
 
 public interface IDepartmentRepository
 {
-    Task Save();
-
     Task<Result<Departments, Error>> GetByIdIncludeLocations(
         DepartmentId departmentIdId,
         CancellationToken cancellationToken);
@@ -27,10 +25,6 @@ public interface IDepartmentRepository
     Task<Result<Domain.Departments.Departments, Error>> GetByIdWithLock(
         DepartmentId departmentIdId,
         CancellationToken cancellationToken);
-
-    Task<List<DepartmentDto>> GetHierarchy(
-        DepartmentPath newDepartmentPath,
-        CancellationToken cancellationToken = default);
 
     Task<UnitResult<Error>> LockChildrenByPath(
         DepartmentPath path,

@@ -18,12 +18,15 @@ public record PositionDescription
     public static Result<PositionDescription, Error> Create(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
-            return Error.Validation(null!, "Position description cannot be empty");
+            return GeneralErrors.ValueIsRequired("Position description");
 
         string trimmed = value.Trim();
 
-        if (trimmed.Length >= LenghtConstants.LENGTH1000)
-            return Error.Validation("length.is.invalid", "Position description must be between 3 and 100 characters");
+        // Было >= с сообщением про 100 символов: описание ровно в лимит отклонялось,
+        // а текст ошибки называл границу, не имеющую отношения к проверке.
+        if (trimmed.Length > LengthConstants.MaxPositionDescriptionLength)
+            return GeneralErrors.LengthIsInvalid(
+                "Position description", max: LengthConstants.MaxPositionDescriptionLength);
 
         PositionDescription description = new(trimmed);
 
