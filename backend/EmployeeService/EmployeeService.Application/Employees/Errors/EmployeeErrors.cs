@@ -23,7 +23,7 @@ public static class EmployeeErrors
             "positionId");
 
     public static Error DirectoryUnavailable() =>
-        Error.Failure("employee.directory.unavailable", "DirectoryService is temporarily unavailable");
+        Error.Unavailable("employee.directory.unavailable", "DirectoryService is temporarily unavailable");
 
     public static Error DirectoryUnauthorized() =>
         Error.Authorization("employee.directory.unauthorized", "DirectoryService rejected the request credentials");

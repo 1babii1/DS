@@ -3,6 +3,7 @@ using EmployeeService.Application.Employees.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Shared;
+using Shared.EndpointResults;
 
 namespace EmployeeService.Web.Controllers;
 
@@ -13,26 +14,22 @@ public class EmployeeController : ControllerBase
 {
     [HttpPost]
     [Authorize(Policy = "CanEdit")]
-    public async Task<IActionResult> Hire(
+    public async Task<EndpointResult<Guid>> Hire(
         [FromServices] HireEmployeeHandler handler,
         HireEmployeeCommand command,
-        CancellationToken cancellationToken)
-    {
-        var result = await handler.Handle(command, cancellationToken);
-        return result.IsSuccess ? Ok(result.Value) : ToProblem(result.Error);
-    }
+        CancellationToken cancellationToken) =>
+        await handler.Handle(command, cancellationToken);
 
     [HttpPut("{employeeId:guid}/transfer")]
     [Authorize(Policy = "CanEdit")]
-    public async Task<IActionResult> Transfer(
+    public async Task<EndpointResult> Transfer(
         [FromRoute] Guid employeeId,
         [FromServices] TransferEmployeeHandler handler,
         [FromBody] TransferEmployeeRequest request,
         CancellationToken cancellationToken)
     {
         var command = new TransferEmployeeCommand(employeeId, request.DepartmentId, request.PositionId);
-        var result = await handler.Handle(command, cancellationToken);
-        return result.IsSuccess ? NoContent() : ToProblem(result.Error);
+        return await handler.Handle(command, cancellationToken);
     }
 
     [HttpGet("{employeeId:guid}")]
@@ -53,29 +50,6 @@ public class EmployeeController : ControllerBase
         [FromServices] ListEmployeesHandler handler,
         CancellationToken cancellationToken) =>
         Ok(await handler.Handle(departmentId, page, size, cancellationToken));
-
-    // 503 отдаётся только при реальной недоступности зависимости. Раньше сюда попадала
-    // любая неклассифицированная ошибка, включая отказ авторизации, из-за чего клиент
-    // видел "сервис недоступен" там, где стоило чинить права.
-    private IActionResult ToProblem(Error error)
-    {
-        if (error.Messages.Any(m => m.Code == "employee.directory.unavailable"))
-        {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, Envelope.Fail(error));
-        }
-
-        var status = error.Type switch
-        {
-            ErrorType.NOT_FOUND => StatusCodes.Status404NotFound,
-            ErrorType.VALIDATION => StatusCodes.Status400BadRequest,
-            ErrorType.CONFLICT => StatusCodes.Status409Conflict,
-            ErrorType.AUTHENTICATION => StatusCodes.Status401Unauthorized,
-            ErrorType.AUTHORIZATION => StatusCodes.Status403Forbidden,
-            _ => StatusCodes.Status500InternalServerError,
-        };
-
-        return StatusCode(status, Envelope.Fail(error));
-    }
 }
 
 public record TransferEmployeeRequest(Guid DepartmentId, Guid PositionId);
