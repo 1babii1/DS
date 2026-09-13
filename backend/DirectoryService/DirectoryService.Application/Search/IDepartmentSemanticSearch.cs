@@ -1,4 +1,4 @@
-using DirectoryService.Contracts.Response.Department;
+﻿using DirectoryService.Contracts.Response.Department;
 
 namespace DirectoryService.Application.Search;
 

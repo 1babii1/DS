@@ -172,7 +172,8 @@ public class CreateDepartmentHandler
                 value: department.Value,
                 options: new()
                 {
-                    LocalCacheExpiration = TimeSpan.FromMinutes(5), Expiration = TimeSpan.FromMinutes(30),
+                    LocalCacheExpiration = TimeSpan.FromMinutes(5),
+                    Expiration = TimeSpan.FromMinutes(30),
                 },
                 cancellationToken: cancellationToken);
 

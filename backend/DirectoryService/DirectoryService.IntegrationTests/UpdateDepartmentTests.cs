@@ -87,7 +87,6 @@ public class UpdateDepartmentTests : IClassFixture<DirectoryTestWEbFactory>, IAs
         return result.Value;
     }
 
-
     public Task InitializeAsync() => Task.CompletedTask;
 
     public async Task DisposeAsync()

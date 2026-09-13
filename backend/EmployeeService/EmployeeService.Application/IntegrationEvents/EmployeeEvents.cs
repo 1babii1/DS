@@ -1,4 +1,4 @@
-namespace EmployeeService.Application.IntegrationEvents;
+﻿namespace EmployeeService.Application.IntegrationEvents;
 
 public static class EmployeeEventTypes
 {

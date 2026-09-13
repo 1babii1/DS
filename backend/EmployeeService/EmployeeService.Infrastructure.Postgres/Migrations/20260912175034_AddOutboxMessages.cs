@@ -21,7 +21,7 @@ namespace EmployeeService.Infrastructure.Postgres.Migrations
                     AggregateId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     Payload = table.Column<string>(type: "jsonb", nullable: false),
                     OccurredAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    ProcessedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                    ProcessedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                 },
                 constraints: table =>
                 {

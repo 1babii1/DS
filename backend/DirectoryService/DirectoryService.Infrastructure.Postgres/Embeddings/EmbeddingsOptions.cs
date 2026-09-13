@@ -1,4 +1,4 @@
-namespace DirectoryService.Infrastructure.Postgres.Embeddings;
+﻿namespace DirectoryService.Infrastructure.Postgres.Embeddings;
 
 public sealed class EmbeddingsOptions
 {

@@ -24,12 +24,12 @@ public record DepartmentName
 
     public static Result<DepartmentName, Error> Create(string value)
     {
-        if(string.IsNullOrWhiteSpace(value))
+        if (string.IsNullOrWhiteSpace(value))
             return Error.Validation(null!, "Department name is required");
 
         string trimmed = value.Trim();
 
-        if(trimmed.Length is < LengthConstants.MinTextLength or > LengthConstants.MaxDepartmentNameLength)
+        if (trimmed.Length is < LengthConstants.MinTextLength or > LengthConstants.MaxDepartmentNameLength)
             return Error.Validation("length.is.invalid", "Department name must be between 3 and 150 characters");
 
         DepartmentName name = new(trimmed);

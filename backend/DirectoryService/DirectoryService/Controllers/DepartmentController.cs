@@ -1,7 +1,7 @@
 ﻿using DirectoryService.Application.Department.Commands;
 using DirectoryService.Application.Department.Queries;
-using DirectoryService.Contracts.Response.Department;
 using DirectoryService.Contracts.Request.Department;
+using DirectoryService.Contracts.Response.Department;
 using DirectoryService.Contracts.Response.Department;
 using DirectoryService.Domain.Departments.ValueObjects;
 using Microsoft.AspNetCore.Authorization;

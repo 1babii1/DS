@@ -1,4 +1,4 @@
-namespace EmployeeService.Application.Directory;
+﻿namespace EmployeeService.Application.Directory;
 
 public enum DirectoryLookupFailure
 {

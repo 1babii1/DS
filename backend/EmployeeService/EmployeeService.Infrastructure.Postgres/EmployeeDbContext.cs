@@ -1,4 +1,4 @@
-using EmployeeService.Application.Database;
+﻿using EmployeeService.Application.Database;
 using EmployeeService.Domain;
 using Microsoft.EntityFrameworkCore;
 using Shared.Outbox;

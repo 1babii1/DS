@@ -27,6 +27,7 @@ public static class DependencyInjectionExtensions
                 options.Address = new Uri(address);
             })
             .AddHttpMessageHandler<TokenForwardingHandler>()
+
             // Retries and circuit-breaking on a call that crosses a network boundary:
             // DirectoryService being briefly unavailable shouldn't fail every hire attempt outright.
             .AddResilienceHandler("directory-grpc", builder =>

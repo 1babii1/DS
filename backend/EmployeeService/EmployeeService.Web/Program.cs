@@ -1,6 +1,3 @@
-using Shared.HealthChecks;
-using Shared.Middlewares;
-using Shared.Cors;
 using EmployeeService.Application.Database;
 using EmployeeService.Application.Employees.Commands;
 using EmployeeService.Application.Employees.Queries;
@@ -8,6 +5,9 @@ using EmployeeService.Infrastructure.DirectoryGrpc;
 using EmployeeService.Infrastructure.Postgres;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Serilog;
+using Shared.Cors;
+using Shared.HealthChecks;
+using Shared.Middlewares;
 using Shared.Outbox;
 using Shared.Security;
 

@@ -1,4 +1,4 @@
-namespace Shared.Security;
+﻿namespace Shared.Security;
 
 /// <summary>
 /// Role names as they appear in the "role" claim every service validates the same

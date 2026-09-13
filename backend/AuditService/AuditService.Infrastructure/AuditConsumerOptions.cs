@@ -1,4 +1,4 @@
-namespace AuditService.Infrastructure;
+﻿namespace AuditService.Infrastructure;
 
 public class AuditConsumerOptions
 {

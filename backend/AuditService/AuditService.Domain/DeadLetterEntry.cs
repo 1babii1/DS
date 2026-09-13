@@ -1,4 +1,4 @@
-namespace AuditService.Domain;
+﻿namespace AuditService.Domain;
 
 // Parking spot for a message that failed every processing attempt. Without this,
 // a message that keeps failing (a transient outage that outlasts the retries, or a
@@ -38,14 +38,14 @@ public class DeadLetterEntry
         string payload,
         string error,
         int attemptCount) => new()
-    {
-        Id = Guid.NewGuid(),
-        MessageId = messageId,
-        Topic = topic,
-        MessageKey = messageKey,
-        Payload = payload,
-        Error = error,
-        AttemptCount = attemptCount,
-        FailedAt = DateTime.UtcNow,
-    };
+        {
+            Id = Guid.NewGuid(),
+            MessageId = messageId,
+            Topic = topic,
+            MessageKey = messageKey,
+            Payload = payload,
+            Error = error,
+            AttemptCount = attemptCount,
+            FailedAt = DateTime.UtcNow,
+        };
 }

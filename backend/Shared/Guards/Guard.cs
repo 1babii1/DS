@@ -1,4 +1,4 @@
-namespace Shared.Guards;
+﻿namespace Shared.Guards;
 
 public static class Guard
 {

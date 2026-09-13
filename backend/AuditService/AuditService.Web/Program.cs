@@ -1,8 +1,8 @@
-using Shared.HealthChecks;
-using Shared.Middlewares;
 using AuditService.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Serilog;
+using Shared.HealthChecks;
+using Shared.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 

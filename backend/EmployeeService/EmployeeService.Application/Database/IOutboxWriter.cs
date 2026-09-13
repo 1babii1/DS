@@ -1,4 +1,4 @@
-namespace EmployeeService.Application.Database;
+﻿namespace EmployeeService.Application.Database;
 
 public interface IOutboxWriter
 {

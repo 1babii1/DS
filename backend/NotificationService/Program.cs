@@ -1,4 +1,4 @@
-using NotificationService;
+﻿using NotificationService;
 using Serilog;
 
 var builder = Host.CreateApplicationBuilder(args);

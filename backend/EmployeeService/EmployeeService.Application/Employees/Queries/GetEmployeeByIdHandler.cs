@@ -1,4 +1,4 @@
-using EmployeeService.Application.Database;
+﻿using EmployeeService.Application.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace EmployeeService.Application.Employees.Queries;

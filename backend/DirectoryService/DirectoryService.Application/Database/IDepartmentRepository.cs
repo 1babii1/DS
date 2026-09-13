@@ -34,6 +34,7 @@ public interface IDepartmentRepository
     /// Re-parents a department and rewrites the paths and depths of its whole subtree.
     /// Depth is derived from the new path, so no depth argument is needed.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous operation.</placeholder></returns>
     Task<UnitResult<Error>> UpdateHierarchy(
         DepartmentId newParentId,
         DepartmentPath newParentPath,

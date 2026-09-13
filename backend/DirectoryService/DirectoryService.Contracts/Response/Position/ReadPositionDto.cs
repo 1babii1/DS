@@ -1,4 +1,4 @@
-namespace DirectoryService.Contracts.Response.Position;
+﻿namespace DirectoryService.Contracts.Response.Position;
 
 public record ReadPositionDto
 {

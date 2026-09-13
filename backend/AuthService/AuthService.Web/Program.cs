@@ -1,12 +1,12 @@
-using Shared.HealthChecks;
-using Shared.Middlewares;
-using Shared.Cors;
 using System.Threading.RateLimiting;
 using AuthService.Application;
 using AuthService.Infrastructure.Postgres;
 using AuthService.Web.Configuration;
 using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
+using Shared.Cors;
+using Shared.HealthChecks;
+using Shared.Middlewares;
 
 var builder = WebApplication.CreateBuilder(args);
 

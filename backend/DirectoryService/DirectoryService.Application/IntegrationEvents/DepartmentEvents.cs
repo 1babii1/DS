@@ -1,4 +1,4 @@
-namespace DirectoryService.Application.IntegrationEvents;
+﻿namespace DirectoryService.Application.IntegrationEvents;
 
 public static class DepartmentEventTypes
 {
