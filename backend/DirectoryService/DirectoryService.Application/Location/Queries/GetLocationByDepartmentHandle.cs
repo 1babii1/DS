@@ -46,7 +46,6 @@ public class GetLocationByDepartmentHandle
 
         var whereClause = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : string.Empty;
 
-        Console.WriteLine(request);
         var departmentLocationDto = await connection.QueryAsync<ReadLocationDto>(
             $"""
             SELECT l.id, l.name, l.timezone, l.street, l.city, l.country, l.is_active, l.created_at, l.updated_at FROM department_locations dl

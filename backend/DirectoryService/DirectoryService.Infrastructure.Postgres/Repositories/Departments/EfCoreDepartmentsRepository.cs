@@ -208,9 +208,11 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
     {
         try
         {
+            // Только регистрирует сущность в контексте. Коммитит вызывающий, одним
+            // SaveChanges вместе с записью в outbox - иначе департамент сохраняется
+            // отдельной транзакцией, и падение между двумя сохранениями оставляет
+            // департамент без события о его создании.
             await _dbContext.Departments.AddAsync(department, cancellationToken);
-
-            await _dbContext.SaveChangesAsync(cancellationToken);
 
             return department.Id.Value;
         }
