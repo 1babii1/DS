@@ -1,3 +1,5 @@
+using Shared.Middlewares;
+using Shared.Cors;
 using DirectoryService.Application.Database;
 using DirectoryService.Application.Department.Commands;
 using DirectoryService.Application.Department.Queries;
@@ -11,7 +13,6 @@ using DirectoryService.Infrastructure.Postgres.Database;
 using DirectoryService.Infrastructure.Postgres.Repositories.Departments;
 using DirectoryService.Infrastructure.Postgres.Repositories.Locations;
 using DirectoryService.Infrastructure.Postgres.Repositories.Positions;
-using DirectoryService.Middleware;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Json;
@@ -51,16 +52,7 @@ builder.Host.UseSerilog((context, _, configuration) =>
 
 builder.Services.AddOpenApi();
 
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.WithOrigins("http://localhost:3000")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
-    });
-});
+builder.Services.AddFrameworkCors(builder.Configuration);
 
 builder.Services.AddControllers();
 
@@ -164,11 +156,13 @@ builder.Services.AddHybridCache(options => options.DefaultEntryOptions = new Hyb
 
 var app = builder.Build();
 
+app.UseRequestCorrelationId();
+app.UseExceptionMiddleware();
+
 app.UseSerilogRequestLogging();
 
 app.UseHttpLogging();
 
-app.UseMiddleware<ExeptionHandlingMiddleware>();
 
 // Configure the HTTP request pipeline.
 // if (app.Environment.IsDevelopment() || app.Environment.Is)
@@ -176,7 +170,7 @@ app.MapOpenApi("/openapi/v1/swagger.json");
 
 app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1/swagger.json", "DirectoryService"));
 
-app.UseCors();
+app.ConfigureCors();
 
 app.UseAuthentication();
 app.UseAuthorization();

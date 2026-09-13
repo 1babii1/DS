@@ -81,7 +81,7 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
             sut.Handle(command, CancellationToken.None));
 
         Assert.True(result.IsFailure);
-        // Assert.Contains("not found", result.Error.Messages.Select(m => m.message), StringComparison.OrdinalIgnoreCase);
+        // Assert.Contains("not found", result.Error.Messages.Select(m => m.Message), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -99,7 +99,7 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
             sut.Handle(command, CancellationToken.None));
 
         Assert.True(result.IsFailure);
-        Assert.Contains("You cannot designate yourself as a parent", result.Error.Messages.Select(m => m.message));
+        Assert.Contains("You cannot designate yourself as a parent", result.Error.Messages.Select(m => m.Message));
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
 
         Assert.True(result.IsFailure);
 
-        // Assert.Contains("not found", result.Error.Messages.Select(m => m.message), StringComparison.OrdinalIgnoreCase);
+        // Assert.Contains("not found", result.Error.Messages.Select(m => m.Message), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -141,7 +141,7 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
 
         // Assert - именно из-за цикла, а не по любой другой причине
         Assert.True(result.IsFailure);
-        Assert.Contains("department.cycle", result.Error.Messages.Select(m => m.code));
+        Assert.Contains("department.cycle", result.Error.Messages.Select(m => m.Code));
     }
 
     [Fact]

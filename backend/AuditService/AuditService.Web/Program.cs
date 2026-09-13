@@ -1,3 +1,4 @@
+using Shared.Middlewares;
 using AuditService.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Serilog;
@@ -31,6 +32,9 @@ builder.Services.AddAuthorization();
 builder.Services.AddAuditInfrastructure(builder.Configuration);
 
 var app = builder.Build();
+
+app.UseRequestCorrelationId();
+app.UseExceptionMiddleware();
 
 app.UseSerilogRequestLogging();
 

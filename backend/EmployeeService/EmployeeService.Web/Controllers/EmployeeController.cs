@@ -57,7 +57,7 @@ public class EmployeeController : ControllerBase
         ErrorType.NOT_FOUND => NotFound(error.Messages),
         ErrorType.VALIDATION => BadRequest(error.Messages),
         ErrorType.CONFLICT => Conflict(error.Messages),
-        _ => Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: error.Messages.FirstOrDefault()?.message),
+        _ => Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: error.Messages.FirstOrDefault()?.Message),
     };
 }
 

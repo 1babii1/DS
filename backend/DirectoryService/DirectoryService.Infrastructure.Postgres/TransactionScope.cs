@@ -27,7 +27,7 @@ public class TransactionScope : ITransactionScope
         catch (Exception e)
         {
             _logger.LogError(e, "Error committing transaction");
-            return UnitResult.Failure<Error>(Error.Failure());
+            return UnitResult.Failure<Error>(Error.Failure("transaction.commit", "Failed to commit transaction"));
         }
     }
 
@@ -41,7 +41,7 @@ public class TransactionScope : ITransactionScope
         catch (Exception e)
         {
             _logger.LogError(e, "Error rolling back transaction");
-            return UnitResult.Failure<Error>(Error.Failure());
+            return UnitResult.Failure<Error>(Error.Failure("transaction.rollback", "Failed to roll back transaction"));
         }
     }
 
