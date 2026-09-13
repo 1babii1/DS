@@ -111,59 +111,23 @@ public class CreateDirectoryTests : IClassFixture<DirectoryTestWEbFactory>, IAsy
         Assert.NotNull(result.Error);
     }
 
+    // Длина проверяется в value object, поэтому команду с некорректным именем
+    // собрать нельзя в принципе - правило проверяется там, где оно живёт.
     [Fact]
-    public async Task CreateDepartment_with_lenght_less_three_name_and_identifier()
+    public void DepartmentName_and_identifier_shorter_than_three_are_rejected()
     {
-        // arrange
-        var locationId = await CreateLocation();
-        var cancellationToken = CancellationToken.None;
-
-        // act
-        var result = await ExecuteHadler((sut) =>
-        {
-            var command =
-                new CreateDepartmentCommand(new CreateDepartmentRequest(
-                    DepartmentName.Create("по").Value,
-                    DepartmentIdentifier.Create("po").Value,
-                    null,
-                    null,
-                    [locationId], DepartmentId.NewDepartmentId()));
-
-            return sut.Handle(command, cancellationToken);
-        });
-
-        // assert
-        Assert.True(result.IsFailure);
-        Assert.False(result.IsSuccess);
-        Assert.NotNull(result.Error);
+        Assert.True(DepartmentName.Create("по").IsFailure);
+        Assert.True(DepartmentIdentifier.Create("po").IsFailure);
     }
 
     [Fact]
-    public async Task CreateDepartment_with_lenght_more_150_name_and_identifier()
+    public void DepartmentName_and_identifier_longer_than_150_are_rejected()
     {
-        // arrange
-        var locationId = await CreateLocation();
-        var cancellationToken = CancellationToken.None;
+        var tooLongName = new string('я', 151);
+        var tooLongIdentifier = new string('a', 151);
 
-        // act
-        var result = await ExecuteHadler((sut) =>
-        {
-            var command =
-                new CreateDepartmentCommand(new CreateDepartmentRequest(
-                    DepartmentName
-                        .Create("подразделениекогдаоткрыливсеникакнеможемзакрытьноможетбытькогданибудьзакроемноэтонеточноведьсейчастяжелоевремяиниктонезнаетчтобудетзавтраазавтраможетслучитьсявсечтоугодно").Value,
-                    DepartmentIdentifier.Create("podrazdeleniekogdaotkrylivsenikaknemozhemzakryt'nomozhetbyt'kogdanibud'zakroemnoetonetochnoved'sejchastyazheloevremyainiktoneznaetchtobudetzavtraazavtramozhetsluchit'syavsechtougodno").Value,
-                    null,
-                    null,
-                    [locationId], null ));
-
-            return sut.Handle(command, cancellationToken);
-        });
-
-        // assert
-        Assert.True(result.IsFailure);
-        Assert.False(result.IsSuccess);
-        Assert.NotNull(result.Error);
+        Assert.True(DepartmentName.Create(tooLongName).IsFailure);
+        Assert.True(DepartmentIdentifier.Create(tooLongIdentifier).IsFailure);
     }
 
     public Task InitializeAsync() => Task.CompletedTask;

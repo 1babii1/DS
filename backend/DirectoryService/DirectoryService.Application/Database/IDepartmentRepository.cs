@@ -36,12 +36,15 @@ public interface IDepartmentRepository
         DepartmentPath path,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Re-parents a department and rewrites the paths and depths of its whole subtree.
+    /// Depth is derived from the new path, so no depth argument is needed.
+    /// </summary>
     Task<UnitResult<Error>> UpdateHierarchy(
         DepartmentId newParentId,
         DepartmentPath newParentPath,
         DepartmentId currentId,
         DepartmentPath oldPath,
-        short depth,
         CancellationToken cancellationToken = default);
 
     Task<Result<Guid, Error>> Add(Departments department, CancellationToken cancellationToken = default);

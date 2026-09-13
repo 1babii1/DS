@@ -81,8 +81,8 @@ public class SoftDeleteDepartmentHandler
         if (department.Value.IsActive == false)
         {
             transactionScope.Rollback();
-            _logger.LogError("department deleted");
-            return department.Error;
+            _logger.LogWarning("Department {DepartmentId} is already deleted", request.departmentId);
+            return Error.Conflict("department.already.deleted", "Department is already deleted");
         }
 
         // Мягкое удаление департамента
@@ -129,7 +129,14 @@ public class SoftDeleteDepartmentHandler
             department.Value.Id.Value.ToString(),
             new DepartmentDeletedEvent(department.Value.Id.Value));
 
-        await _transactionManager.SaveChangesAsync(cancellationToken);
+        var save = await _transactionManager.SaveChangesAsync(cancellationToken);
+        if (save.IsFailure)
+        {
+            transactionScope.Rollback();
+            _logger.LogError("Failed to save soft delete of department {DepartmentId}", request.departmentId);
+            return save.Error;
+        }
+
         var commitResult = transactionScope.Commit();
         if (commitResult.IsFailure)
         {
