@@ -100,15 +100,36 @@ namespace DirectoryService.Application.Department.Commands
             if (lockChildren.IsFailure)
             {
                 transactionScope.Rollback();
-                _logger.LogError("could not be found");
-                return currentDep.Error;
+                _logger.LogError(
+                    "Failed to lock subtree of {ParentPath} while moving {DepartmentId}",
+                    newParentDep.Value.Path.Value,
+                    currentDepId.Value);
+                return lockChildren.Error;
             }
 
-            var newDepth = (short)(currentDep.Value.Depth - newParentDep.Value.Depth - 1);
+            // A department cannot move into its own subtree - that would detach the subtree
+            // from the tree and leave a cycle. Mirrors ltree's <@ operator: A is inside B
+            // when A equals B or is prefixed by "B.".
+            var newParentPath = newParentDep.Value.Path.Value;
+            var currentPath = currentDep.Value.Path.Value;
+            if (newParentPath == currentPath || newParentPath.StartsWith(currentPath + "."))
+            {
+                transactionScope.Rollback();
+                _logger.LogWarning(
+                    "Refused to move {DepartmentId} under its own descendant {ParentId}",
+                    currentDepId.Value,
+                    newParentDepId.Value);
+                return Error.Validation(
+                    "department.cycle",
+                    "A department cannot be moved under its own descendant");
+            }
 
-            var updateParent = await _departmentRepository.UpdateHierarchy(newParentDepId, newParentDep.Value.Path,
+            var updateParent = await _departmentRepository.UpdateHierarchy(
+                newParentDepId,
+                newParentDep.Value.Path,
                 currentDepId,
-                currentDep.Value.Path, newDepth, cancellationToken);
+                currentDep.Value.Path,
+                cancellationToken);
             if (updateParent.IsFailure)
             {
                 transactionScope.Rollback();

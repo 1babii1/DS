@@ -13,8 +13,10 @@ namespace DirectoryService.IntegrationTests;
 
 public class DirectoryTestWEbFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    // Same image as docker-compose: the model uses ltree for hierarchy paths and
+    // vector for department embeddings, neither of which exists on a plain postgres image.
     private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder()
-        .WithImage("postgres")
+        .WithImage("pgvector/pgvector:pg18")
         .WithDatabase("directory_service_db")
         .WithPassword("postgres")
         .WithUsername("postgres")
@@ -27,25 +29,38 @@ public class DirectoryTestWEbFactory : WebApplicationFactory<Program>, IAsyncLif
     {
         await _dbContainer.StartAsync();
 
+        _dbConection = new NpgsqlConnection(_dbContainer.GetConnectionString());
+        await _dbConection.OpenAsync();
+
+        // EnsureCreated does not emit CREATE EXTENSION, so the extensions the model
+        // depends on have to exist before it runs. In Docker this is done by
+        // docker/postgres/init-databases.sql.
+        await using (var createExtensions = _dbConection.CreateCommand())
+        {
+            createExtensions.CommandText =
+                "CREATE EXTENSION IF NOT EXISTS ltree; CREATE EXTENSION IF NOT EXISTS vector;";
+            await createExtensions.ExecuteNonQueryAsync();
+        }
+
         await using var scope = Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DirectoryServiceDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.EnsureCreatedAsync();
-
-        _dbConection = new NpgsqlConnection(_dbContainer.GetConnectionString());
-        await _dbConection.OpenAsync();
 
         await InitializeRespawner();
     }
 
     public new async Task DisposeAsync()
     {
-        await _dbContainer.StartAsync();
-        await _dbContainer.DisposeAsync();
+        // Null when InitializeAsync threw. Without this guard the NRE here replaces the
+        // real setup failure in the test output, which is how a broken container image
+        // stayed hidden behind 24 identical NullReferenceExceptions.
+        if (_dbConection is not null)
+        {
+            await _dbConection.DisposeAsync();
+        }
 
-        await _dbConection.CloseAsync();
-        await _dbConection.DisposeAsync();
+        await _dbContainer.DisposeAsync();
     }
 
     public async Task ResetDatabaseAsync()
@@ -63,8 +78,10 @@ public class DirectoryTestWEbFactory : WebApplicationFactory<Program>, IAsyncLif
 
     private async Task InitializeRespawner()
     {
+        // The model sets HasDefaultSchema("directory"), so every table lives there -
+        // resetting "public" finds nothing and Respawn refuses to initialize.
         _respawner = await Respawner.CreateAsync(
             _dbConection,
-            new RespawnerOptions { DbAdapter = DbAdapter.Postgres, SchemasToInclude = ["public"] });
+            new RespawnerOptions { DbAdapter = DbAdapter.Postgres, SchemasToInclude = ["directory"] });
     }
 }

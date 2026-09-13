@@ -13,7 +13,12 @@ public class ClearDbOptions
 {
     public TimeSpan Interval { get; set; } = TimeSpan.FromHours(24);
 
-    public DateTime DateTime { get; set; } = DateTime.UtcNow.AddMonths(-1);
+    /// <summary>
+    /// How long a soft-deleted row is kept before it is purged. Stored as a duration,
+    /// not an absolute date: an absolute date captured at startup stops moving, so a
+    /// long-running service would keep purging against the cutoff it had on boot.
+    /// </summary>
+    public TimeSpan Retention { get; set; } = TimeSpan.FromDays(30);
 }
 
 public class ClearDbOfDeletedEntities : BackgroundService
@@ -21,7 +26,7 @@ public class ClearDbOfDeletedEntities : BackgroundService
     private readonly IServiceProvider _services;
     private readonly ILogger<ClearDbOfDeletedEntities> _logger;
     private readonly TimeSpan _delay;
-    private readonly DateTime _start;
+    private readonly TimeSpan _retention;
 
     public ClearDbOfDeletedEntities(IServiceProvider services, ILogger<ClearDbOfDeletedEntities> logger,
         IOptions<ClearDbOptions> options)
@@ -29,7 +34,7 @@ public class ClearDbOfDeletedEntities : BackgroundService
         _services = services;
         _logger = logger;
         _delay = options.Value.Interval;
-        _start = options.Value.DateTime;
+        _retention = options.Value.Retention;
     }
 
     protected async override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -60,7 +65,7 @@ public class ClearDbOfDeletedEntities : BackgroundService
         using var scope = _services.CreateScope();
         await using var dbContext = scope.ServiceProvider.GetRequiredService<DirectoryServiceDbContext>();
         var transactionManager = scope.ServiceProvider.GetRequiredService<ITransactionManager>();
-        var date = _start;
+        var date = DateTime.UtcNow - _retention;
 
         var transactionScopeResult =
             await transactionManager.BeginTransactionAsync(cancellationToken);
@@ -111,10 +116,10 @@ public class ClearDbOfDeletedEntities : BackgroundService
         // var result = await dbContext.Database.SqlQueryRaw<Stats>(sql: sql, new { date }).FirstAsync(cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync(
             """
-            UPDATE departments 
+            UPDATE directory.departments 
             SET path = subpath(path, 0, nlevel(identifier::ltree)) || subpath(path, nlevel(identifier::ltree) + 1)
             WHERE path <@ (
-                SELECT identifier::ltree FROM departments d2 
+                SELECT identifier::ltree FROM directory.departments d2 
                 WHERE d2.is_active = false AND d2.deleted_at < {0}
                 AND departments.path <@ d2.identifier::ltree
                 LIMIT 1
@@ -123,7 +128,7 @@ public class ClearDbOfDeletedEntities : BackgroundService
 
         await dbContext.Database.ExecuteSqlRawAsync(
             """
-            DELETE FROM departments 
+            DELETE FROM directory.departments 
             WHERE is_active = false AND deleted_at < {0}
             """, date);
 
