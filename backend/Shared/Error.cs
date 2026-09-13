@@ -53,6 +53,9 @@ public record Error
     public static Error Unprocessable(string code, string message, string? invalidField = null) =>
         new([new ErrorMessage(code, message, invalidField)], ErrorType.UNPROCESSABLE_ENTITY);
 
+    public static Error Unavailable(string code, string message, string? invalidField = null) =>
+        new([new ErrorMessage(code, message, invalidField)], ErrorType.UNAVAILABLE);
+
     public static Error Unprocessable(IEnumerable<ErrorMessage> messages) =>
         new(messages, ErrorType.UNPROCESSABLE_ENTITY);
 
@@ -99,4 +102,12 @@ public enum ErrorType
     /// <remarks>The request is syntactically valid but business state prevents it —
     /// maps to HTTP 422 (e.g. "product not ready for review").</remarks>
     UNPROCESSABLE_ENTITY,
+
+    /// <summary>Зависимость, нужная для выполнения запроса, реально недоступна (например,
+    /// gRPC-вызов в другой сервис не прошёл по сети) — маппится в HTTP 503, не в общий 500,
+    /// чтобы клиент отличал "повторить чуть позже" от "запрос сломан".</summary>
+    /// <remarks>A dependency the request actually needed is unreachable (e.g. a gRPC call to
+    /// another service failed on the network) — maps to HTTP 503, not a generic 500, so the
+    /// caller can tell "retry shortly" apart from "the request itself is broken".</remarks>
+    UNAVAILABLE,
 }

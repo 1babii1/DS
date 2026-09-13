@@ -35,6 +35,7 @@ public class ErrorResult : IResult
             ErrorType.AUTHORIZATION => StatusCodes.Status403Forbidden,
             ErrorType.RATE_LIMITED => StatusCodes.Status429TooManyRequests,
             ErrorType.UNPROCESSABLE_ENTITY => StatusCodes.Status422UnprocessableEntity,
+            ErrorType.UNAVAILABLE => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status500InternalServerError
         };
 }
