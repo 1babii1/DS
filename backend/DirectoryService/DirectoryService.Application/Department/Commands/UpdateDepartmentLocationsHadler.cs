@@ -117,8 +117,8 @@ public class UpdateDepartmentLocationsHadler
         }
 
         // Удаление из кэша
-        await _cache.RemoveAsync(
-            key: GetKey.DepartmentKey.ById(department.Value.Id), cancellationToken);
+        await _cache.RemoveOrIgnoreAsync(
+            _logger, key: GetKey.DepartmentKey.ById(department.Value.Id), cancellationToken);
 
         return department.Value.Id;
     }

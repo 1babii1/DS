@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Npgsql;
 using Respawn;
 using Testcontainers.PostgreSql;
@@ -70,6 +71,13 @@ public class DirectoryTestWEbFactory : WebApplicationFactory<Program>, IAsyncLif
 
     protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.ConfigureTestServices(service =>
     {
+        // Тесты вызывают хендлеры напрямую, фоновые сервисы в них не участвуют, но
+        // мешают: воркер ретеншена удаляет из тех же таблиц, что чистит Respawn между
+        // тестами, и два конкурирующих DELETE ловят deadlock, из-за чего падает
+        // случайный тест. Воркеры эмбеддингов и outbox к тому же непрерывно логируют
+        // ошибки, потому что Ollama и Kafka в тестовом окружении не подняты.
+        service.RemoveAll<IHostedService>();
+
         service.RemoveAll<DirectoryServiceDbContext>();
 
         service.AddScoped<DirectoryServiceDbContext>(_ =>

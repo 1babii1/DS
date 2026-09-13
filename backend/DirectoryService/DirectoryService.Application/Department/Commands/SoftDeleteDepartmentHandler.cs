@@ -142,7 +142,8 @@ public class SoftDeleteDepartmentHandler
         }
 
         // Удаление из кэша
-        await _cache.RemoveAsync(key: GetKey.DepartmentKey.ById(department.Value.Id), cancellationToken);
+        await _cache.RemoveOrIgnoreAsync(
+            _logger, key: GetKey.DepartmentKey.ById(department.Value.Id), cancellationToken);
 
         _logger.LogInformation(
             "Департамент удален{0}{1}",
