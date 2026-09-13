@@ -1,4 +1,4 @@
-using EmployeeService.Application.Directory;
+﻿using EmployeeService.Application.Directory;
 
 namespace EmployeeService.IntegrationTests;
 

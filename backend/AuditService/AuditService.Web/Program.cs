@@ -1,4 +1,4 @@
-using AuditService.Infrastructure;
+﻿using AuditService.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Serilog;
 using Shared.HealthChecks;

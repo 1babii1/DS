@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 
 // AuditConsumer.HandleWithRetryAndDeadLetter is internal specifically so
 // AuditService.IntegrationTests can call it directly against a real database

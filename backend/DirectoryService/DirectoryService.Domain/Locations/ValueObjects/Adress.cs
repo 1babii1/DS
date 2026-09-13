@@ -24,7 +24,9 @@ public record Address
         // без них слишком длинный адрес проходит валидацию и падает уже на вставке,
         // превращая ошибку ввода в 500.
         if (string.IsNullOrWhiteSpace(street))
+        {
             errors.Add(new ErrorMessage("value.is.required", "Street is required", nameof(Street)));
+        }
         else if (street.Length is < LengthConstants.MinTextLength or > LengthConstants.MaxStreetLength)
         {
             errors.Add(GeneralErrors.LengthIsInvalid(
@@ -32,7 +34,9 @@ public record Address
         }
 
         if (string.IsNullOrWhiteSpace(city))
+        {
             errors.Add(new ErrorMessage("value.is.required", "City is required", nameof(City)));
+        }
         else if (city.Length is < LengthConstants.MinTextLength or > LengthConstants.MaxCityLength)
         {
             errors.Add(GeneralErrors.LengthIsInvalid(
@@ -40,7 +44,9 @@ public record Address
         }
 
         if (string.IsNullOrWhiteSpace(country))
+        {
             errors.Add(new ErrorMessage("value.is.required", "Country is required", nameof(Country)));
+        }
         else if (country.Length is < LengthConstants.MinTextLength or > LengthConstants.MaxCountryLength)
         {
             errors.Add(GeneralErrors.LengthIsInvalid(

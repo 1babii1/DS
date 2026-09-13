@@ -1,4 +1,4 @@
-using DirectoryService.Application.Database;
+﻿using DirectoryService.Application.Database;
 using DirectoryService.Domain.Departments.ValueObjects;
 using DirectoryService.Domain.Positions.ValueObjects;
 using Grpc.Core;
