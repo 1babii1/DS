@@ -69,29 +69,30 @@ public class GetChildrenLazyHandler
         using var connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
 
         var departments = await connection.QueryAsync<ReadDepartmentHierarchyDto>(
-            """
-            SELECT d.id,
-                   d.name,
-                   d.parent_id,
-                   d.created_at,
-                   d.updated_at,
-                   d.is_active,
-                   d.identifier,
-                   d.path,
-                   d.depth,
-                   (EXISTS (SELECT 1 FROM departments WHERE parent_id = d.id)) AS has_more_children
-            FROM departments d
-            WHERE d.parent_id = @departmentId
-            ORDER BY d.created_at
-            LIMIT @pageSize OFFSET @offset
-
-            """,
-            param: new
-            {
-                departmentId = request.ParentId,
-                pageSize = request.Request.PageSize,
-                offset = (request.Request.Page - 1) * request.Request.PageSize,
-            });
+            new CommandDefinition(
+                """
+                SELECT d.id,
+                       d.name,
+                       d.parent_id,
+                       d.created_at,
+                       d.updated_at,
+                       d.is_active,
+                       d.identifier,
+                       d.path,
+                       d.depth,
+                       (EXISTS (SELECT 1 FROM departments WHERE parent_id = d.id)) AS has_more_children
+                FROM departments d
+                WHERE d.parent_id = @departmentId
+                ORDER BY d.created_at
+                LIMIT @pageSize OFFSET @offset
+                """,
+                new
+                {
+                    departmentId = request.ParentId,
+                    pageSize = request.Request.PageSize,
+                    offset = (request.Request.Page - 1) * request.Request.PageSize,
+                },
+                cancellationToken: cancellationToken));
 
         return departments.ToList();
     }
