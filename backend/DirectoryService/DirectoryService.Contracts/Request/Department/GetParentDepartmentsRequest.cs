@@ -1,4 +1,4 @@
-namespace DirectoryService.Contracts.Request.Department;
+﻿namespace DirectoryService.Contracts.Request.Department;
 
 /// <param name="Preferch">
 /// Misspelling of "prefetch", kept as-is deliberately: it is a public query

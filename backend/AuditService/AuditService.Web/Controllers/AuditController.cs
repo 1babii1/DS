@@ -1,4 +1,4 @@
-using AuditService.Infrastructure;
+﻿using AuditService.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -50,6 +50,7 @@ public class AuditController(AuditDbContext dbContext) : ControllerBase
     /// PagedResponse.MaxSize: журнал растёт бесконечно, и запрос без потолка означал
     /// возможность вытащить его целиком одним вызовом.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous operation.</placeholder></returns>
     [HttpGet]
     public async Task<ActionResult<PagedResponse<AuditEntryDto>>> List(
         [FromQuery] string? aggregateId,
@@ -96,6 +97,7 @@ public class AuditController(AuditDbContext dbContext) : ControllerBase
     /// эндпоинта их существование было бы видно только в критических логах - здесь
     /// они остаются доступны для разбора и ручного повторного воспроизведения.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous operation.</placeholder></returns>
     [HttpGet("dead-letters")]
     public async Task<ActionResult<PagedResponse<DeadLetterDto>>> ListDeadLetters(
         [FromQuery] int? page,

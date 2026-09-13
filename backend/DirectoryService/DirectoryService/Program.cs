@@ -1,6 +1,4 @@
-using Shared.HealthChecks;
-using Shared.Middlewares;
-using Shared.Cors;
+using System.Threading.RateLimiting;
 using DirectoryService.Application.Database;
 using DirectoryService.Application.Department.Commands;
 using DirectoryService.Application.Department.Queries;
@@ -8,25 +6,27 @@ using DirectoryService.Application.Location.Commands;
 using DirectoryService.Application.Location.Queries;
 using DirectoryService.Application.Position;
 using DirectoryService.Application.Position.Queries;
+using DirectoryService.Application.Search;
 using DirectoryService.Grpc;
 using DirectoryService.Infrastructure.Postgres;
 using DirectoryService.Infrastructure.Postgres.Backgrounds;
 using DirectoryService.Infrastructure.Postgres.Database;
+using DirectoryService.Infrastructure.Postgres.Embeddings;
 using DirectoryService.Infrastructure.Postgres.Repositories.Departments;
 using DirectoryService.Infrastructure.Postgres.Repositories.Locations;
 using DirectoryService.Infrastructure.Postgres.Repositories.Positions;
-using System.Threading.RateLimiting;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
-using DirectoryService.Application.Search;
-using DirectoryService.Infrastructure.Postgres.Embeddings;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Shared;
+using Shared.Cors;
+using Shared.HealthChecks;
+using Shared.Middlewares;
 using Shared.Outbox;
 using Shared.Security;
 
@@ -163,7 +163,8 @@ builder.Services.AddStackExchangeRedisCache(setup =>
 
 builder.Services.AddHybridCache(options => options.DefaultEntryOptions = new HybridCacheEntryOptions
 {
-    LocalCacheExpiration = TimeSpan.FromMinutes(5), Expiration = TimeSpan.FromMinutes(30),
+    LocalCacheExpiration = TimeSpan.FromMinutes(5),
+    Expiration = TimeSpan.FromMinutes(30),
 });
 
 builder.Services.AddDatabaseHealthCheck<DirectoryServiceDbContext>();
@@ -194,7 +195,6 @@ app.UseExceptionMiddleware();
 app.UseSerilogRequestLogging();
 
 app.UseHttpLogging();
-
 
 // Configure the HTTP request pipeline.
 // if (app.Environment.IsDevelopment() || app.Environment.Is)

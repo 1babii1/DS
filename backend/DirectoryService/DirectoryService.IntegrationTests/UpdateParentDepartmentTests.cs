@@ -81,6 +81,7 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
             sut.Handle(command, CancellationToken.None));
 
         Assert.True(result.IsFailure);
+
         // Assert.Contains("not found", result.Error.Messages.Select(m => m.Message), StringComparison.OrdinalIgnoreCase);
     }
 

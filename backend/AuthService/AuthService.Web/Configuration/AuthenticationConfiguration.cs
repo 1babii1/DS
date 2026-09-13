@@ -1,4 +1,4 @@
-using AuthService.Domain;
+﻿using AuthService.Domain;
 using AuthService.Infrastructure.Postgres;
 using Microsoft.AspNetCore.Identity;
 using OpenIddict.Abstractions;

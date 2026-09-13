@@ -1,4 +1,4 @@
-namespace Shared.Outbox;
+﻿namespace Shared.Outbox;
 
 public class OutboxPublisherOptions
 {

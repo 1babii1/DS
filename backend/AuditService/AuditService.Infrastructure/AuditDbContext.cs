@@ -34,6 +34,7 @@ public class AuditDbContext(DbContextOptions<AuditDbContext> options) : DbContex
             entity.HasKey(e => e.Id);
 
             entity.Property(e => e.Topic).HasMaxLength(200).IsRequired();
+
             // Unbounded, unlike AggregateId in Entries: this table exists specifically to
             // capture messages the normal constraints reject, so it cannot carry a
             // constraint of its own that a poison message could violate the same way.

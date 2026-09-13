@@ -1,4 +1,4 @@
-using AuthService.Application;
+﻿using AuthService.Application;
 using AuthService.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;

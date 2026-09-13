@@ -1,4 +1,4 @@
-namespace Shared.Outbox;
+﻿namespace Shared.Outbox;
 
 // Written in the same DB transaction as the domain change it describes - this is what
 // makes the "publish an event" step atomic with the write it accompanies (the classic

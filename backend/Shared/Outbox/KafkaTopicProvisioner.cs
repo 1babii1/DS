@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Confluent.Kafka.Admin;
 using Microsoft.Extensions.Logging;
 
@@ -37,6 +37,7 @@ public static class KafkaTopicProvisioner
     /// недоступная при старте Kafka уносила вместе с собой и HTTP-API сервиса, хотя
     /// шина нужна только для асинхронной доставки событий.
     /// </summary>
+    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous operation.</placeholder></returns>
     public static async Task WaitForTopicsAsync(
         string bootstrapServers,
         ILogger logger,

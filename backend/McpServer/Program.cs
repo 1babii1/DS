@@ -1,4 +1,4 @@
-using McpServer.Embeddings;
+﻿using McpServer.Embeddings;
 using McpServer.HealthChecks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;

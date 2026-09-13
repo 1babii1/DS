@@ -1,4 +1,4 @@
-namespace EmployeeService.Domain;
+﻿namespace EmployeeService.Domain;
 
 public enum EmployeeStatus
 {

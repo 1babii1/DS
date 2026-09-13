@@ -23,12 +23,12 @@ public record LocationName
 
     public static Result<LocationName, Error> Create(string value)
     {
-        if(string.IsNullOrWhiteSpace(value))
+        if (string.IsNullOrWhiteSpace(value))
             return Error.Validation(null!, "Location name is required");
 
         string trimmed = value.Trim();
 
-        if(trimmed.Length is < LengthConstants.MinTextLength or > LengthConstants.MaxLocationNameLength)
+        if (trimmed.Length is < LengthConstants.MinTextLength or > LengthConstants.MaxLocationNameLength)
             return Error.Validation("length.is.invalid", "Location name must be between 3 and 150 characters");
 
         LocationName name = new(trimmed);

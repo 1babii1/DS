@@ -19,7 +19,7 @@ namespace DirectoryService.Infrastructure.Postgres.Migrations
                 {
                     department_id = table.Column<Guid>(type: "uuid", nullable: false),
                     embedding = table.Column<Vector>(type: "vector(768)", nullable: false),
-                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    updated_at = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                 },
                 constraints: table =>
                 {

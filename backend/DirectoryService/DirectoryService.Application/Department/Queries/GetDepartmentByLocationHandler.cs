@@ -1,4 +1,4 @@
-using Dapper;
+﻿using Dapper;
 using DirectoryService.Application.Database;
 using DirectoryService.Contracts.Request.Department;
 using DirectoryService.Contracts.Response.Department;

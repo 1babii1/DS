@@ -1,4 +1,4 @@
-namespace DirectoryService.Contracts.Request.Location;
+﻿namespace DirectoryService.Contracts.Request.Location;
 
 /// <param name="DepartmentId">Необязательный фильтр: только локации этого департамента.
 /// Без него возвращается весь каталог, включая локации без привязок.</param>

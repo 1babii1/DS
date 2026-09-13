@@ -1,4 +1,4 @@
-namespace Shared;
+﻿namespace Shared;
 
 /// <summary>
 /// Страница результатов вместе с метаданными. Без Total клиент не может показать

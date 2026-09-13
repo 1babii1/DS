@@ -1,4 +1,4 @@
-using AuthService.Domain;
+﻿using AuthService.Domain;
 using AuthService.Web.Contracts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;

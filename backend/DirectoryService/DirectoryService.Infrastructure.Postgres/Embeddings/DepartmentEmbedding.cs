@@ -1,4 +1,4 @@
-using Pgvector;
+﻿using Pgvector;
 
 namespace DirectoryService.Infrastructure.Postgres.Embeddings;
 

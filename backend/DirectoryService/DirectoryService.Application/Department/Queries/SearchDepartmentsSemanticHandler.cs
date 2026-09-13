@@ -1,4 +1,4 @@
-using DirectoryService.Application.Search;
+﻿using DirectoryService.Application.Search;
 using DirectoryService.Contracts.Response.Department;
 using FluentValidation;
 using FluentValidation.Results;

@@ -1,4 +1,4 @@
-namespace McpServer.Embeddings;
+﻿namespace McpServer.Embeddings;
 
 public sealed class EmbeddingsOptions
 {

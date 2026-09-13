@@ -1,4 +1,4 @@
-namespace EmployeeService.Application.Directory;
+﻿namespace EmployeeService.Application.Directory;
 
 public record DepartmentLookupResult(bool Found, string Name, bool IsActive);
 

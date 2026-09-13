@@ -34,8 +34,10 @@ public record PositionDescription
         // Было >= с сообщением про 100 символов: описание ровно в лимит отклонялось,
         // а текст ошибки называл границу, не имеющую отношения к проверке.
         if (trimmed.Length > LengthConstants.MaxPositionDescriptionLength)
+        {
             return GeneralErrors.LengthIsInvalid(
                 "Position description", max: LengthConstants.MaxPositionDescriptionLength);
+        }
 
         PositionDescription description = new(trimmed);
 

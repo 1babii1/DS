@@ -1,4 +1,4 @@
-namespace AuditService.Domain;
+﻿namespace AuditService.Domain;
 
 // Append-only: rows are never updated or deleted. MessageId is the Kafka outbox
 // message id set by the producer - the unique index on it is what makes writing
@@ -32,14 +32,14 @@ public class AuditEntry
         string aggregateId,
         string payloadJson,
         DateTime occurredAt) => new()
-    {
-        Id = Guid.NewGuid(),
-        MessageId = messageId,
-        SourceService = sourceService,
-        EventType = eventType,
-        AggregateId = aggregateId,
-        Payload = payloadJson,
-        OccurredAt = occurredAt,
-        ReceivedAt = DateTime.UtcNow,
-    };
+        {
+            Id = Guid.NewGuid(),
+            MessageId = messageId,
+            SourceService = sourceService,
+            EventType = eventType,
+            AggregateId = aggregateId,
+            Payload = payloadJson,
+            OccurredAt = occurredAt,
+            ReceivedAt = DateTime.UtcNow,
+        };
 }

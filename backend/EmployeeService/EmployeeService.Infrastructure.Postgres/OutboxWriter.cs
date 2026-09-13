@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using EmployeeService.Application.Database;
 using Shared.Outbox;
 

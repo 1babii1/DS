@@ -1,4 +1,4 @@
-namespace AuthService.Domain;
+﻿namespace AuthService.Domain;
 
 public static class RoleNames
 {

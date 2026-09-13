@@ -1,4 +1,4 @@
-namespace DirectoryService.Contracts.Response.Department;
+﻿namespace DirectoryService.Contracts.Response.Department;
 
 public record DepartmentSearchResultDto
 {
