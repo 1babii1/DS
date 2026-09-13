@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using Shared;
+using Shared.Database;
 
 namespace DirectoryService.Infrastructure.Postgres.Repositories.Locations;
 
@@ -33,7 +34,7 @@ public class EfCoreLocationsRepository : ILocationsRepository
 
             return locations.Id.Value;
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
+        catch (DbUpdateException ex) when (ex.IsUniqueViolation() && ex.InnerException is PostgresException pgEx)
         {
             _logger.LogError(ex, "Error adding location");
 
@@ -105,20 +106,6 @@ public class EfCoreLocationsRepository : ILocationsRepository
             var missedIds = enumerable.Except(allLocationIds);
 
             return Result.Success<IEnumerable<LocationId>, Error>(missedIds);
-        }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx)
-        {
-            if (pgEx.SqlState == "23503")
-            {
-                return Error.Conflict("foreign.key", "Related entity not found");
-            }
-
-            if (pgEx.SqlState == "23505")
-            {
-                return Error.Conflict("unique.constraint", "Duplicate value");
-            }
-
-            return Error.Failure("location.update", "Database error");
         }
         catch (Exception e)
         {

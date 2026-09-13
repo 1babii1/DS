@@ -3,8 +3,8 @@ using EmployeeService.Application.Database;
 using EmployeeService.Application.Employees.Errors;
 using EmployeeService.Domain;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using Shared;
+using Shared.Database;
 
 namespace EmployeeService.Infrastructure.Postgres;
 
@@ -34,7 +34,7 @@ public class EmployeeRepository(EmployeeDbContext dbContext) : IEmployeeReposito
             // that as a conflict, not as an opaque 500.
             return EmployeeErrors.ConcurrencyConflict();
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        catch (DbUpdateException ex) when (ex.IsUniqueViolation())
         {
             // Two concurrent hires with the same email both pass validation and both
             // reach here; the unique index is what actually decides which one wins.
