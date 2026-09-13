@@ -20,7 +20,7 @@ public class LocationConfigurations : IEntityTypeConfiguration<Locations>
             .HasColumnName("id");
 
         builder.Property(l => l.Name)
-            .HasConversion(l => l.Value, name => LocationName.Create(name).Value)
+            .HasConversion(l => l.Value, value => LocationName.FromPersisted(value))
             .IsRequired()
             .HasMaxLength(LengthConstants.MaxLocationNameLength)
             .HasColumnName("name");
@@ -30,7 +30,7 @@ public class LocationConfigurations : IEntityTypeConfiguration<Locations>
             .HasDatabaseName("ux_locations_name");
 
         builder.Property(l => l.Timezone)
-            .HasConversion(l => l.Value, timezone => Timezone.Create(timezone).Value)
+            .HasConversion(l => l.Value, value => Timezone.FromPersisted(value))
             .IsRequired()
             .HasColumnName("timezone");
 
