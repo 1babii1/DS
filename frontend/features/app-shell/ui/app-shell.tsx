@@ -18,6 +18,7 @@ import type { ComponentType, ReactNode } from 'react'
 
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/shared/ui/sheet'
 
+import { CommandMenu } from './command-menu'
 import { ThemeToggle } from './theme-toggle'
 
 const navigation: ReadonlyArray<{
@@ -129,6 +130,7 @@ export function AppShell({ accountControl, children }: { accountControl: ReactNo
 					<p className='app-topbar__context'>People operations workspace</p>
 					<div className='app-topbar__actions'>
 						<span className='environment-badge'><span aria-hidden='true' />Local environment</span>
+						<CommandMenu />
 						{accountControl}
 						<ThemeToggle />
 					</div>
