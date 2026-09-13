@@ -154,14 +154,18 @@ services:
     build:
       context: ./backend
       dockerfile: McpServer/Dockerfile
-    ports:
-      - "5133:5133"
+    # Порт наружу не публикуется: доступ только через nginx на /mcp, как у остальных
+    # сервисов. Опубликованный порт означал вход в обход шлюза.
+    expose:
+      - "5133"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://*:5133
     depends_on:
       postgres:
         condition: service_healthy
+      auth_service:
+        condition: service_started
       directory_service:
         condition: service_started
       employee_service:
