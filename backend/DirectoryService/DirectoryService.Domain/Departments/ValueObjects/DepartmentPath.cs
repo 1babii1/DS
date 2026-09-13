@@ -85,6 +85,6 @@ public partial record DepartmentPath
         return new DepartmentPath(newPathValue);
     }
 
-    [GeneratedRegex(@"^[a-zA-Z.-]+$")]
+    [GeneratedRegex(@"^[a-zA-Z0-9.-]+$")]
     private static partial Regex LatinDotHyphenRegex();
 }
