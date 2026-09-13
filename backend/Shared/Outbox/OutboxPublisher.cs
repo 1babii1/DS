@@ -21,7 +21,13 @@ public class OutboxPublisher<TContext>(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await KafkaTopicProvisioner.EnsureTopicsExistAsync(_options.BootstrapServers, _options.Topic);
+        await KafkaTopicProvisioner.WaitForTopicsAsync(
+            _options.BootstrapServers, logger, stoppingToken, _options.Topic);
+
+        if (stoppingToken.IsCancellationRequested)
+        {
+            return;
+        }
 
         _producer = new ProducerBuilder<string, string>(
             new ProducerConfig { BootstrapServers = _options.BootstrapServers }).Build();
@@ -32,12 +38,21 @@ public class OutboxPublisher<TContext>(
             {
                 await PublishPendingAsync(stoppingToken);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogError(ex, "Outbox publish cycle failed for topic {Topic}", _options.Topic);
             }
 
-            await Task.Delay(_options.PollInterval, stoppingToken);
+            // Отмена при остановке - это штатное завершение, а не сбой: вылетевшее
+            // отсюда исключение тоже остановило бы хост.
+            try
+            {
+                await Task.Delay(_options.PollInterval, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
         }
     }
 
