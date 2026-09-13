@@ -27,7 +27,7 @@ public class LocationController : ControllerBase
     /// Сортировка: активные первыми, затем по имени. Размер страницы ограничен
     /// <see cref="PagedResponse{T}.MaxSize"/>.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous operation.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     [HttpGet]
     [ProducesResponseType<PagedResponse<ReadLocationDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResponse<ReadLocationDto>>> GetLocations(
@@ -40,7 +40,7 @@ public class LocationController : ControllerBase
     /// Локации конкретного департамента. Оставлен для существующих потребителей;
     /// для каталога используйте GET /api/locations.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous operation.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     [HttpGet("by-department")]
     public async Task<ActionResult<List<ReadLocationDto>?>> GetLocationByDepartment(
         [FromQuery] GetLocationByDepartmentRequest request,

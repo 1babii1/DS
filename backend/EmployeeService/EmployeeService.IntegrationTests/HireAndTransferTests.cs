@@ -152,8 +152,8 @@ public class HireAndTransferTests : IClassFixture<EmployeeTestWebFactory>, IAsyn
         var repositoryA = scopeA.ServiceProvider.GetRequiredService<EmployeeService.Application.Database.IEmployeeRepository>();
         var repositoryB = scopeB.ServiceProvider.GetRequiredService<EmployeeService.Application.Database.IEmployeeRepository>();
 
-        var employeeA = (await dbA.Employees.SingleAsync(e => e.Id == employeeId));
-        var employeeB = (await dbB.Employees.SingleAsync(e => e.Id == employeeId));
+        var employeeA = await dbA.Employees.SingleAsync(e => e.Id == employeeId);
+        var employeeB = await dbB.Employees.SingleAsync(e => e.Id == employeeId);
 
         var departmentA = Guid.NewGuid();
         var departmentB = Guid.NewGuid();

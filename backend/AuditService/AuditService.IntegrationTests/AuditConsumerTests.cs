@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using AuditService.Infrastructure;
 using Confluent.Kafka;
 using Microsoft.EntityFrameworkCore;

@@ -1,4 +1,4 @@
-using Xunit;
+﻿using Xunit;
 
 // One shared database per fixture, cleaned via Respawn between tests. Parallel test
 // execution races two Respawn resets against each other and Postgres deadlocks -

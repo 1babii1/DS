@@ -1,4 +1,4 @@
-using AuditService.Domain;
+﻿using AuditService.Domain;
 using Microsoft.EntityFrameworkCore;
 
 namespace AuditService.Infrastructure;

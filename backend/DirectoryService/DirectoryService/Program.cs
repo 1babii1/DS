@@ -1,4 +1,4 @@
-using System.Threading.RateLimiting;
+﻿using System.Threading.RateLimiting;
 using DirectoryService.Application.Database;
 using DirectoryService.Application.Department.Commands;
 using DirectoryService.Application.Department.Queries;

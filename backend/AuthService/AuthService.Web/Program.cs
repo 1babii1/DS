@@ -1,4 +1,4 @@
-using System.Threading.RateLimiting;
+﻿using System.Threading.RateLimiting;
 using AuthService.Application;
 using AuthService.Infrastructure.Postgres;
 using AuthService.Web.Configuration;

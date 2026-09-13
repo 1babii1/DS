@@ -24,7 +24,7 @@ public class PositionController : ControllerBase
     /// Каталог позиций с привязанными департаментами. Сортировка: активные первыми,
     /// затем по имени. Размер страницы ограничен <see cref="PagedResponse{T}.MaxSize"/>.
     /// </summary>
-    /// <returns><placeholder>A <see cref="Task"/> representing the asynchronous operation.</placeholder></returns>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     [HttpGet]
     [ProducesResponseType<PagedResponse<ReadPositionDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResponse<ReadPositionDto>>> GetPositions(
