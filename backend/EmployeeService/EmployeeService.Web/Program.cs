@@ -9,6 +9,7 @@ using EmployeeService.Infrastructure.Postgres;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Serilog;
 using Shared.Outbox;
+using Shared.Security;
 
 // Required for the gRPC client to call DirectoryService over cleartext HTTP/2 (h2c) -
 // no TLS between services inside the docker network for this pet project.
@@ -42,7 +43,7 @@ builder.Services
     });
 
 builder.Services.AddAuthorizationBuilder()
-    .AddPolicy("CanEdit", policy => policy.RequireRole("admin", "editor"));
+    .AddPolicy("CanEdit", policy => policy.RequireRole(RoleNames.Admin, RoleNames.Editor));
 
 builder.Services.AddInfrastructurePostgres(builder.Configuration);
 builder.Services.AddDirectoryGrpcClient(builder.Configuration);

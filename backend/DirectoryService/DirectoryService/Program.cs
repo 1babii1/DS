@@ -15,9 +15,11 @@ using DirectoryService.Infrastructure.Postgres.Database;
 using DirectoryService.Infrastructure.Postgres.Repositories.Departments;
 using DirectoryService.Infrastructure.Postgres.Repositories.Locations;
 using DirectoryService.Infrastructure.Postgres.Repositories.Positions;
+using System.Threading.RateLimiting;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using DirectoryService.Application.Search;
 using DirectoryService.Infrastructure.Postgres.Embeddings;
@@ -26,6 +28,7 @@ using Microsoft.Extensions.Options;
 using Serilog;
 using Shared;
 using Shared.Outbox;
+using Shared.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -77,7 +80,7 @@ builder.Services
     });
 
 builder.Services.AddAuthorizationBuilder()
-    .AddPolicy("CanEdit", policy => policy.RequireRole("admin", "editor"));
+    .AddPolicy("CanEdit", policy => policy.RequireRole(RoleNames.Admin, RoleNames.Editor));
 
 builder.Services.AddValidatorsFromAssemblyContaining<CreateDepartmentValidation>();
 
@@ -165,6 +168,24 @@ builder.Services.AddHybridCache(options => options.DefaultEntryOptions = new Hyb
 
 builder.Services.AddDatabaseHealthCheck<DirectoryServiceDbContext>();
 
+// Semantic search does an Ollama round trip plus a vector-distance query on every
+// call - an authenticated caller in a tight loop (a buggy client, a compromised
+// token) can still drive real load per request, unlike a plain indexed read.
+// 30/min per IP is generous for real usage, tight enough to blunt a loop.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("search", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 30,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
+});
+
 var app = builder.Build();
 
 app.UseRequestCorrelationId();
@@ -185,6 +206,7 @@ app.ConfigureCors();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 app.MapDefaultHealthChecks();
