@@ -134,4 +134,3 @@ An international reviewer understands the product and its engineering decisions 
 - [ ] CI/build/E2E and measured browser checks linked from PR.
 
 Depends on working product workflows. Optional subsequent work: notification persistence/inbox, SSE delivery, history-backed analytics, or keyboard-accessible org-chart drag/drop; each requires its own justification and issue.
-
