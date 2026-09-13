@@ -1,3 +1,4 @@
+using Shared.HealthChecks;
 using Shared.Middlewares;
 using AuditService.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -32,6 +33,8 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddAuditInfrastructure(builder.Configuration);
 
+builder.Services.AddDatabaseHealthCheck<AuditDbContext>();
+
 var app = builder.Build();
 
 app.UseRequestCorrelationId();
@@ -46,6 +49,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapDefaultHealthChecks();
 
 app.Run();
 

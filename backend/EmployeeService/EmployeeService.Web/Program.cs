@@ -1,3 +1,4 @@
+using Shared.HealthChecks;
 using Shared.Middlewares;
 using Shared.Cors;
 using EmployeeService.Application.Database;
@@ -54,6 +55,8 @@ builder.Services.AddScoped<TransferEmployeeHandler>();
 builder.Services.AddScoped<GetEmployeeByIdHandler>();
 builder.Services.AddScoped<ListEmployeesHandler>();
 
+builder.Services.AddDatabaseHealthCheck<EmployeeDbContext>();
+
 var app = builder.Build();
 
 app.UseRequestCorrelationId();
@@ -70,6 +73,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapDefaultHealthChecks();
 
 app.Run();
 

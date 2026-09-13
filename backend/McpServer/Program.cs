@@ -1,4 +1,5 @@
 using McpServer.Embeddings;
+using McpServer.HealthChecks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Npgsql;
@@ -44,6 +45,10 @@ builder.Services
 builder.Services.AddAuthorization();
 
 builder.Services
+    .AddHealthChecks()
+    .AddCheck<NpgsqlDataSourceHealthCheck>("database", tags: ["ready"]);
+
+builder.Services
     .AddMcpServer()
     .WithHttpTransport()
     .WithToolsFromAssembly();
@@ -54,5 +59,10 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapMcp("/mcp").RequireAuthorization();
+
+// Как и в остальных сервисах: liveness ничего не проверяет (перезапуск не
+// чинит недоступную базу), readiness проверяет то, что помечено тегом "ready".
+app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).AllowAnonymous();
+app.MapHealthChecks("/health/ready", new() { Predicate = c => c.Tags.Contains("ready") }).AllowAnonymous();
 
 app.Run();
