@@ -46,11 +46,13 @@ public class EmployeeController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<EmployeeDto>>> List(
+    public async Task<ActionResult<PagedResponse<EmployeeDto>>> List(
         [FromQuery] Guid? departmentId,
+        [FromQuery] int? page,
+        [FromQuery] int? size,
         [FromServices] ListEmployeesHandler handler,
         CancellationToken cancellationToken) =>
-        Ok(await handler.Handle(departmentId, cancellationToken));
+        Ok(await handler.Handle(departmentId, page, size, cancellationToken));
 
     // 503 отдаётся только при реальной недоступности зависимости. Раньше сюда попадала
     // любая неклассифицированная ошибка, включая отказ авторизации, из-за чего клиент
