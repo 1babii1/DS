@@ -82,11 +82,15 @@ builder.Services.AddValidatorsFromAssemblyContaining<CreateDepartmentValidation>
 
 builder.Services.AddSingleton<IConfigureOptions<JsonOptions>, InjectJSONSerializeConfig>();
 
-builder.Services.AddScoped<DirectoryServiceDbContext>(_ =>
-    new DirectoryServiceDbContext(builder.Configuration.GetConnectionString("DirectoryServiceDb")!));
+builder.Services.AddScoped<DirectoryServiceDbContext>(sp =>
+    new DirectoryServiceDbContext(
+        builder.Configuration.GetConnectionString("DirectoryServiceDb")!,
+        sp.GetRequiredService<ILoggerFactory>()));
 
-builder.Services.AddScoped<IReadDbContext, DirectoryServiceDbContext>(_ =>
-    new DirectoryServiceDbContext(builder.Configuration.GetConnectionString("DirectoryServiceDb")!));
+builder.Services.AddScoped<IReadDbContext, DirectoryServiceDbContext>(sp =>
+    new DirectoryServiceDbContext(
+        builder.Configuration.GetConnectionString("DirectoryServiceDb")!,
+        sp.GetRequiredService<ILoggerFactory>()));
 
 builder.Services.Configure<ClearDbOptions>(builder.Configuration.GetSection("ClearDbOptions"));
 
