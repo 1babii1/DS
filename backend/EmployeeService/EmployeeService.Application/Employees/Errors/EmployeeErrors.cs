@@ -35,4 +35,7 @@ public static class EmployeeErrors
         Error.Conflict(
             "employee.concurrency_conflict",
             "This employee was modified by another request - reload and try again");
+
+    public static Error EmailAlreadyExists(string email) =>
+        Error.Conflict("employee.email.already_exists", $"An employee with email '{email}' already exists", "email");
 }
