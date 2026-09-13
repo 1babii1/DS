@@ -1,5 +1,6 @@
 ﻿using DirectoryService.Application.Department.Commands;
 using DirectoryService.Application.Department.Queries;
+using DirectoryService.Contracts.Response.Department;
 using DirectoryService.Contracts.Request.Department;
 using DirectoryService.Contracts.Response.Department;
 using DirectoryService.Domain.Departments.ValueObjects;
@@ -52,6 +53,18 @@ public class DepartmentController : ControllerBase
         [FromServices] GetDepartmentByLocationHandler handler,
         CancellationToken cancellationToken) =>
         await handler.Handle(request, cancellationToken);
+
+    [HttpGet("search")]
+    public async Task<ActionResult<List<DepartmentSearchResultDto>?>> SearchSemantic(
+        [FromQuery] string query,
+        [FromQuery] int limit,
+        [FromServices] SearchDepartmentsSemanticHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var effectiveLimit = limit <= 0 ? 10 : limit;
+        var request = new SearchDepartmentsSemanticRequest(query, effectiveLimit);
+        return await handler.Handle(request, cancellationToken);
+    }
 
     [HttpGet("top-positions")]
     public async Task<ActionResult<List<ReadDepartmentsTopDto>?>> GetDepartmentsTopForPositions(

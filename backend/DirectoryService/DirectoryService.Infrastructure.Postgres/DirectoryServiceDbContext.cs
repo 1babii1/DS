@@ -4,8 +4,10 @@ using DirectoryService.Domain.DepartmentPositions;
 using DirectoryService.Domain.Departments;
 using DirectoryService.Domain.Locations;
 using DirectoryService.Domain.Positions;
+using DirectoryService.Infrastructure.Postgres.Embeddings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Pgvector.EntityFrameworkCore;
 
 namespace DirectoryService.Infrastructure.Postgres;
 
@@ -25,7 +27,7 @@ public class DirectoryServiceDbContext : DbContext, IReadDbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        optionsBuilder.UseNpgsql(_connectionString);
+        optionsBuilder.UseNpgsql(_connectionString, o => o.UseVector());
         optionsBuilder.UseLoggerFactory(LoggerFactory);
     }
 
@@ -44,6 +46,8 @@ public class DirectoryServiceDbContext : DbContext, IReadDbContext
     public DbSet<DepartmentLocation> DepartmentLocations => Set<DepartmentLocation>();
 
     public DbSet<DepartmentPosition> DepartmentPositions => Set<DepartmentPosition>();
+
+    public DbSet<DepartmentEmbedding> DepartmentEmbeddings => Set<DepartmentEmbedding>();
 
     public IQueryable<Departments> DepartmentsRead => Set<Departments>().AsNoTracking();
 
