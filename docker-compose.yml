@@ -46,6 +46,9 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://*:5130
+      - Auth__WebClient__Enabled
+      - Auth__WebClient__FrontendOrigin
+      - Auth__WebClient__ClientSecret
     depends_on:
       postgres:
         condition: service_healthy
