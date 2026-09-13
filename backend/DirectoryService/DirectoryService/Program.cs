@@ -16,6 +16,8 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using DirectoryService.Application.Search;
+using DirectoryService.Infrastructure.Postgres.Embeddings;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Options;
 using Serilog;
@@ -103,6 +105,18 @@ builder.Services.AddScoped<ITransactionManager, TransactionManager>();
 
 builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
 builder.Services.AddOutboxPublisher<DirectoryServiceDbContext>(builder.Configuration, "directory.events");
+
+builder.Services.AddOptions<EmbeddingsOptions>()
+    .Bind(builder.Configuration.GetSection(EmbeddingsOptions.SectionName));
+builder.Services.AddHttpClient<IEmbeddingClient, OllamaEmbeddingClient>((sp, client) =>
+{
+    var options = sp.GetRequiredService<IOptions<EmbeddingsOptions>>().Value;
+    client.BaseAddress = new Uri(options.OllamaBaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddHostedService<DepartmentEmbeddingWorker>();
+builder.Services.AddScoped<IDepartmentSemanticSearch, DepartmentSemanticSearchService>();
+builder.Services.AddScoped<SearchDepartmentsSemanticHandler>();
 
 builder.Services.AddScoped<ILocationsRepository, EfCoreLocationsRepository>();
 

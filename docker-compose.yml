@@ -10,6 +10,7 @@ services:
       - "5179:5179"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
+      - Embeddings__OllamaBaseUrl=http://ollama:11434
     depends_on:
       postgres:
         condition: service_healthy
@@ -17,6 +18,8 @@ services:
         condition: service_completed_successfully
       kafka:
         condition: service_healthy
+      ollama_pull:
+        condition: service_completed_successfully
 
   directory_service_migrations:
     container_name: directory_service_migrations
@@ -145,6 +148,27 @@ services:
       './efbundle --connection "Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=postgres;Search Path=audit,public"'
     ]
 
+  mcp_server:
+    container_name: mcp_server
+    restart: always
+    build:
+      context: ./backend
+      dockerfile: McpServer/Dockerfile
+    ports:
+      - "5133:5133"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+      - ASPNETCORE_URLS=http://*:5133
+    depends_on:
+      postgres:
+        condition: service_healthy
+      directory_service:
+        condition: service_started
+      employee_service:
+        condition: service_started
+      ollama_pull:
+        condition: service_completed_successfully
+
   notification_service:
     container_name: notification_service
     restart: always
@@ -199,7 +223,7 @@ services:
 
   postgres:
     container_name: postgres
-    image: postgres
+    image: pgvector/pgvector:pg18
     restart: always
     environment:
       POSTGRES_USER: postgres
@@ -216,6 +240,32 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  ollama:
+    container_name: ollama
+    image: ollama/ollama
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  ollama_pull:
+    container_name: ollama_pull
+    image: ollama/ollama
+    restart: "no"
+    environment:
+      - OLLAMA_HOST=ollama:11434
+    entrypoint: ["ollama", "pull", "nomic-embed-text"]
+    depends_on:
+      ollama:
+        condition: service_healthy
 
   redis:
     container_name: redis
@@ -243,3 +293,4 @@ volumes:
   seq_data:
   redis_data:
   kafka_data:
+  ollama_data:
