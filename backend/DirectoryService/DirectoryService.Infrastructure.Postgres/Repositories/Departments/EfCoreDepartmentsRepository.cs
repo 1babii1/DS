@@ -238,12 +238,6 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
 
             return Result.Success<IEnumerable<DepartmentId>, Error>(missIds);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
-        {
-            _logger.LogError(ex, "Error getting departments ids");
-
-            return Error.Failure("department.get", "Fail to get departments ids");
-        }
         catch (Exception e)
         {
             _logger.LogError(e, "Error getting departments ids");
