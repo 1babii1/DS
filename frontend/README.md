@@ -1,10 +1,30 @@
 # DS frontend
 
-The DS frontend is a Next.js application for the People & Organization workspace.
+The People & Organization workspace is a Next.js application for the DS platform. It provides an accessible, responsive interface for organization data while keeping OAuth credentials on the server.
 
-## Authentication boundary
+## Stack
 
-The browser receives only Auth.js' opaque, `HttpOnly` database-session cookie. OAuth access and refresh tokens live in PostgreSQL schema `web_auth`; they are never exposed to React state, TanStack Query, Axios, local storage, or the browser session JSON.
+- Next.js App Router and React with TypeScript
+- Auth.js with PostgreSQL-backed database sessions
+- Tailwind CSS with semantic design tokens and shadcn/ui primitives
+- TanStack Query for server state
+- `next-themes` for persisted dark and light themes
+
+## Architecture
+
+```text
+app/             Route composition and page metadata
+entities/        Business entities and API contracts
+features/        User-facing capabilities
+widgets/         Composite page sections
+shared/          Reusable UI, hooks, utilities, auth, and infrastructure
+```
+
+`shared/ui` is the shadcn/ui destination. Its aliases are defined in `components.json`, so newly generated components follow the same structure.
+
+### Authentication boundary
+
+The browser receives only Auth.js' opaque, `HttpOnly` database-session cookie. OAuth access and refresh tokens live in the PostgreSQL `web_auth` schema; they are never exposed to React state, TanStack Query, Axios, local storage, or the browser session JSON.
 
 ```mermaid
 sequenceDiagram
@@ -19,52 +39,34 @@ sequenceDiagram
     Next->>Auth: Code exchange as confidential client
     Next->>DB: Store account tokens and session
     Next-->>Browser: HttpOnly session cookie
-    Browser->>Next: /api/backend/employees
+    Browser->>Next: /api/backend/api/departments
     Next->>DB: Read or refresh server-side access token
     Next->>API: Bearer access token
     API-->>Next: Protected result
     Next-->>Browser: API result
 ```
 
-The BFF route only proxies the explicitly allowlisted `/api/departments`, `/api/positions`, `/api/locations`, `/api/employees`, and `/api/audit` paths. It rejects cross-origin mutations and never forwards an upstream `Set-Cookie` header.
+The BFF route proxies only explicitly allowlisted service paths and never forwards upstream cookies.
 
 ## Local setup
 
-Use Node 20.9+; the project is verified with Node 22. The secrets policy permits `.env.example` as the public configuration contract. Do not create or commit `.env` files.
+Use Node.js 20.9 or newer. The public configuration contract is in [.env.example](.env.example); never create or commit an `.env` file.
 
-1. Create the required values interactively in a project vault, for example `ds-portfolio-dev`, with `~/.local/bin/secrets-edit ds-portfolio-dev`.
-2. Supply only variable names from [.env.example](.env.example). `AUTH_SECRET`, `AUTH_OIDC_CLIENT_SECRET`, and `DATABASE_URL` are sensitive. `AUTH_OIDC_ISSUER` addresses AuthService; `BACKEND_API_ORIGIN` addresses nginx. The AuthService also needs `Auth__WebClient__Enabled`, `Auth__WebClient__FrontendOrigin`, and `Auth__WebClient__ClientSecret`.
-3. Apply the idempotent database migration through the narrow migration process:
+1. Create the required values interactively in the project vault with `~/.local/bin/secrets-edit ds-portfolio-dev`.
+2. Apply the idempotent `web_auth` migration:
 
    ```bash
    ~/.local/bin/secrets-run ds-portfolio-dev -- npm run migrate:auth-db
    ```
 
-4. Start the backend with those values injected so Docker Compose passes the web-client settings to AuthService:
+3. Start the backend and frontend with the required configuration injected through the vault runner.
 
-   ```bash
-   ~/.local/bin/secrets-run ds-portfolio-dev -- docker compose up --build
-   ```
-
-5. Start Next.js with the same narrowly injected configuration:
-
-   ```bash
-   ~/.local/bin/secrets-run ds-portfolio-dev -- npm run dev
-   ```
-
-The client is disabled until `Auth__WebClient__Enabled` is true. AuthService then seeds `portfolio-web` as a confidential OpenIddict client, with callback `/api/auth/callback/openiddict` and post-logout redirect `/login`. The pre-existing public client remains unchanged.
-
-## Commands
+## Quality checks
 
 ```bash
-npm run dev
 npm run lint
 npm run build
 npm run migrate:auth-db
 ```
 
-`npm run build` requires the server-auth environment contract because Auth.js validates routes while it builds. CI may inject safe non-production placeholders; deployments must inject real values through the secrets runner or platform secret store.
-
-## Current verification status
-
-Lint and a production build pass with safe build-only placeholders. AuthService builds successfully. A live browser login, refresh and logout check awaits creation of the project vault and application of `web_auth`; it is not claimed as complete.
+A full browser sign-in, refresh, and logout check requires the project vault and `web_auth` migration to be available locally.

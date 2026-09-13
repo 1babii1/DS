@@ -1,8 +1,6 @@
-import axios from "axios";
+import axios from 'axios'
 
 export const axiosInstance = axios.create({
-    baseURL: '',
-    headers: {
-        'Content-Type': 'application/json',
-    },
+	baseURL: '/api/backend',
+	headers: { 'Content-Type': 'application/json' }
 })

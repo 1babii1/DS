@@ -1,62 +1,23 @@
-import React from 'react'
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardFooter,
-	CardHeader,
-	CardTitle
-} from '@/components/ui/card'
-import { ParentDepartment } from '@/entities/departments/types/department.types'
-import { Button } from '@/components/ui/button'
+import { ArrowUpRight, CircleCheck, CircleOff } from 'lucide-react'
 import Link from 'next/link'
 
-type DepartmentCardProps = {
-	department: ParentDepartment
-}
+import type { ParentDepartment } from '@/entities/departments/types/department.types'
 
-export default function DepartmentCard({
-	department
-}: DepartmentCardProps): React.JSX.Element {
+export default function DepartmentCard({ department }: { department: ParentDepartment }) {
 	return (
-		<div className='h-64 w-full'>
-			<Card className='flex h-full flex-col'>
-				<CardHeader>
-					<CardTitle className='line-clamp-2'>
-						<div className='flex flex-row justify-between'>
-							{department.name}
-							<Button>
-								<Link href={`/departments/${department.id}`}>
-									Просмотр
-								</Link>
-							</Button>
-						</div>
-					</CardTitle>
-
-					<CardDescription>
-						Статус: {department.isActive ? 'Активен' : 'Неактивен'}
-					</CardDescription>
-				</CardHeader>
-				<CardContent className='flex-1 overflow-y-auto'>
-					<div className='space-y-2 text-sm'>
-						<p>
-							<span className='font-semibold'>Родитель: </span>
-							{department.parentId
-								? department.parentId
-								: 'Корневой департамент'}
-						</p>
-						<p>
-							<span className='font-semibold'>Путь: </span>
-							{department.path}
-						</p>
-					</div>
-				</CardContent>
-				<CardFooter className='border-t pt-4'>
-					<p className='text-xs text-muted-foreground'>
-						Обновлено {department.updatedAt.toLocaleString()}
-					</p>
-				</CardFooter>
-			</Card>
-		</div>
+		<article className='department-card'>
+			<div className='department-card__header'>
+				<span className='department-card__state' data-active={department.isActive}>
+					{department.isActive ? <CircleCheck aria-hidden='true' size={16} /> : <CircleOff aria-hidden='true' size={16} />}
+					{department.isActive ? 'Active' : 'Inactive'}
+				</span>
+				<Link aria-label={`View ${department.name}`} className='department-card__link' href={`/departments/${department.id}`}><ArrowUpRight aria-hidden='true' size={17} /></Link>
+			</div>
+			<h2>{department.name}</h2>
+			<dl>
+				<div><dt>Path</dt><dd>/{department.path}</dd></div>
+				<div><dt>Last updated</dt><dd>{new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(department.updatedAt))}</dd></div>
+			</dl>
+		</article>
 	)
 }
