@@ -82,7 +82,11 @@ public class HireEmployeeHandler(
             employee.Id.ToString(),
             new EmployeeHiredEvent(employee.Id, employee.FullName, employee.Email, employee.DepartmentId, employee.PositionId));
 
-        await repository.Save(cancellationToken);
+        var saveResult = await repository.Save(cancellationToken);
+        if (saveResult.IsFailure)
+        {
+            return saveResult.Error;
+        }
 
         return employee.Id;
     }

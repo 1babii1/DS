@@ -66,8 +66,6 @@ public class TransferEmployeeHandler(
             command.EmployeeId.ToString(),
             new EmployeeTransferredEvent(command.EmployeeId, command.DepartmentId, command.PositionId));
 
-        await repository.Save(cancellationToken);
-
-        return UnitResult.Success<Error>();
+        return await repository.Save(cancellationToken);
     }
 }

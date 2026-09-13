@@ -10,5 +10,5 @@ public interface IEmployeeRepository
 
     Task<Result<Employee, Error>> GetById(Guid employeeId, CancellationToken cancellationToken);
 
-    Task Save(CancellationToken cancellationToken);
+    Task<UnitResult<Error>> Save(CancellationToken cancellationToken);
 }
