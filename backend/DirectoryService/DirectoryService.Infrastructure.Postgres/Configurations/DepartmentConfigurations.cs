@@ -21,20 +21,20 @@ public class DepartmentConfigurations : IEntityTypeConfiguration<Departments>
 
         builder
             .Property(d => d.Name)
-            .HasConversion(d => d.Value, name => DepartmentName.Create(name).Value)
+            .HasConversion(d => d.Value, value => DepartmentName.FromPersisted(value))
             .IsRequired()
             .HasMaxLength(LengthConstants.MaxDepartmentNameLength)
             .HasColumnName("name");
 
         builder
             .Property(d => d.Identifier)
-            .HasConversion(d => d.Value, identifier => DepartmentIdentifier.Create(identifier).Value)
+            .HasConversion(d => d.Value, value => DepartmentIdentifier.FromPersisted(value))
             .IsRequired()
             .HasMaxLength(LengthConstants.MaxDepartmentIdentifierLength)
             .HasColumnName("identifier");
 
         builder.Property(d => d.Path)
-            .HasConversion(d => d.Value, path => DepartmentPath.Create(path).Value)
+            .HasConversion(d => d.Value, value => DepartmentPath.FromPersisted(value))
             .HasColumnType("ltree")
             .HasColumnName("path")
             .IsRequired();
