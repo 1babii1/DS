@@ -25,6 +25,7 @@
     <Project Path="EmployeeService/EmployeeService.Domain/EmployeeService.Domain.csproj" />
     <Project Path="EmployeeService/EmployeeService.Infrastructure.DirectoryGrpc/EmployeeService.Infrastructure.DirectoryGrpc.csproj" />
     <Project Path="EmployeeService/EmployeeService.Infrastructure.Postgres/EmployeeService.Infrastructure.Postgres.csproj" />
+    <Project Path="EmployeeService/EmployeeService.IntegrationTests/EmployeeService.IntegrationTests.csproj" />
     <Project Path="EmployeeService/EmployeeService.Web/EmployeeService.Web.csproj" />
   </Folder>
   <Project Path="McpServer/McpServer.csproj" />
