@@ -3,6 +3,7 @@ using EmployeeService.Application.Database;
 using EmployeeService.Application.Employees.Errors;
 using EmployeeService.Domain;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Shared;
 
 namespace EmployeeService.Infrastructure.Postgres;
@@ -32,6 +33,17 @@ public class EmployeeRepository(EmployeeDbContext dbContext) : IEmployeeReposito
             // a change to the same row first. The caller lost the race and needs to see
             // that as a conflict, not as an opaque 500.
             return EmployeeErrors.ConcurrencyConflict();
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
+        {
+            // Two concurrent hires with the same email both pass validation and both
+            // reach here; the unique index is what actually decides which one wins.
+            // Without this, the loser hit an unhandled exception and a 500 - a retry
+            // of the exact same request that would fail again the same way.
+            var email = dbContext.ChangeTracker.Entries<Employee>()
+                .FirstOrDefault(e => e.State == EntityState.Added)?.Entity.Email;
+
+            return EmployeeErrors.EmailAlreadyExists(email ?? "unknown");
         }
     }
 }
