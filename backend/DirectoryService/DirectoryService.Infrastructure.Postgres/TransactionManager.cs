@@ -50,7 +50,7 @@ namespace DirectoryService.Infrastructure.Postgres
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error saving changes");
-                return UnitResult.Failure<Error>(Error.Failure());
+                return UnitResult.Failure<Error>(GeneralErrors.DatabaseError());
             }
         }
     }

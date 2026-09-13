@@ -1,3 +1,5 @@
+using Shared.Middlewares;
+using Shared.Cors;
 using EmployeeService.Application.Database;
 using EmployeeService.Application.Employees.Commands;
 using EmployeeService.Application.Employees.Queries;
@@ -22,16 +24,7 @@ builder.Host.UseSerilog((context, _, configuration) =>
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.WithOrigins("http://localhost:3000")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
-    });
-});
+builder.Services.AddFrameworkCors(builder.Configuration);
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -62,12 +55,15 @@ builder.Services.AddScoped<ListEmployeesHandler>();
 
 var app = builder.Build();
 
+app.UseRequestCorrelationId();
+app.UseExceptionMiddleware();
+
 app.UseSerilogRequestLogging();
 
 app.MapOpenApi("/openapi/v1/swagger.json");
 app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1/swagger.json", "EmployeeService"));
 
-app.UseCors();
+app.ConfigureCors();
 
 app.UseAuthentication();
 app.UseAuthorization();

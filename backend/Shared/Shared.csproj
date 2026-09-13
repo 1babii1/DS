@@ -1,15 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <ItemGroup>
+      <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+    <ItemGroup>
       <PackageReference Include="CSharpFunctionalExtensions" />
-      <PackageReference Include="Microsoft.AspNetCore.Http" />
-      <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" />
+      <PackageReference Include="FluentValidation" />
       <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" />
       <PackageReference Include="Microsoft.EntityFrameworkCore" />
       <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
       <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
       <PackageReference Include="Microsoft.Extensions.Options" />
       <PackageReference Include="Confluent.Kafka" />
+      <PackageReference Include="Serilog" />
     </ItemGroup>
 
 </Project>

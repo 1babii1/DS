@@ -1,3 +1,5 @@
+using Shared.Middlewares;
+using Shared.Cors;
 using AuthService.Application;
 using AuthService.Infrastructure.Postgres;
 using AuthService.Web.Configuration;
@@ -14,16 +16,7 @@ builder.Host.UseSerilog((context, _, configuration) =>
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.WithOrigins("http://localhost:3000")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
-    });
-});
+builder.Services.AddFrameworkCors(builder.Configuration);
 
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOptions.SectionName));
 
@@ -34,12 +27,15 @@ builder.Services.AddOpenIddictServer(builder.Environment, builder.Configuration)
 
 var app = builder.Build();
 
+app.UseRequestCorrelationId();
+app.UseExceptionMiddleware();
+
 app.UseSerilogRequestLogging();
 
 app.MapOpenApi("/openapi/v1/swagger.json");
 app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1/swagger.json", "AuthService"));
 
-app.UseCors();
+app.ConfigureCors();
 
 app.UseAuthentication();
 app.UseAuthorization();
