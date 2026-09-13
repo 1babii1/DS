@@ -30,4 +30,9 @@ public static class EmployeeErrors
 
     public static Error NotFound(Guid employeeId) =>
         Error.NotFound("employee.not_found", $"Employee '{employeeId}' does not exist", "employeeId");
+
+    public static Error ConcurrencyConflict() =>
+        Error.Conflict(
+            "employee.concurrency_conflict",
+            "This employee was modified by another request - reload and try again");
 }

@@ -19,6 +19,19 @@ public class EmployeeRepository(EmployeeDbContext dbContext) : IEmployeeReposito
         return employee is null ? EmployeeErrors.NotFound(employeeId) : employee;
     }
 
-    public async Task Save(CancellationToken cancellationToken) =>
-        await dbContext.SaveChangesAsync(cancellationToken);
+    public async Task<UnitResult<Error>> Save(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return UnitResult.Success<Error>();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // xmin no longer matches what this transaction read - someone else committed
+            // a change to the same row first. The caller lost the race and needs to see
+            // that as a conflict, not as an opaque 500.
+            return EmployeeErrors.ConcurrencyConflict();
+        }
+    }
 }

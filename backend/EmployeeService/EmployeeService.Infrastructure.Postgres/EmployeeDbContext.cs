@@ -28,6 +28,13 @@ public class EmployeeDbContext(DbContextOptions<EmployeeDbContext> options) : Db
 
             entity.HasIndex(e => e.DepartmentId);
             entity.HasIndex(e => e.Email).IsUnique();
+
+            // xmin is Postgres's own per-row version counter, already present on every
+            // table - no new column, no backfill. Mapping it as a concurrency token means
+            // SaveChanges checks it was unchanged since this row was read: two concurrent
+            // transfers of the same employee now produce a lost-update conflict instead of
+            // the second write silently overwriting the first.
+            entity.Property<uint>("xmin").IsRowVersion();
         });
 
         builder.Entity<OutboxMessage>(entity =>
