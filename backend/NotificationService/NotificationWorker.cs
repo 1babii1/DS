@@ -18,7 +18,14 @@ public class NotificationWorker(IOptions<NotificationOptions> options, ILogger<N
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await KafkaTopicProvisioner.EnsureTopicsExistAsync(_options.BootstrapServers, _options.Topics);
+        await KafkaTopicProvisioner.WaitForTopicsAsync(
+            _options.BootstrapServers, logger, stoppingToken, _options.Topics);
+
+        if (stoppingToken.IsCancellationRequested)
+        {
+            return;
+        }
+
         await Task.Run(() => Run(stoppingToken), stoppingToken);
     }
 
