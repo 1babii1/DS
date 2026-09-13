@@ -154,7 +154,7 @@ builder.Services.AddScoped<SoftDeleteDepartmentHandler>();
 
 builder.Services.AddStackExchangeRedisCache(setup =>
 {
-    setup.Configuration = "localhost:6379";
+    setup.Configuration = builder.Configuration.GetConnectionString("Redis");
 });
 
 builder.Services.AddHybridCache(options => options.DefaultEntryOptions = new HybridCacheEntryOptions
