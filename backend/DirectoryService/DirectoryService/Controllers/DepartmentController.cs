@@ -6,6 +6,7 @@ using DirectoryService.Contracts.Response.Department;
 using DirectoryService.Domain.Departments.ValueObjects;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Shared.EndpointResults;
 
 namespace DirectoryService.Controllers;
@@ -55,6 +56,7 @@ public class DepartmentController : ControllerBase
         await handler.Handle(request, cancellationToken);
 
     [HttpGet("search")]
+    [EnableRateLimiting("search")]
     public async Task<ActionResult<List<DepartmentSearchResultDto>?>> SearchSemantic(
         [FromQuery] string query,
         [FromQuery] int limit,

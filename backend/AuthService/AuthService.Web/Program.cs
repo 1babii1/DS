@@ -1,9 +1,11 @@
 using Shared.HealthChecks;
 using Shared.Middlewares;
 using Shared.Cors;
+using System.Threading.RateLimiting;
 using AuthService.Application;
 using AuthService.Infrastructure.Postgres;
 using AuthService.Web.Configuration;
+using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -29,6 +31,24 @@ builder.Services.AddOpenIddictServer(builder.Environment, builder.Configuration)
 
 builder.Services.AddDatabaseHealthCheck<AuthDbContext>();
 
+// Partitioned by client IP, not global: a global limiter would let one abusive IP
+// lock out every other user sharing the same bucket. Five attempts a minute is
+// tight enough to blunt credential stuffing without a legitimate user who mistypes
+// their password twice ever noticing.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("auth", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
+});
+
 var app = builder.Build();
 
 app.UseRequestCorrelationId();
@@ -43,6 +63,7 @@ app.ConfigureCors();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 app.MapDefaultHealthChecks();
