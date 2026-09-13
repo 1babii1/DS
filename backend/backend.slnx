@@ -2,6 +2,7 @@
   <Folder Name="/AuditService/">
     <Project Path="AuditService/AuditService.Domain/AuditService.Domain.csproj" />
     <Project Path="AuditService/AuditService.Infrastructure/AuditService.Infrastructure.csproj" />
+    <Project Path="AuditService/AuditService.IntegrationTests/AuditService.IntegrationTests.csproj" />
     <Project Path="AuditService/AuditService.Web/AuditService.Web.csproj" />
   </Folder>
   <Folder Name="/AuthService/">

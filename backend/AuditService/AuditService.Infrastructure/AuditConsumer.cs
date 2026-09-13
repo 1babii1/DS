@@ -109,7 +109,13 @@ public class AuditConsumer(
     /// True once the message is durably accounted for - either recorded normally or
     /// parked in dead_letters - and it is safe to commit its offset.
     /// </returns>
-    private bool HandleWithRetryAndDeadLetter(ConsumeResult<string, string> result, CancellationToken stoppingToken)
+    /// <remarks>
+    /// Internal, not private: this is the entire retry/dead-letter decision, with no
+    /// dependency on a live Kafka broker (it only reads ConsumeResult as a data
+    /// holder), so AuditService.IntegrationTests calls it directly against a real
+    /// Postgres via Testcontainers rather than needing a Kafka test harness too.
+    /// </remarks>
+    internal bool HandleWithRetryAndDeadLetter(ConsumeResult<string, string> result, CancellationToken stoppingToken)
     {
         Exception? lastError = null;
 
