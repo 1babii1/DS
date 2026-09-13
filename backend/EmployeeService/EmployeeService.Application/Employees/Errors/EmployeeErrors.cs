@@ -25,6 +25,9 @@ public static class EmployeeErrors
     public static Error DirectoryUnavailable() =>
         Error.Failure("employee.directory.unavailable", "DirectoryService is temporarily unavailable");
 
+    public static Error DirectoryUnauthorized() =>
+        Error.Authorization("employee.directory.unauthorized", "DirectoryService rejected the request credentials");
+
     public static Error NotFound(Guid employeeId) =>
         Error.NotFound("employee.not_found", $"Employee '{employeeId}' does not exist", "employeeId");
 }

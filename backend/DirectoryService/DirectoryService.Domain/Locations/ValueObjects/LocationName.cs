@@ -19,7 +19,7 @@ public record LocationName
 
         string trimmed = value.Trim();
 
-        if(trimmed.Length is < LenghtConstants.LENGTH3 or > LenghtConstants.LENGTH120)
+        if(trimmed.Length is < LengthConstants.MinTextLength or > LengthConstants.MaxLocationNameLength)
             return Error.Validation("length.is.invalid", "Location name must be between 3 and 150 characters");
 
         LocationName name = new(trimmed);

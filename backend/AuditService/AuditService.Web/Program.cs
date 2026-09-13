@@ -12,6 +12,7 @@ builder.Host.UseSerilog((context, _, configuration) =>
     configuration.ReadFrom.Configuration(context.Configuration));
 
 builder.Services.AddControllers();
+builder.Services.AddEnvelopeModelStateValidation();
 builder.Services.AddOpenApi();
 
 builder.Services

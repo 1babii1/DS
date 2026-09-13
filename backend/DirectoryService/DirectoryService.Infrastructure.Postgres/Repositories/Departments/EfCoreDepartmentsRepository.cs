@@ -24,11 +24,6 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
         _logger = logger;
     }
 
-    public async Task Save()
-    {
-        await _dbContext.SaveChangesAsync();
-    }
-
     public async Task<Result<IReadOnlyList<Domain.Departments.Departments>, Error>> GetById(
         IReadOnlyList<DepartmentId> departmentIds,
         CancellationToken cancellationToken)
@@ -162,41 +157,6 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
             cancellationToken);
 
         return UnitResult.Success<Error>();
-    }
-
-    public async Task<List<DepartmentDto>> GetHierarchy(
-        DepartmentPath newDepartmentPath,
-        CancellationToken cancellationToken = default)
-    {
-        const string dapperSql = """
-                                 SELECT * FROM directory.departments
-                                 WHERE path <@ @path::ltree
-                                 ORDER BY depth
-                                 """;
-
-        var dbCon = _dbContext.Database.GetDbConnection();
-
-        var departmentRaws = (await dbCon.QueryAsync<DepartmentDto>(
-                dapperSql,
-                new { path = newDepartmentPath.Value }))
-            .ToList();
-
-        var departmentDict = departmentRaws.ToDictionary(d => d.Id);
-        var roots = new List<DepartmentDto>();
-
-        foreach (var row in departmentRaws)
-        {
-            if (row.ParentId.HasValue && departmentDict.TryGetValue(row.ParentId.Value, out var department))
-            {
-                department.Children.Add(departmentDict[row.Id]);
-            }
-            else
-            {
-                roots.Add(departmentDict[row.Id]);
-            }
-        }
-
-        return roots;
     }
 
     public async Task<UnitResult<Error>> UpdateHierarchy(

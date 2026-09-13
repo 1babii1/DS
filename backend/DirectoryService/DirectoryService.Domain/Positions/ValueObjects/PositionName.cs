@@ -21,7 +21,7 @@ public record PositionName
 
         string trimmed = value.Trim();
 
-        if (trimmed.Length is < LenghtConstants.LENGTH3 or > LenghtConstants.LENGTH100)
+        if (trimmed.Length is < LengthConstants.MinTextLength or > LengthConstants.MaxPositionNameLength)
             return Error.Validation("length.is.invalid", "Position name must be between 3 and 100 characters");
 
         PositionName name = new(trimmed);

@@ -7,7 +7,7 @@ services:
       dockerfile: DirectoryService/Dockerfile
     ports:
       - "5129:5129"
-      - "5179:5179"
+      # 5179 (gRPC) is service-to-service only and stays on the compose network.
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - Embeddings__OllamaBaseUrl=http://ollama:11434
