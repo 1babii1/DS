@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+﻿using CSharpFunctionalExtensions;
 using DirectoryService.Application.Cache;
 using DirectoryService.Application.Database;
 using DirectoryService.Application.Validation;

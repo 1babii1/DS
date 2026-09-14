@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+﻿using CSharpFunctionalExtensions;
 using EmployeeService.Application.Database;
 using EmployeeService.Application.IntegrationEvents;
 using Shared;
