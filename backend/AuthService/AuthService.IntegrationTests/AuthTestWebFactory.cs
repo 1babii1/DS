@@ -1,4 +1,4 @@
-using System.Data.Common;
+﻿using System.Data.Common;
 using AuthService.Infrastructure.Postgres;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
