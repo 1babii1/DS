@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Net.Http.Json;
 using AuthService.Web.Contracts;
+using Shared;
 
 namespace AuthService.IntegrationTests;
 
@@ -81,6 +82,14 @@ public class AccountControllerTests : IClassFixture<AuthTestWebFactory>, IAsyncL
         var response = await loginClient.PostAsJsonAsync("/auth/login", new LoginRequest(email, "WrongPassword999"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+
+        // Every error response in the system - AuthService included - answers in the
+        // same Envelope shape, not RFC 9110 ProblemDetails. A client that already
+        // knows how to read one service's errors can read all of them.
+        var envelope = await response.Content.ReadFromJsonAsync<Envelope>();
+        Assert.NotNull(envelope);
+        Assert.True(envelope!.IsError);
+        Assert.Equal("auth.invalid_credentials", envelope.Error!.Messages[0].Code);
     }
 
     [Fact]
