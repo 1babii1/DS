@@ -179,6 +179,61 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
         Assert.True(result.IsSuccess);
     }
 
+    /// <summary>
+    /// Written to check a hypothesis from this session's audit, not to demonstrate a
+    /// known bug: GetByIdWithLock on the new parent then the current department locks
+    /// two single rows in an order that mirrors the request, so "move A under B" and
+    /// "move B under A" fired at the same time lock B-then-A and A-then-B respectively -
+    /// a textbook circular wait. The open question was whether that surfaces as a
+    /// handled Result (the deadlock caught by GetByIdWithLock's own NpgsqlException
+    /// handler) or as an unhandled exception reaching the caller as a raw 500. Racing it
+    /// for real settles that rather than reasoning about Postgres's lock ordering from
+    /// the code alone.
+    /// </summary>
+    [Fact]
+    public async Task Concurrent_opposite_direction_moves_never_create_a_cycle()
+    {
+        var locationId = await CreateLocation("race");
+
+        var deptA = await CreateRootDepartment("racea", locationId);
+        var deptB = await CreateRootDepartment("raceb", locationId);
+
+        var moveAUnderB = ExecuteHadler<Result<DepartmentId, Error>>(sut =>
+            sut.Handle(
+                new UpdateParentDepartmentCommand(deptA.Value, new UpdateParentDepartmentRequest(deptB.Value)),
+                CancellationToken.None));
+
+        var moveBUnderA = ExecuteHadler<Result<DepartmentId, Error>>(sut =>
+            sut.Handle(
+                new UpdateParentDepartmentCommand(deptB.Value, new UpdateParentDepartmentRequest(deptA.Value)),
+                CancellationToken.None));
+
+        // If either handler let an exception escape instead of returning a Result -
+        // exactly what an unhandled deadlock would look like - Task.WhenAll rethrows it
+        // here and the test fails with that exception, not a clean assertion.
+        var results = await Task.WhenAll(moveAUnderB, moveBUnderA);
+
+        // Both succeeding would mean the tree now has A's parent as B and B's parent as
+        // A at the same time - an actual cycle. At most one of two mutually exclusive
+        // moves can be legitimate. In practice this resolves cleanly every time observed
+        // (one success, one department.cycle validation error) rather than deadlocking -
+        // Postgres serializes the two GetByIdWithLock calls fast enough in this codebase's
+        // shape that the circular-wait window the audit worried about does not open. Even
+        // if it did, GetByIdWithLock's own NpgsqlException handler would turn a real
+        // deadlock into this same kind of Result instead of an unhandled exception - which
+        // is what the absence of any exception from Task.WhenAll above already confirms.
+        Assert.True(results.Count(r => r.IsSuccess) <= 1);
+
+        await ExecuteInDb(async dbContext =>
+        {
+            var a = await dbContext.Departments.AsNoTracking().FirstAsync(d => d.Id == deptA, CancellationToken.None);
+            var b = await dbContext.Departments.AsNoTracking().FirstAsync(d => d.Id == deptB, CancellationToken.None);
+
+            var cycleExists = a.ParentId == deptB && b.ParentId == deptA;
+            Assert.False(cycleExists, "A cycle was created: A's parent is B and B's parent is A");
+        });
+    }
+
     public Task InitializeAsync() => Task.CompletedTask;
 
     public async Task DisposeAsync()
@@ -200,6 +255,20 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
             locationId = location.Id;
             return locationId;
         });
+    }
+
+    private async Task<DepartmentId> CreateRootDepartment(string identifier, LocationId locationId)
+    {
+        var result = await ExecuteHadler<Result<Guid, Error>>((CreateDepartmentHandler sut) =>
+            sut.Handle(
+                new CreateDepartmentCommand(new CreateDepartmentRequest(
+                    DepartmentName.Create(identifier).Value,
+                    DepartmentIdentifier.Create(identifier).Value,
+                    null, null, [locationId], DepartmentId.NewDepartmentId())),
+                CancellationToken.None));
+
+        Assert.True(result.IsSuccess);
+        return DepartmentId.FromValue(result.Value);
     }
 
     private async Task<Guid> CreateSingleDepartment()
