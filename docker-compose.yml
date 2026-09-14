@@ -11,6 +11,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - Embeddings__OllamaBaseUrl=http://ollama:11434
+      - ConnectionStrings__DirectoryServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=directory,public
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5129/health/ready || exit 1"]
       interval: 10s
@@ -41,7 +42,7 @@ services:
     entrypoint: [
       "/bin/sh",
       "-c",
-      './efbundle --connection "Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=postgres;Search Path=directory,public"'
+      './efbundle --connection "Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=directory,public"'
     ]
 
   auth_service:
@@ -55,6 +56,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://*:5130
+      - ConnectionStrings__AuthServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=auth,public
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5130/health/ready || exit 1"]
       interval: 10s
@@ -81,7 +83,7 @@ services:
     entrypoint: [
       "/bin/sh",
       "-c",
-      './efbundle --connection "Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=postgres;Search Path=auth,public"'
+      './efbundle --connection "Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=auth,public"'
     ]
 
   employee_service:
@@ -95,6 +97,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://*:5131
+      - ConnectionStrings__EmployeeServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=employee,public
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5131/health/ready || exit 1"]
       interval: 10s
@@ -127,7 +130,7 @@ services:
     entrypoint: [
       "/bin/sh",
       "-c",
-      './efbundle --connection "Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=postgres;Search Path=employee,public"'
+      './efbundle --connection "Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=employee,public"'
     ]
 
   audit_service:
@@ -141,6 +144,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://*:5132
+      - ConnectionStrings__AuditServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=audit,public
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5132/health/ready || exit 1"]
       interval: 10s
@@ -169,7 +173,7 @@ services:
     entrypoint: [
       "/bin/sh",
       "-c",
-      './efbundle --connection "Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=postgres;Search Path=audit,public"'
+      './efbundle --connection "Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=audit,public"'
     ]
 
   mcp_server:
@@ -185,6 +189,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://*:5133
+      - ConnectionStrings__PlatformDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres}
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5133/health/ready || exit 1"]
       interval: 10s
@@ -261,7 +266,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: platform
     ports:
       - "5434:5432"
