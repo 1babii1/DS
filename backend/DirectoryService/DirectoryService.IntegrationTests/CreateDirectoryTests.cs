@@ -30,7 +30,7 @@ public class CreateDirectoryTests : IClassFixture<DirectoryTestWEbFactory>, IAsy
         var cancellationToken = CancellationToken.None;
 
         // act
-        var result = await ExecuteHadler((sut) =>
+        var result = await ExecuteHandler((sut) =>
         {
             var command =
                 new CreateDepartmentCommand(new CreateDepartmentRequest(
@@ -66,7 +66,7 @@ public class CreateDirectoryTests : IClassFixture<DirectoryTestWEbFactory>, IAsy
         var cancellationToken = CancellationToken.None;
 
         // act
-        var result = await ExecuteHadler((sut) =>
+        var result = await ExecuteHandler((sut) =>
         {
             var command =
                 new CreateDepartmentCommand(new CreateDepartmentRequest(
@@ -92,7 +92,7 @@ public class CreateDirectoryTests : IClassFixture<DirectoryTestWEbFactory>, IAsy
         var cancellationToken = CancellationToken.None;
 
         // act
-        var result = await ExecuteHadler((sut) =>
+        var result = await ExecuteHandler((sut) =>
         {
             var command =
                 new CreateDepartmentCommand(new CreateDepartmentRequest(
@@ -152,7 +152,7 @@ public class CreateDirectoryTests : IClassFixture<DirectoryTestWEbFactory>, IAsy
         });
     }
 
-    private async Task<T> ExecuteHadler<T>(Func<CreateDepartmentHandler, Task<T>> action)
+    private async Task<T> ExecuteHandler<T>(Func<CreateDepartmentHandler, Task<T>> action)
     {
         await using var scope = Services.CreateAsyncScope();
 
