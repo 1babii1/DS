@@ -11,7 +11,7 @@ import type { AuditEntry } from '@/entities/audit/types/audit-entry.types'
 import { AggregateFilter } from '@/features/catalog-filter/ui/aggregate-filter'
 import { CatalogPagination } from '@/features/catalog-pagination/ui/catalog-pagination'
 
-function dayKey(value: string) { return new Date(value).toISOString().slice(0, 10) }
+function dayKey(value: string) { const date = new Date(value); return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-') }
 function eventLabel(eventType: string) { return eventType.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[._-]/g, ' ') }
 function TimelineItem({ entry }: { entry: AuditEntry }) {
 	const time = new Intl.DateTimeFormat('en', { timeStyle: 'short' }).format(new Date(entry.occurredAt))
