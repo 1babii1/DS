@@ -20,7 +20,7 @@ function flatten(items: ParentDepartment[]): { id: string; name: string; path: s
 function HierarchyBranch({ department }: { department: ParentDepartment }) {
 	return <li>
 		<Link className='hierarchy-node' href={`/departments/${department.id}`}><span>{department.name}</span><ChevronRight aria-hidden='true' size={15} /></Link>
-		{department.children.length ? <ul>{department.children.map(child => <HierarchyBranch department={child} key={child.id} />)}</ul> : null}
+		{department.children.length || department.hasMoreChildren ? <ul>{department.children.map(child => <HierarchyBranch department={child} key={child.id} />)}{department.hasMoreChildren ? <li><Link className='hierarchy-more' href={`/departments/${department.id}`}>View more teams <ChevronRight aria-hidden='true' size={14} /></Link></li> : null}</ul> : null}
 	</li>
 }
 
