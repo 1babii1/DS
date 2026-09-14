@@ -205,6 +205,27 @@ public class HireAndTransferTests : IClassFixture<EmployeeTestWebFactory>, IAsyn
         Assert.Equal("employee.not_found", result.Error.Messages[0].Code);
     }
 
+    /// <summary>
+    /// Terminate made Status != Active reachable through the API for the first time -
+    /// Transfer's own guard against moving a non-active employee existed before that
+    /// and was never exercisable. Closes that gap now that it can actually happen.
+    /// </summary>
+    [Fact]
+    public async Task Transfer_of_a_terminated_employee_fails()
+    {
+        var hired = await ExecuteHireAsync(NewHireCommand());
+        Assert.True(hired.IsSuccess);
+        Assert.True((await ExecuteTerminateAsync(new TerminateEmployeeCommand(hired.Value))).IsSuccess);
+
+        var result = await ExecuteTransferAsync(new TransferEmployeeCommand(hired.Value, Guid.NewGuid(), Guid.NewGuid()));
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("employee.transfer.not_active", result.Error.Messages[0].Code);
+
+        var stored = await ExecuteInDb(db => db.Employees.SingleAsync(e => e.Id == hired.Value));
+        Assert.Equal(EmployeeStatus.Terminated, stored.Status);
+    }
+
     public Task InitializeAsync() => Task.CompletedTask;
 
     public async Task DisposeAsync() => await _resetDatabase();
