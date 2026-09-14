@@ -24,6 +24,7 @@ export function EmployeeForm({ employee, onClose, positions }: { employee?: { id
 	const { showSuccess } = useNotice()
 	const departments = Array.from(new Map(positions.flatMap(position => position.departments).map(department => [department.id, { id: department.id, name: department.name }])).values()).sort((a, b) => a.name.localeCompare(b.name)) as DepartmentOption[]
 	const form = useForm<EmployeeFormValues>({ resolver: zodResolver(employeeSchema), mode: 'onSubmit', defaultValues: { fullName: '', email: '', departmentId: '', positionId: '' } })
+	useEffect(() => { form.setFocus(employee ? 'departmentId' : 'fullName') }, [employee, form])
 	const departmentId = useWatch({ control: form.control, name: 'departmentId', defaultValue: '' })
 	const availablePositions = positions.filter(position => position.departments.some(department => department.id === departmentId))
 	useEffect(() => { form.setValue('positionId', '') }, [departmentId, form])
