@@ -8,6 +8,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- McpServer.IntegrationTests lives under this project's own folder (matching
+         every other service's <Service>/<Service>.IntegrationTests layout) - without
+         this exclude, the SDK's default recursive glob would also compile the test
+         project's own files (and its generated obj/ output) into McpServer itself. -->
+    <Compile Remove="McpServer.IntegrationTests/**/*.cs" />
+    <Content Remove="McpServer.IntegrationTests/**/*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Dapper" />

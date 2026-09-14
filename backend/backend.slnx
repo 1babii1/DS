@@ -30,7 +30,7 @@
     <Project Path="EmployeeService/EmployeeService.IntegrationTests/EmployeeService.IntegrationTests.csproj" />
     <Project Path="EmployeeService/EmployeeService.Web/EmployeeService.Web.csproj" />
   </Folder>
-  <Project Path="McpServer.IntegrationTests/McpServer.IntegrationTests.csproj" />
+  <Project Path="McpServer/McpServer.IntegrationTests/McpServer.IntegrationTests.csproj" />
   <Project Path="McpServer/McpServer.csproj" />
   <Project Path="NotificationService/NotificationService.csproj" />
   <Project Path="Shared/Shared.csproj" />
