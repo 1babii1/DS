@@ -10,6 +10,7 @@
     <Project Path="AuthService/AuthService.Contracts/AuthService.Contracts.csproj" />
     <Project Path="AuthService/AuthService.Domain/AuthService.Domain.csproj" />
     <Project Path="AuthService/AuthService.Infrastructure.Postgres/AuthService.Infrastructure.Postgres.csproj" />
+    <Project Path="AuthService/AuthService.IntegrationTests/AuthService.IntegrationTests.csproj" />
     <Project Path="AuthService/AuthService.Web/AuthService.Web.csproj" />
   </Folder>
   <Folder Name="/DirectoryService/">
