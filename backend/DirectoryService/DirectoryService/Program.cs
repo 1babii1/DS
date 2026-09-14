@@ -132,7 +132,7 @@ builder.Services.AddScoped<CreatePositionHandle>();
 
 builder.Services.AddScoped<CreateDepartmentHandler>();
 
-builder.Services.AddScoped<UpdateDepartmentLocationsHadler>();
+builder.Services.AddScoped<UpdateDepartmentLocationsHandler>();
 
 builder.Services.AddScoped<UpdateParentDepartmentHandler>();
 

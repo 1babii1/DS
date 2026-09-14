@@ -39,7 +39,7 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
         var deepest = departmentIdHierarchy[3];
 
         // Act
-        var resultUpdate = await ExecuteHadler((sut) =>
+        var resultUpdate = await ExecuteHandler((sut) =>
         {
             var command =
                 new UpdateParentDepartmentCommand(
@@ -90,7 +90,7 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
             new UpdateParentDepartmentRequest(validParentId));
 
         // Act & Assert
-        var result = await ExecuteHadler<Result<DepartmentId, Error>>((UpdateParentDepartmentHandler sut) =>
+        var result = await ExecuteHandler<Result<DepartmentId, Error>>((UpdateParentDepartmentHandler sut) =>
             sut.Handle(command, CancellationToken.None));
 
         Assert.True(result.IsFailure);
@@ -109,7 +109,7 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
             new UpdateParentDepartmentRequest(departmentId)); // ← Сам себе parent
 
         // Act & Assert
-        var result = await ExecuteHadler<Result<DepartmentId, Error>>((UpdateParentDepartmentHandler sut) =>
+        var result = await ExecuteHandler<Result<DepartmentId, Error>>((UpdateParentDepartmentHandler sut) =>
             sut.Handle(command, CancellationToken.None));
 
         Assert.True(result.IsFailure);
@@ -128,7 +128,7 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
             new UpdateParentDepartmentRequest(nonExistentParentId));
 
         // Act & Assert
-        var result = await ExecuteHadler<Result<DepartmentId, Error>>((UpdateParentDepartmentHandler sut) =>
+        var result = await ExecuteHandler<Result<DepartmentId, Error>>((UpdateParentDepartmentHandler sut) =>
             sut.Handle(command, CancellationToken.None));
 
         Assert.True(result.IsFailure);
@@ -150,7 +150,7 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
             new UpdateParentDepartmentRequest(departmentC.Value));
 
         // Act
-        var result = await ExecuteHadler<Result<DepartmentId, Error>>((UpdateParentDepartmentHandler sut) =>
+        var result = await ExecuteHandler<Result<DepartmentId, Error>>((UpdateParentDepartmentHandler sut) =>
             sut.Handle(command, CancellationToken.None));
 
         // Assert - именно из-за цикла, а не по любой другой причине
@@ -172,7 +172,7 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
             new UpdateParentDepartmentRequest(departmentA.Value));
 
         // Act
-        var result = await ExecuteHadler<Result<DepartmentId, Error>>((UpdateParentDepartmentHandler sut) =>
+        var result = await ExecuteHandler<Result<DepartmentId, Error>>((UpdateParentDepartmentHandler sut) =>
             sut.Handle(command, CancellationToken.None));
 
         // Assert
@@ -198,12 +198,12 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
         var deptA = await CreateRootDepartment("racea", locationId);
         var deptB = await CreateRootDepartment("raceb", locationId);
 
-        var moveAUnderB = ExecuteHadler<Result<DepartmentId, Error>>(sut =>
+        var moveAUnderB = ExecuteHandler<Result<DepartmentId, Error>>(sut =>
             sut.Handle(
                 new UpdateParentDepartmentCommand(deptA.Value, new UpdateParentDepartmentRequest(deptB.Value)),
                 CancellationToken.None));
 
-        var moveBUnderA = ExecuteHadler<Result<DepartmentId, Error>>(sut =>
+        var moveBUnderA = ExecuteHandler<Result<DepartmentId, Error>>(sut =>
             sut.Handle(
                 new UpdateParentDepartmentCommand(deptB.Value, new UpdateParentDepartmentRequest(deptA.Value)),
                 CancellationToken.None));
@@ -259,7 +259,7 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
 
     private async Task<DepartmentId> CreateRootDepartment(string identifier, LocationId locationId)
     {
-        var result = await ExecuteHadler<Result<Guid, Error>>((CreateDepartmentHandler sut) =>
+        var result = await ExecuteHandler<Result<Guid, Error>>((CreateDepartmentHandler sut) =>
             sut.Handle(
                 new CreateDepartmentCommand(new CreateDepartmentRequest(
                     DepartmentName.Create(identifier).Value,
@@ -274,7 +274,7 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
     private async Task<Guid> CreateSingleDepartment()
     {
         var locationId = await CreateLocation("single");
-        var result = await ExecuteHadler<Result<Guid, Error>>((CreateDepartmentHandler sut) =>
+        var result = await ExecuteHandler<Result<Guid, Error>>((CreateDepartmentHandler sut) =>
         {
             return sut.Handle(
                 new CreateDepartmentCommand(new CreateDepartmentRequest(
@@ -296,7 +296,7 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
 
         for (int i = 0; i < levels; i++)
         {
-            var result = await ExecuteHadler((sut) =>
+            var result = await ExecuteHandler((sut) =>
             {
                 if (parentId != null)
                 {
@@ -330,7 +330,7 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
         return departmentIdHierarchy;
     }
 
-    private async Task<T> ExecuteHadler<T>(Func<CreateDepartmentHandler, Task<T>> action)
+    private async Task<T> ExecuteHandler<T>(Func<CreateDepartmentHandler, Task<T>> action)
     {
         await using var scope = Services.CreateAsyncScope();
 
@@ -339,7 +339,7 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
         return await action(sut);
     }
 
-    private async Task<T> ExecuteHadler<T>(Func<UpdateParentDepartmentHandler, Task<T>> action)
+    private async Task<T> ExecuteHandler<T>(Func<UpdateParentDepartmentHandler, Task<T>> action)
     {
         await using var scope = Services.CreateAsyncScope();
 
