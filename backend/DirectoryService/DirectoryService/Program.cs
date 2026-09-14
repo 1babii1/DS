@@ -173,6 +173,13 @@ builder.Services.AddDatabaseHealthCheck<DirectoryServiceDbContext>();
 // call - an authenticated caller in a tight loop (a buggy client, a compromised
 // token) can still drive real load per request, unlike a plain indexed read.
 // 30/min per IP is generous for real usage, tight enough to blunt a loop.
+// Bound to configuration, not hardcoded - same reasoning as AuthService's "auth"
+// policy: a future test suite that exercises /api/departments/search through real
+// HTTP needs to be able to raise this, since TestServer never populates
+// RemoteIpAddress and every call would otherwise share one partition.
+var searchRateLimit = builder.Configuration.GetValue("RateLimiting:Search:PermitLimit", 30);
+var searchRateLimitWindow = builder.Configuration.GetValue("RateLimiting:Search:WindowSeconds", 60);
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -181,8 +188,8 @@ builder.Services.AddRateLimiter(options =>
         partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 30,
-            Window = TimeSpan.FromMinutes(1),
+            PermitLimit = searchRateLimit,
+            Window = TimeSpan.FromSeconds(searchRateLimitWindow),
             QueueLimit = 0,
         }));
 });
