@@ -166,7 +166,8 @@ public class CreateDirectoryTests : IClassFixture<DirectoryTestWEbFactory>, IAsy
 
         // Warm the cache with an empty children list before the child exists.
         var beforeChild = await ExecuteChildrenHandler(parentId.Value);
-        Assert.Empty(beforeChild ?? []);
+        Assert.True(beforeChild.IsSuccess);
+        Assert.Empty(beforeChild.Value);
 
         var childResult = await ExecuteHandler<CSharpFunctionalExtensions.Result<Guid, Shared.Error>>(sut => sut.Handle(
             new CreateDepartmentCommand(new CreateDepartmentRequest(
@@ -182,10 +183,11 @@ public class CreateDirectoryTests : IClassFixture<DirectoryTestWEbFactory>, IAsy
         Assert.Equal(parentId.Value, childRowParentId!.Value);
 
         var afterChild = await ExecuteChildrenHandler(parentId.Value);
-        Assert.Contains(afterChild ?? [], d => d.Id == childResult.Value);
+        Assert.True(afterChild.IsSuccess);
+        Assert.Contains(afterChild.Value, d => d.Id == childResult.Value);
     }
 
-    private async Task<List<DirectoryService.Contracts.Response.Department.ReadDepartmentHierarchyDto>?> ExecuteChildrenHandler(Guid parentId)
+    private async Task<CSharpFunctionalExtensions.Result<List<DirectoryService.Contracts.Response.Department.ReadDepartmentHierarchyDto>, Shared.Error>> ExecuteChildrenHandler(Guid parentId)
     {
         await using var scope = Services.CreateAsyncScope();
         var sut = scope.ServiceProvider.GetRequiredService<GetChildrenLazyHandler>();

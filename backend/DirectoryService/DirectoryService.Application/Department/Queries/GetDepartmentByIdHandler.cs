@@ -1,5 +1,7 @@
-﻿using DirectoryService.Application.Cache;
+﻿using CSharpFunctionalExtensions;
+using DirectoryService.Application.Cache;
 using DirectoryService.Application.Database;
+using DirectoryService.Application.Validation;
 using DirectoryService.Contracts.Request.Department;
 using DirectoryService.Contracts.Response.Department;
 using DirectoryService.Domain.Departments.ValueObjects;
@@ -8,6 +10,7 @@ using FluentValidation.Results;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
+using Shared;
 
 namespace DirectoryService.Application.Department.Queries;
 
@@ -35,7 +38,7 @@ public class GetDepartmentByIdHandler
         _validator = validator;
     }
 
-    public async Task<ReadDepartmentWithChildrenDto?> Handle(
+    public async Task<Result<ReadDepartmentWithChildrenDto?, Error>> Handle(
         GetDepartmentByIdRequest request,
         CancellationToken cancellationToken)
     {
@@ -44,7 +47,7 @@ public class GetDepartmentByIdHandler
         if (!validateResult.IsValid)
         {
             _logger.LogError("Failed to validate departmentId");
-            return null;
+            return validateResult.ToError();
         }
 
         var department = await _cache.GetOrCreateAsync(
@@ -53,6 +56,9 @@ public class GetDepartmentByIdHandler
             options: new() { LocalCacheExpiration = TimeSpan.FromMinutes(5), Expiration = TimeSpan.FromMinutes(30), },
             cancellationToken: cancellationToken);
 
+        // No department at this id is not a client error - it is a legitimate empty
+        // answer (a real gap in the org tree), so it stays a success with a null
+        // result rather than becoming Error.NotFound.
         return department;
     }
 
