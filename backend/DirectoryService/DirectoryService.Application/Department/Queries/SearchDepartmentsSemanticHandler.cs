@@ -1,8 +1,11 @@
-﻿using DirectoryService.Application.Search;
+﻿using CSharpFunctionalExtensions;
+using DirectoryService.Application.Search;
+using DirectoryService.Application.Validation;
 using DirectoryService.Contracts.Response.Department;
 using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.Extensions.Logging;
+using Shared;
 
 namespace DirectoryService.Application.Department.Queries;
 
@@ -22,7 +25,7 @@ public class SearchDepartmentsSemanticHandler(
     ILogger<SearchDepartmentsSemanticHandler> logger,
     SearchDepartmentsSemanticValidator validator)
 {
-    public async Task<List<DepartmentSearchResultDto>?> Handle(
+    public async Task<Result<List<DepartmentSearchResultDto>, Error>> Handle(
         SearchDepartmentsSemanticRequest request,
         CancellationToken cancellationToken)
     {
@@ -30,7 +33,7 @@ public class SearchDepartmentsSemanticHandler(
         if (!validationResult.IsValid)
         {
             logger.LogError("Failed to validate semantic search request");
-            return null;
+            return validationResult.ToError();
         }
 
         return await search.SearchAsync(request.Query, request.Limit, cancellationToken);
