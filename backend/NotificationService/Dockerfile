@@ -1,5 +1,10 @@
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
+# curl - the only dependency added on top of the runtime image, needed only
+# for the docker-compose HEALTHCHECK (/health/ready).
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+EXPOSE 5133
 
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
