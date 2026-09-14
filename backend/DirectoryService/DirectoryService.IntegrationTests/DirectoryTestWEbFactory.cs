@@ -69,20 +69,39 @@ public class DirectoryTestWEbFactory : WebApplicationFactory<Program>, IAsyncLif
         await _respawner.ResetAsync(_dbConection);
     }
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.ConfigureTestServices(service =>
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Тесты вызывают хендлеры напрямую, фоновые сервисы в них не участвуют, но
-        // мешают: воркер ретеншена удаляет из тех же таблиц, что чистит Respawn между
-        // тестами, и два конкурирующих DELETE ловят deadlock, из-за чего падает
-        // случайный тест. Воркеры эмбеддингов и outbox к тому же непрерывно логируют
-        // ошибки, потому что Ollama и Kafka в тестовом окружении не подняты.
-        service.RemoveAll<IHostedService>();
+        // NpgsqlConnectionFactory (every Dapper-based read handler, e.g.
+        // GetChildrenLazyHandler) reads ConnectionStrings:DirectoryServiceDb straight
+        // from IConfiguration at construction - overriding only the DbContext
+        // registration below leaves it pointed at whatever real database appsettings
+        // configures, not this test's isolated container. Without this, every Dapper
+        // read in the test suite silently queries the wrong database.
+        //
+        // Search Path matters here too: the model declares HasDefaultSchema("directory"),
+        // so EF always schema-qualifies its own generated SQL regardless of search_path,
+        // but the raw Dapper queries (GetChildrenLazyFromDb and friends) do not - they
+        // rely on the connection's search_path to resolve "departments", same as the
+        // real appsettings connection strings already do.
+        builder.UseSetting(
+            "ConnectionStrings:DirectoryServiceDb",
+            _dbContainer.GetConnectionString() + ";Search Path=directory,public");
 
-        service.RemoveAll<DirectoryServiceDbContext>();
+        builder.ConfigureTestServices(service =>
+        {
+            // Тесты вызывают хендлеры напрямую, фоновые сервисы в них не участвуют, но
+            // мешают: воркер ретеншена удаляет из тех же таблиц, что чистит Respawn между
+            // тестами, и два конкурирующих DELETE ловят deadlock, из-за чего падает
+            // случайный тест. Воркеры эмбеддингов и outbox к тому же непрерывно логируют
+            // ошибки, потому что Ollama и Kafka в тестовом окружении не подняты.
+            service.RemoveAll<IHostedService>();
 
-        service.AddScoped<DirectoryServiceDbContext>(_ =>
-            new DirectoryServiceDbContext(_dbContainer.GetConnectionString()));
-    });
+            service.RemoveAll<DirectoryServiceDbContext>();
+
+            service.AddScoped<DirectoryServiceDbContext>(_ =>
+                new DirectoryServiceDbContext(_dbContainer.GetConnectionString()));
+        });
+    }
 
     private async Task InitializeRespawner()
     {

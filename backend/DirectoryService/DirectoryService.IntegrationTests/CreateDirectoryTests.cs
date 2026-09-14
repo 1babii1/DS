@@ -1,5 +1,6 @@
 ﻿using DirectoryService.Application.Department;
 using DirectoryService.Application.Department.Commands;
+using DirectoryService.Application.Department.Queries;
 using DirectoryService.Contracts.Request.Department;
 using DirectoryService.Domain.Departments.ValueObjects;
 using DirectoryService.Domain.Locations;
@@ -141,6 +142,55 @@ public class CreateDirectoryTests : IClassFixture<DirectoryTestWEbFactory>, IAsy
             CancellationToken.None));
 
         Assert.True(second.IsFailure, "A second root department with the same identifier should not be allowed to collide on path with the first");
+    }
+
+    /// <summary>
+    /// Written to check a hypothesis from this session's audit, not to demonstrate a
+    /// known bug: GetChildrenLazyHandler caches its result keyed only by parentId with
+    /// a 30-minute expiration, and CreateDepartmentHandler never invalidates that key
+    /// (it only ever sets its own ById entry) - so a client that listed a parent's
+    /// children right before a new child was created would keep seeing the stale list
+    /// for up to half an hour.
+    /// </summary>
+    [Fact]
+    public async Task CreateDepartment_invalidates_the_parents_cached_children_list()
+    {
+        var locationId = await CreateLocation("cache");
+        var parentId = await ExecuteHandler<CSharpFunctionalExtensions.Result<Guid, Shared.Error>>(sut => sut.Handle(
+            new CreateDepartmentCommand(new CreateDepartmentRequest(
+                DepartmentName.Create("Parent").Value,
+                DepartmentIdentifier.Create("cacheparent").Value,
+                null, null, [locationId], DepartmentId.NewDepartmentId())),
+            CancellationToken.None));
+        Assert.True(parentId.IsSuccess);
+
+        // Warm the cache with an empty children list before the child exists.
+        var beforeChild = await ExecuteChildrenHandler(parentId.Value);
+        Assert.Empty(beforeChild ?? []);
+
+        var childResult = await ExecuteHandler<CSharpFunctionalExtensions.Result<Guid, Shared.Error>>(sut => sut.Handle(
+            new CreateDepartmentCommand(new CreateDepartmentRequest(
+                DepartmentName.Create("Child").Value,
+                DepartmentIdentifier.Create("cachechild").Value,
+                DepartmentId.FromValue(parentId.Value), null, [locationId], DepartmentId.NewDepartmentId())),
+            CancellationToken.None));
+        Assert.True(childResult.IsSuccess);
+
+        var childRowParentId = await ExecuteInDb(async dbContext =>
+            (await dbContext.Departments.AsNoTracking().SingleAsync(
+                d => d.Id == DepartmentId.FromValue(childResult.Value), CancellationToken.None)).ParentId);
+        Assert.Equal(parentId.Value, childRowParentId!.Value);
+
+        var afterChild = await ExecuteChildrenHandler(parentId.Value);
+        Assert.Contains(afterChild ?? [], d => d.Id == childResult.Value);
+    }
+
+    private async Task<List<DirectoryService.Contracts.Response.Department.ReadDepartmentHierarchyDto>?> ExecuteChildrenHandler(Guid parentId)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var sut = scope.ServiceProvider.GetRequiredService<GetChildrenLazyHandler>();
+        return await sut.Handle(
+            new GetChildrenLazyCommand(parentId, new GetChildrenLazyRequest()), CancellationToken.None);
     }
 
     // Длина проверяется в value object, поэтому команду с некорректным именем
