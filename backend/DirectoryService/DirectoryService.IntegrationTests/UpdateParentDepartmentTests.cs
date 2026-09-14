@@ -63,6 +63,19 @@ public class UpdateParentDepartmentTests : IClassFixture<DirectoryTestWEbFactory
             Assert.Equal("level0.level3", department.Path.Value);
             Assert.Equal(1, department.Depth);
         });
+
+        // Assert - перемещение попало в outbox в той же транзакции, что и сам переезд:
+        // без этого события AuditService никогда не узнал бы, что структура менялась.
+        await ExecuteInDb(async dbContext =>
+        {
+            var moved = await dbContext.Set<Shared.Outbox.OutboxMessage>()
+                .AsNoTracking()
+                .SingleAsync(
+                    m => m.Type == "DepartmentMoved" && m.AggregateId == deepest.Value.ToString(),
+                    cancellationToken);
+
+            Assert.Contains(root.Value.ToString(), moved.Payload);
+        });
     }
 
     [Fact]

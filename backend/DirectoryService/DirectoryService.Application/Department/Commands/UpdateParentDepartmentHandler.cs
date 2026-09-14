@@ -1,6 +1,7 @@
 ﻿using CSharpFunctionalExtensions;
 using DirectoryService.Application.Cache;
 using DirectoryService.Application.Database;
+using DirectoryService.Application.IntegrationEvents;
 using DirectoryService.Application.Validation;
 using DirectoryService.Contracts.Request.Department;
 using DirectoryService.Domain.Departments.ValueObjects;
@@ -30,19 +31,22 @@ namespace DirectoryService.Application.Department.Commands
         private readonly ITransactionManager _transactionManager;
         private readonly ILogger<UpdateParentDepartmentHandler> _logger;
         private readonly HybridCache _cache;
+        private readonly IOutboxWriter _outboxWriter;
 
         public UpdateParentDepartmentHandler(
             IDepartmentRepository departmentRepository,
             UpdateParentDepartmentValidation validator,
             ITransactionManager transaction,
             ILogger<UpdateParentDepartmentHandler> logger,
-            HybridCache cache)
+            HybridCache cache,
+            IOutboxWriter outboxWriter)
         {
             _departmentRepository = departmentRepository;
             _validator = validator;
             _transactionManager = transaction;
             _logger = logger;
             _cache = cache;
+            _outboxWriter = outboxWriter;
         }
 
         public async Task<Result<DepartmentId, Error>> Handle(
@@ -121,6 +125,11 @@ namespace DirectoryService.Application.Department.Commands
                     "A department cannot be moved under its own descendant");
             }
 
+            // Захватывается до UpdateHierarchy: этот вызов переписывает path/depth напрямую
+            // в базе через сырой SQL, минуя трекер изменений, поэтому свойство сущности в
+            // памяти он не трогает и остаётся прежним значением родителя для события.
+            var oldParentId = currentDep.Value.ParentId?.Value;
+
             var updateParent = await _departmentRepository.UpdateHierarchy(
                 newParentDepId,
                 newParentDep.Value.Path,
@@ -132,6 +141,11 @@ namespace DirectoryService.Application.Department.Commands
                 _logger.LogError("Failed to rewrite hierarchy for {DepartmentId}", currentDepId.Value);
                 return updateParent.Error;
             }
+
+            _outboxWriter.Enqueue(
+                DepartmentEventTypes.Moved,
+                currentDepId.Value.ToString(),
+                new DepartmentMovedEvent(currentDepId.Value, oldParentId, newParentDepId.Value));
 
             var save = await _transactionManager.SaveChangesAsync(cancellationToken);
             if (save.IsFailure)
