@@ -32,6 +32,14 @@ public class EmployeeController : ControllerBase
         return await handler.Handle(command, cancellationToken);
     }
 
+    [HttpDelete("{employeeId:guid}")]
+    [Authorize(Policy = "CanEdit")]
+    public async Task<EndpointResult> Terminate(
+        [FromRoute] Guid employeeId,
+        [FromServices] TerminateEmployeeHandler handler,
+        CancellationToken cancellationToken) =>
+        await handler.Handle(new TerminateEmployeeCommand(employeeId), cancellationToken);
+
     [HttpGet("{employeeId:guid}")]
     public async Task<ActionResult<EmployeeDto>> GetById(
         [FromRoute] Guid employeeId,

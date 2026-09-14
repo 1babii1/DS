@@ -170,6 +170,41 @@ public class HireAndTransferTests : IClassFixture<EmployeeTestWebFactory>, IAsyn
         Assert.Equal(winningDepartment, stored.DepartmentId);
     }
 
+    [Fact]
+    public async Task Terminate_of_an_active_employee_succeeds()
+    {
+        var hired = await ExecuteHireAsync(NewHireCommand());
+        Assert.True(hired.IsSuccess);
+
+        var result = await ExecuteTerminateAsync(new TerminateEmployeeCommand(hired.Value));
+
+        Assert.True(result.IsSuccess);
+        var stored = await ExecuteInDb(db => db.Employees.SingleAsync(e => e.Id == hired.Value));
+        Assert.Equal(EmployeeStatus.Terminated, stored.Status);
+    }
+
+    [Fact]
+    public async Task Terminating_an_already_terminated_employee_fails()
+    {
+        var hired = await ExecuteHireAsync(NewHireCommand());
+        Assert.True(hired.IsSuccess);
+        Assert.True((await ExecuteTerminateAsync(new TerminateEmployeeCommand(hired.Value))).IsSuccess);
+
+        var second = await ExecuteTerminateAsync(new TerminateEmployeeCommand(hired.Value));
+
+        Assert.True(second.IsFailure);
+        Assert.Equal("employee.terminate.already_terminated", second.Error.Messages[0].Code);
+    }
+
+    [Fact]
+    public async Task Terminate_of_an_unknown_employee_fails()
+    {
+        var result = await ExecuteTerminateAsync(new TerminateEmployeeCommand(Guid.NewGuid()));
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("employee.not_found", result.Error.Messages[0].Code);
+    }
+
     public Task InitializeAsync() => Task.CompletedTask;
 
     public async Task DisposeAsync() => await _resetDatabase();
@@ -192,6 +227,13 @@ public class HireAndTransferTests : IClassFixture<EmployeeTestWebFactory>, IAsyn
     {
         await using var scope = Services.CreateAsyncScope();
         var sut = scope.ServiceProvider.GetRequiredService<TransferEmployeeHandler>();
+        return await sut.Handle(command, CancellationToken.None);
+    }
+
+    private async Task<CSharpFunctionalExtensions.UnitResult<Shared.Error>> ExecuteTerminateAsync(TerminateEmployeeCommand command)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var sut = scope.ServiceProvider.GetRequiredService<TerminateEmployeeHandler>();
         return await sut.Handle(command, CancellationToken.None);
     }
 
