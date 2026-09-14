@@ -35,6 +35,14 @@ builder.Services.AddDatabaseHealthCheck<AuthDbContext>();
 // lock out every other user sharing the same bucket. Five attempts a minute is
 // tight enough to blunt credential stuffing without a legitimate user who mistypes
 // their password twice ever noticing.
+// Bound to configuration, not hardcoded, so integration tests can raise the limit
+// instead of tripping it on their own traffic - TestServer's in-memory transport
+// never populates RemoteIpAddress, so every test request would otherwise land in
+// the same "unknown" partition and exhaust the limit after five calls regardless of
+// which test made them. Defaults match what was hardcoded before.
+var authRateLimit = builder.Configuration.GetValue("RateLimiting:Auth:PermitLimit", 5);
+var authRateLimitWindow = builder.Configuration.GetValue("RateLimiting:Auth:WindowSeconds", 60);
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -43,8 +51,8 @@ builder.Services.AddRateLimiter(options =>
         partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 5,
-            Window = TimeSpan.FromMinutes(1),
+            PermitLimit = authRateLimit,
+            Window = TimeSpan.FromSeconds(authRateLimitWindow),
             QueueLimit = 0,
         }));
 });
