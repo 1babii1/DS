@@ -140,7 +140,13 @@ namespace DirectoryService.Application.Department.Commands
                 return save.Error;
             }
 
-            transactionScope.Commit();
+            var commitResult = transactionScope.Commit();
+            if (commitResult.IsFailure)
+            {
+                transactionScope.Rollback();
+                _logger.LogError("Failed to commit re-parent of {DepartmentId}", currentDepId.Value);
+                return commitResult.Error;
+            }
 
             // Удаление из кэша
             await _cache.RemoveOrIgnoreAsync(
