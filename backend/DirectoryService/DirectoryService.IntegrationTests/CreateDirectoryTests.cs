@@ -111,6 +111,38 @@ public class CreateDirectoryTests : IClassFixture<DirectoryTestWEbFactory>, IAsy
         Assert.NotNull(result.Error);
     }
 
+    /// <summary>
+    /// Written to check a hypothesis from this session's audit, not to demonstrate a
+    /// known bug: CreateDepartmentHandler never looks up an existing sibling before
+    /// inserting, and Path has no unique constraint or index in
+    /// DepartmentConfigurations - only a GiST index for query performance. Path is
+    /// built as parent.path + "." + identifier, so two children of the same parent
+    /// (or two roots) with the same identifier would get an identical path, which the
+    /// ltree hierarchy assumes can never happen.
+    /// </summary>
+    [Fact]
+    public async Task CreateDepartment_with_a_duplicate_identifier_is_rejected()
+    {
+        var locationId = await CreateLocation("dup");
+
+        var first = await ExecuteHandler(sut => sut.Handle(
+            new CreateDepartmentCommand(new CreateDepartmentRequest(
+                DepartmentName.Create("First").Value,
+                DepartmentIdentifier.Create("dupident").Value,
+                null, null, [locationId], DepartmentId.NewDepartmentId())),
+            CancellationToken.None));
+        Assert.True(first.IsSuccess);
+
+        var second = await ExecuteHandler(sut => sut.Handle(
+            new CreateDepartmentCommand(new CreateDepartmentRequest(
+                DepartmentName.Create("Second").Value,
+                DepartmentIdentifier.Create("dupident").Value,
+                null, null, [locationId], DepartmentId.NewDepartmentId())),
+            CancellationToken.None));
+
+        Assert.True(second.IsFailure, "A second root department with the same identifier should not be allowed to collide on path with the first");
+    }
+
     // Длина проверяется в value object, поэтому команду с некорректным именем
     // собрать нельзя в принципе - правило проверяется там, где оно живёт.
     [Fact]

@@ -1,7 +1,9 @@
 ﻿using CSharpFunctionalExtensions;
 using DirectoryService.Application.Database;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Shared;
+using Shared.Database;
 
 namespace DirectoryService.Infrastructure.Postgres
 {
@@ -47,6 +49,14 @@ namespace DirectoryService.Infrastructure.Postgres
             {
                 await _dbContext.SaveChangesAsync(cancellationToken);
                 return UnitResult.Success<Error>();
+            }
+            catch (DbUpdateException ex) when (ex.IsUniqueViolation())
+            {
+                // A department path collides with an existing one - most likely two
+                // siblings (or two roots) created with the same identifier at the same
+                // time, both past application-level validation before either committed.
+                _logger.LogWarning(ex, "Unique constraint violation saving changes");
+                return UnitResult.Failure<Error>(GeneralErrors.UniqueConstraintViolation());
             }
             catch (Exception ex)
             {
