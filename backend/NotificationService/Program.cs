@@ -1,13 +1,22 @@
-﻿using NotificationService;
+using Microsoft.Extensions.Hosting;
+using NotificationService;
 using Serilog;
+using Shared.HealthChecks;
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .CreateLogger();
 
 builder.Services.AddSerilog();
+
+// A BackgroundService exception is swallowed by default and the process keeps running
+// with a dead consumer - nothing downstream would ever know. StopHost makes a fatal
+// consumer failure visible the same way every other dependency failure is: the health
+// check (and with it, docker's restart policy) reacts instead of a silent no-op worker.
+builder.Services.Configure<HostOptions>(options =>
+    options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost);
 
 builder.Services.Configure<NotificationOptions>(options =>
 {
@@ -19,6 +28,10 @@ builder.Services.Configure<NotificationOptions>(options =>
 });
 
 builder.Services.AddHostedService<NotificationWorker>();
+builder.Services.AddHealthChecks();
 
-var host = builder.Build();
-host.Run();
+var app = builder.Build();
+
+app.MapDefaultHealthChecks();
+
+app.Run();

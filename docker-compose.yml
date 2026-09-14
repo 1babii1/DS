@@ -214,11 +214,20 @@ services:
     build:
       context: ./backend
       dockerfile: NotificationService/Dockerfile
+    ports:
+      - "5133:5133"
     environment:
-      - DOTNET_ENVIRONMENT=Docker
+      - ASPNETCORE_ENVIRONMENT=Docker
+      - ASPNETCORE_URLS=http://*:5133
     depends_on:
       kafka:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5133/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   kafka:
     container_name: kafka
