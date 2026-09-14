@@ -66,3 +66,8 @@ app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).AllowAnony
 app.MapHealthChecks("/health/ready", new() { Predicate = c => c.Tags.Contains("ready") }).AllowAnonymous();
 
 app.Run();
+
+namespace McpServer
+{
+    public partial class Program;
+}
