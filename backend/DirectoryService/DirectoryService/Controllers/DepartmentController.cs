@@ -41,7 +41,7 @@ public class DepartmentController : ControllerBase
     }
 
     [HttpGet("department/{departmentId:guid}")]
-    public async Task<ActionResult<ReadDepartmentWithChildrenDto?>> GetDepartmentById(
+    public async Task<EndpointResult<ReadDepartmentWithChildrenDto?>> GetDepartmentById(
         [FromRoute] Guid departmentId,
         [FromServices] GetDepartmentByIdHandler handler,
         CancellationToken cancellationToken) =>
@@ -56,7 +56,7 @@ public class DepartmentController : ControllerBase
 
     [HttpGet("search")]
     [EnableRateLimiting("search")]
-    public async Task<ActionResult<List<DepartmentSearchResultDto>?>> SearchSemantic(
+    public async Task<EndpointResult<List<DepartmentSearchResultDto>>> SearchSemantic(
         [FromQuery] string query,
         [FromQuery] int limit,
         [FromServices] SearchDepartmentsSemanticHandler handler,
@@ -74,14 +74,14 @@ public class DepartmentController : ControllerBase
         await handler.Handle(cancellationToken);
 
     [HttpGet("roots")]
-    public async Task<ActionResult<List<ReadDepartmentHierarchyDto>?>> GetRootDepartments(
+    public async Task<EndpointResult<List<ReadDepartmentHierarchyDto>>> GetRootDepartments(
         [FromQuery] GetParentDepartmentsRequest request,
         [FromServices] GetParentDepartmentsHandler handler,
         CancellationToken cancellationToken) =>
         await handler.Handle(request, cancellationToken);
 
     [HttpGet("{parentId:guid}/children")]
-    public async Task<ActionResult<List<ReadDepartmentHierarchyDto>?>> GetChildrenLazy(
+    public async Task<EndpointResult<List<ReadDepartmentHierarchyDto>>> GetChildrenLazy(
         [FromRoute] Guid parentId,
         [FromQuery] GetChildrenLazyRequest request,
         [FromServices] GetChildrenLazyHandler handler,

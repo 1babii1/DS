@@ -1,12 +1,15 @@
-﻿using Dapper;
+﻿using CSharpFunctionalExtensions;
+using Dapper;
 using DirectoryService.Application.Cache;
 using DirectoryService.Application.Database;
+using DirectoryService.Application.Validation;
 using DirectoryService.Contracts.Request.Department;
 using DirectoryService.Contracts.Response.Department;
 using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
+using Shared;
 
 namespace DirectoryService.Application.Department.Queries;
 
@@ -39,7 +42,7 @@ public class GetParentDepartmentsHandler
         _validator = validator;
     }
 
-    public async Task<List<ReadDepartmentHierarchyDto>> Handle(
+    public async Task<Result<List<ReadDepartmentHierarchyDto>, Error>> Handle(
         GetParentDepartmentsRequest request,
         CancellationToken cancellationToken)
     {
@@ -48,7 +51,7 @@ public class GetParentDepartmentsHandler
         if (!validateResult.IsValid)
         {
             _logger.LogError("Failed to validate departmentId");
-            return [];
+            return validateResult.ToError();
         }
 
         var departments = await _cache.GetOrCreateAsync(

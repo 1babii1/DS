@@ -1,5 +1,6 @@
 ﻿using System.Data.Common;
 using DirectoryService.Infrastructure.Postgres;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -95,6 +96,15 @@ public class DirectoryTestWEbFactory : WebApplicationFactory<Program>, IAsyncLif
             // случайный тест. Воркеры эмбеддингов и outbox к тому же непрерывно логируют
             // ошибки, потому что Ollama и Kafka в тестовом окружении не подняты.
             service.RemoveAll<IHostedService>();
+
+            // Program.cs wires JWT Bearer against a real AuthService JWKS endpoint this
+            // test host doesn't have. Query-contract tests need [Authorize] to actually
+            // run (not a real credential check) to prove the HTTP-level status/body a
+            // fix like this one changes, so the default scheme becomes a fixed
+            // authenticated test principal instead.
+            service
+                .AddAuthentication(TestAuthHandler.SchemeName)
+                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
 
             service.RemoveAll<DirectoryServiceDbContext>();
 
