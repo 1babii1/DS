@@ -177,6 +177,19 @@ public class CreateDepartmentHandler
                 },
                 cancellationToken: cancellationToken);
 
+            // The new department is invisible to its parent's cached children list
+            // (and to the aggregate top-by-positions view) until these are evicted -
+            // that cache entry was populated before this row existed and has no way
+            // to know about it otherwise.
+            if (departmentFromDB is not null)
+            {
+                await _cache.RemoveOrIgnoreAsync(
+                    _logger, key: GetKey.DepartmentKey.Children(departmentFromDB.Id.Value), cancellationToken);
+            }
+
+            await _cache.RemoveOrIgnoreAsync(
+                _logger, key: GetKey.DepartmentKey.TopByPositions(), cancellationToken);
+
             return result;
         }
         catch (Exception e)

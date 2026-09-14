@@ -162,11 +162,23 @@ namespace DirectoryService.Application.Department.Commands
                 return commitResult.Error;
             }
 
-            // Удаление из кэша
+            // Удаление из кэша: собственные записи обоих департаментов, и списки детей
+            // старого и нового родителя - переезд меняет оба списка, иначе один из них
+            // ещё до 30 минут показывает департамент там, где его уже нет (или не
+            // показывает там, где он уже появился).
             await _cache.RemoveOrIgnoreAsync(
                 _logger,
                 keys: GetKey.DepartmentKey.ById([newParentDepId.Value, currentDepId.Value]),
                 cancellationToken);
+
+            await _cache.RemoveOrIgnoreAsync(
+                _logger, key: GetKey.DepartmentKey.Children(newParentDepId.Value), cancellationToken);
+
+            if (oldParentId is not null)
+            {
+                await _cache.RemoveOrIgnoreAsync(
+                    _logger, key: GetKey.DepartmentKey.Children(oldParentId.Value), cancellationToken);
+            }
 
             return newParentDepId;
         }
