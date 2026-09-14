@@ -75,7 +75,7 @@ public class ClearDbOfDeletedEntities : BackgroundService
             return transactionScopeResult.Error;
         }
 
-        using var transactionScope = transactionScopeResult.Value;
+        await using var transactionScope = transactionScopeResult.Value;
 
         // Очистка связей
         var deleteDepId = await dbContext.Departments
@@ -132,10 +132,10 @@ public class ClearDbOfDeletedEntities : BackgroundService
             WHERE is_active = false AND deleted_at < {0}
             """, date);
 
-        var commitResult = transactionScope.Commit();
+        var commitResult = await transactionScope.CommitAsync(cancellationToken);
         if (commitResult.IsFailure)
         {
-            transactionScope.Rollback();
+            await transactionScope.RollbackAsync(cancellationToken);
             _logger.LogError("Failed to commit transaction");
             return commitResult.Error;
         }

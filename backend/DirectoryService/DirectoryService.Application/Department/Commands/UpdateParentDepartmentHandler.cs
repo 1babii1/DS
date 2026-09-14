@@ -72,7 +72,7 @@ namespace DirectoryService.Application.Department.Commands
 
             // Выход без Commit откатывает транзакцию при Dispose, поэтому явные Rollback
             // на каждой ветке не нужны.
-            using var transactionScope = transactionScopeResult.Value;
+            await using var transactionScope = transactionScopeResult.Value;
 
             // Проверка id
             var newParentDepId = DepartmentId.FromValue(requestCommand.Request.parentDepartmentId);
@@ -154,10 +154,10 @@ namespace DirectoryService.Application.Department.Commands
                 return save.Error;
             }
 
-            var commitResult = transactionScope.Commit();
+            var commitResult = await transactionScope.CommitAsync(cancellationToken);
             if (commitResult.IsFailure)
             {
-                transactionScope.Rollback();
+                await transactionScope.RollbackAsync(cancellationToken);
                 _logger.LogError("Failed to commit re-parent of {DepartmentId}", currentDepId.Value);
                 return commitResult.Error;
             }
