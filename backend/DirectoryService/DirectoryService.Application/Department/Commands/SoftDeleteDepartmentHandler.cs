@@ -141,14 +141,26 @@ public class SoftDeleteDepartmentHandler
             return commitResult.Error;
         }
 
-        // Удаление из кэша
+        // Удаление из кэша. Собственная запись департамента, его место в кэшированном
+        // списке детей родителя (иначе удалённый департамент продолжит там числиться
+        // до истечения TTL) и агрегат top-by-positions, который мог включать его.
         await _cache.RemoveOrIgnoreAsync(
             _logger, key: GetKey.DepartmentKey.ById(department.Value.Id), cancellationToken);
 
+        if (department.Value.ParentId is not null)
+        {
+            await _cache.RemoveOrIgnoreAsync(
+                _logger, key: GetKey.DepartmentKey.Children(department.Value.ParentId.Value), cancellationToken);
+        }
+
+        await _cache.RemoveOrIgnoreAsync(
+            _logger, key: GetKey.DepartmentKey.TopByPositions(), cancellationToken);
+
         _logger.LogInformation(
-            "Департамент удален{0}{1}",
-            locationOrphan.Value?.Any() == true ? ", удалены связанные локации" : " ",
-            positionOrphan.Value?.Any() == true ? ", удалены связанные позиции" : " ");
+            "Department {DepartmentId} deleted (orphan locations removed: {LocationsRemoved}, orphan positions removed: {PositionsRemoved})",
+            department.Value.Id.Value,
+            locationOrphan.Value?.Any() == true,
+            positionOrphan.Value?.Any() == true);
 
         return department.Value.Id;
     }
