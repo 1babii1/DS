@@ -1,4 +1,4 @@
-﻿using CSharpFunctionalExtensions;
+using CSharpFunctionalExtensions;
 using DirectoryService.Application.Cache;
 using DirectoryService.Application.Database;
 using DirectoryService.Application.Validation;
@@ -57,13 +57,13 @@ public class UpdateDepartmentLocationsHadler
             return transactionScopeResult.Error;
         }
 
-        using var transactionScope = transactionScopeResult.Value;
+        await using var transactionScope = transactionScopeResult.Value;
 
         // Валидация данных запроса
         var validateResult = await _validator.ValidateAsync(commandRequest, cancellationToken);
         if (!validateResult.IsValid)
         {
-            transactionScope.Rollback();
+            await transactionScope.RollbackAsync(cancellationToken);
             _logger.LogError("Failed to validate update department locations");
             return validateResult.ToError();
         }
@@ -72,7 +72,7 @@ public class UpdateDepartmentLocationsHadler
         var department = await _departmentRepository.GetByIdIncludeLocations(commandRequest.Request.departmentId, cancellationToken);
         if (department.IsFailure)
         {
-            transactionScope.Rollback();
+            await transactionScope.RollbackAsync(cancellationToken);
             _logger.LogError("Failed to get department by id");
             return department.Error;
         }
@@ -82,14 +82,14 @@ public class UpdateDepartmentLocationsHadler
             await _locationRepository.GetLocationsIds(commandRequest.Request.locationIds, cancellationToken);
         if (locations.IsFailure)
         {
-            transactionScope.Rollback();
+            await transactionScope.RollbackAsync(cancellationToken);
             _logger.LogError("Failed to get locations by ids");
             return locations.Error;
         }
 
         if (locations.Value.Any())
         {
-            transactionScope.Rollback();
+            await transactionScope.RollbackAsync(cancellationToken);
             var missed = string.Join(", ", locations.Value.Select(id => id.Value));
             _logger.LogError("Missing locations: {Missed}", missed);
             return Error.Validation("locations", $"Locations not found: {missed}");
@@ -108,10 +108,10 @@ public class UpdateDepartmentLocationsHadler
             return result.Error;
         }
 
-        var commitResult = transactionScope.Commit();
+        var commitResult = await transactionScope.CommitAsync(cancellationToken);
         if (commitResult.IsFailure)
         {
-            transactionScope.Rollback();
+            await transactionScope.RollbackAsync(cancellationToken);
             _logger.LogError("Failed to commit transaction");
             return commitResult.Error;
         }

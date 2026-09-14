@@ -1,7 +1,5 @@
-﻿using System.Data;
-using CSharpFunctionalExtensions;
+﻿using CSharpFunctionalExtensions;
 using DirectoryService.Application.Database;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using Shared;
 
@@ -29,7 +27,10 @@ namespace DirectoryService.Infrastructure.Postgres
 
                 var transactionScopeLogger = _loggerFactory.CreateLogger<TransactionScope>();
 
-                var transactionScope = new TransactionScope(transaction.GetDbTransaction(), transactionScopeLogger);
+                // IDbContextTransaction itself has CommitAsync/RollbackAsync - unwrapping to
+                // the raw ADO.NET IDbTransaction via GetDbTransaction() (the previous shape of
+                // this code) threw that away and left only the blocking sync members.
+                var transactionScope = new TransactionScope(transaction, transactionScopeLogger);
 
                 return transactionScope;
             }

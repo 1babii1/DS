@@ -68,7 +68,7 @@ public class SoftDeleteDepartmentHandler
 
         // Выход без Commit откатывает транзакцию при Dispose, поэтому явные Rollback
         // на каждой ветке не нужны.
-        using var transactionScope = transaction.Value;
+        await using var transactionScope = transaction.Value;
 
         // Проверка на существование Департамента
         var department =
@@ -134,7 +134,7 @@ public class SoftDeleteDepartmentHandler
             return save.Error;
         }
 
-        var commitResult = transactionScope.Commit();
+        var commitResult = await transactionScope.CommitAsync(cancellationToken);
         if (commitResult.IsFailure)
         {
             _logger.LogError("Failed to commit soft delete of department {DepartmentId}", request.departmentId);
