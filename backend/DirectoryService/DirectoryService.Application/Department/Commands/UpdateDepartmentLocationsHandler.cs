@@ -23,18 +23,18 @@ public class UpdateDepartmentLocationsValidation : AbstractValidator<UpdateDepar
 
 public record UpdateDepartmentLocationsCommand(UpdateDepartmentLocationsRequest Request);
 
-public class UpdateDepartmentLocationsHadler
+public class UpdateDepartmentLocationsHandler
 {
     private readonly IDepartmentRepository _departmentRepository;
     private readonly ILocationsRepository _locationRepository;
     private readonly UpdateDepartmentLocationsValidation _validator;
-    private readonly ILogger<UpdateDepartmentLocationsHadler> _logger;
+    private readonly ILogger<UpdateDepartmentLocationsHandler> _logger;
     private readonly ITransactionManager _transactionManager;
     private readonly HybridCache _cache;
 
-    public UpdateDepartmentLocationsHadler(
+    public UpdateDepartmentLocationsHandler(
         IDepartmentRepository departmentRepository,
-        ILogger<UpdateDepartmentLocationsHadler> logger, ILocationsRepository locationRepository,
+        ILogger<UpdateDepartmentLocationsHandler> logger, ILocationsRepository locationRepository,
         UpdateDepartmentLocationsValidation validator, ITransactionManager transactionManager, HybridCache cache)
     {
         _departmentRepository = departmentRepository;
@@ -57,39 +57,34 @@ public class UpdateDepartmentLocationsHadler
             return transactionScopeResult.Error;
         }
 
+        // Exiting without Commit rolls the transaction back on Dispose, so early
+        // returns below don't need an explicit Rollback.
         await using var transactionScope = transactionScopeResult.Value;
 
-        // Валидация данных запроса
         var validateResult = await _validator.ValidateAsync(commandRequest, cancellationToken);
         if (!validateResult.IsValid)
         {
-            await transactionScope.RollbackAsync(cancellationToken);
             _logger.LogError("Failed to validate update department locations");
             return validateResult.ToError();
         }
 
-        // Находим департамент
         var department = await _departmentRepository.GetByIdIncludeLocations(commandRequest.Request.departmentId, cancellationToken);
         if (department.IsFailure)
         {
-            await transactionScope.RollbackAsync(cancellationToken);
             _logger.LogError("Failed to get department by id");
             return department.Error;
         }
 
-        // Проверяем локации
         var locations =
             await _locationRepository.GetLocationsIds(commandRequest.Request.locationIds, cancellationToken);
         if (locations.IsFailure)
         {
-            await transactionScope.RollbackAsync(cancellationToken);
             _logger.LogError("Failed to get locations by ids");
             return locations.Error;
         }
 
         if (locations.Value.Any())
         {
-            await transactionScope.RollbackAsync(cancellationToken);
             var missed = string.Join(", ", locations.Value.Select(id => id.Value));
             _logger.LogError("Missing locations: {Missed}", missed);
             return Error.Validation("locations", $"Locations not found: {missed}");

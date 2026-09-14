@@ -2,7 +2,6 @@
 using DirectoryService.Application.Department.Queries;
 using DirectoryService.Contracts.Request.Department;
 using DirectoryService.Contracts.Response.Department;
-using DirectoryService.Contracts.Response.Department;
 using DirectoryService.Domain.Departments.ValueObjects;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -26,7 +25,7 @@ public class DepartmentController : ControllerBase
     [HttpPatch("locations")]
     [Authorize(Policy = "CanEdit")]
     public async Task<EndpointResult<DepartmentId>> UpdateLocations(
-        [FromServices] UpdateDepartmentLocationsHadler handler,
+        [FromServices] UpdateDepartmentLocationsHandler handler,
         UpdateDepartmentLocationsCommand request, CancellationToken cancellationToken) =>
         await handler.Handle(request, cancellationToken);
 
