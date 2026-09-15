@@ -2,14 +2,17 @@ using Microsoft.Extensions.Hosting;
 using NotificationService;
 using Serilog;
 using Shared.HealthChecks;
+using Shared.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
 
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
+    .AddOtlpLogging(builder.Configuration, "notification-service")
     .CreateLogger();
 
 builder.Services.AddSerilog();
+builder.Services.AddObservability(builder.Configuration, "notification-service");
 
 // A BackgroundService exception is swallowed by default and the process keeps running
 // with a dead consumer - nothing downstream would ever know. StopHost makes a fatal
