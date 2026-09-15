@@ -57,16 +57,20 @@ builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
 builder.Services.AddOutboxPublisher<AuthDbContext>(builder.Configuration, "auth.events");
 
+var kafkaBootstrapServers = builder.Configuration["Kafka:BootstrapServers"]
+    ?? throw new InvalidOperationException("Configuration 'Kafka:BootstrapServers' is not set.");
+var kafkaSecurity = KafkaSecurityOptions.FromConfiguration(builder.Configuration);
+
 builder.Services.Configure<AuthConsumerOptions>(options =>
 {
-    options.BootstrapServers = builder.Configuration["Kafka:BootstrapServers"]
-        ?? throw new InvalidOperationException("Configuration 'Kafka:BootstrapServers' is not set.");
-    options.Security = KafkaSecurityOptions.FromConfiguration(builder.Configuration);
+    options.BootstrapServers = kafkaBootstrapServers;
+    options.Security = kafkaSecurity;
     options.Topics = builder.Configuration.GetSection("Kafka:Topics").Get<string[]>()
         ?? throw new InvalidOperationException("Configuration 'Kafka:Topics' is not set.");
     options.GroupId = builder.Configuration["Kafka:GroupId"] ?? "auth-service";
 });
 builder.Services.AddHostedService<EmployeeEventsConsumer>();
+builder.Services.AddKafkaHealthCheck(kafkaBootstrapServers, kafkaSecurity);
 
 // Partitioned by client IP, not global: a global limiter would let one abusive IP
 // lock out every other user sharing the same bucket. Five attempts a minute is
