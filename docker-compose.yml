@@ -13,6 +13,7 @@ services:
       - Embeddings__OllamaBaseUrl=http://ollama:11434
       - ConnectionStrings__DirectoryServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=directory,public
       - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:-changeme-redis}
+      - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5129/health/ready || exit 1"]
@@ -59,6 +60,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://*:5130
       - ConnectionStrings__AuthServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=auth,public
+      - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - SigningKeys__SigningKeyBase64=${SIGNINGKEYS_SIGNING_KEY_BASE64:-}
       - SigningKeys__EncryptionKeyBase64=${SIGNINGKEYS_ENCRYPTION_KEY_BASE64:-}
@@ -105,6 +107,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://*:5131
       - ConnectionStrings__EmployeeServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=employee,public
+      - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5131/health/ready || exit 1"]
@@ -153,6 +156,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://*:5132
       - ConnectionStrings__AuditServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=audit,public
+      - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5132/health/ready || exit 1"]
