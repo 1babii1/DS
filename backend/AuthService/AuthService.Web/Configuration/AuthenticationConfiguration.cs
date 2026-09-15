@@ -8,9 +8,6 @@ namespace AuthService.Web.Configuration;
 
 public static class AuthenticationConfiguration
 {
-    private static bool IsLocalInsecureEnvironment(IWebHostEnvironment environment)
-        => environment.IsDevelopment() || environment.IsEnvironment("Docker");
-
     public static IServiceCollection AddIdentityServices(this IServiceCollection services)
     {
         services.AddIdentity<Account, Role>(options =>
@@ -48,8 +45,15 @@ public static class AuthenticationConfiguration
             options.Cookie.Name = "AuthServiceCookie";
             options.Cookie.HttpOnly = true;
             options.Cookie.SameSite = SameSiteMode.Lax;
+            options.LoginPath = "/auth/sign-in";
             options.Events.OnRedirectToLogin = context =>
             {
+                if (context.Request.Path.StartsWithSegments("/connect/authorize"))
+                {
+                    context.Response.Redirect(context.RedirectUri);
+                    return Task.CompletedTask;
+                }
+
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return Task.CompletedTask;
             };
@@ -133,4 +137,7 @@ public static class AuthenticationConfiguration
 
         return services;
     }
+
+    private static bool IsLocalInsecureEnvironment(IWebHostEnvironment environment)
+        => environment.IsDevelopment() || environment.IsEnvironment("Docker");
 }

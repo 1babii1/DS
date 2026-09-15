@@ -1,0 +1,46 @@
+@page "/auth/sign-in"
+@model AuthService.Web.Pages.SignInModel
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{ Layout = null; }
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Sign in · DS</title>
+    <style>
+        :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #131a17; color: #f0f4f1; }
+        body { margin: 0; min-height: 100dvh; display: grid; place-items: center; }
+        main { width: min(26rem, calc(100% - 3rem)); padding-block: 3rem; }
+        .brand { font-weight: 700; letter-spacing: .15em; color: #a8d7b8; }
+        h1 { font-size: 2.5rem; letter-spacing: -.04em; margin-bottom: .75rem; }
+        p { color: #abb9b0; line-height: 1.6; }
+        form { display: grid; gap: .75rem; margin-top: 2rem; }
+        input, button { box-sizing: border-box; width: 100%; border-radius: .75rem; padding: .875rem 1rem; font: inherit; }
+        input { background: #1c2520; color: #f0f4f1; border: 1px solid #53685b; margin-bottom: .5rem; }
+        input:focus-visible, button:focus-visible { outline: 3px solid #a8d7b8; outline-offset: 3px; }
+        button { border: 0; background: #a8d7b8; color: #131a17; font-weight: 600; cursor: pointer; margin-top: .75rem; }
+        .validation-summary-errors, .field-validation-error { color: #ffb5b5; }
+        .validation-summary-valid { display: none; }
+    </style>
+</head>
+<body>
+<main>
+    <div class="brand">DS / PEOPLE &amp; ORGANIZATION</div>
+    <h1>Welcome back.</h1>
+    <p>Sign in to your organization's workspace.</p>
+    <form method="post">
+        <input type="hidden" asp-for="ReturnUrl" />
+        <div asp-validation-summary="ModelOnly" role="alert"></div>
+        <label asp-for="Email">Work email</label>
+        <input asp-for="Email" autocomplete="username" required aria-describedby="email-error" />
+        <span asp-validation-for="Email" id="email-error"></span>
+        <label asp-for="Password">Password</label>
+        <input asp-for="Password" autocomplete="current-password" required aria-describedby="password-error" />
+        <span asp-validation-for="Password" id="password-error"></span>
+        <button type="submit">Sign in</button>
+    </form>
+</main>
+</body>
+</html>
