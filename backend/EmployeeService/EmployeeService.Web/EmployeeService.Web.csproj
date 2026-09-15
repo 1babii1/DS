@@ -17,6 +17,7 @@
       <ProjectReference Include="..\EmployeeService.Infrastructure.Postgres\EmployeeService.Infrastructure.Postgres.csproj" />
       <ProjectReference Include="..\EmployeeService.Infrastructure.DirectoryGrpc\EmployeeService.Infrastructure.DirectoryGrpc.csproj" />
       <ProjectReference Include="..\EmployeeService.Contracts\EmployeeService.Contracts.csproj" />
+      <ProjectReference Include="..\..\Shared\Shared.csproj" />
     </ItemGroup>
 
     <ItemGroup>
