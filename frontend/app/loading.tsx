@@ -1,0 +1,1 @@
+export default function Loading() { return <div className='page'><section aria-busy='true' className='route-state'><span className='route-state__pulse' aria-hidden='true'/><p className='eyebrow'>DS platform</p><h1>Preparing your workspace</h1><p>Loading the route and its service boundary.</p></section></div> }

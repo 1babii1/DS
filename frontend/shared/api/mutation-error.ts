@@ -1,0 +1,2 @@
+import { isAxiosError } from 'axios'
+export function mutationErrorMessage(error: unknown, action: string) { if (isAxiosError(error) && error.response?.status === 403) return 'Your role does not have permission to make this change.'; if (isAxiosError(error) && error.response?.status === 401) return 'Your session has expired. Sign in again to continue.'; return `${action} could not be completed. Check the selected data and try again.` }

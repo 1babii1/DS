@@ -21,7 +21,7 @@ export default function OverviewPage() {
 				<div className='introduction-panel'>
 					<div className='introduction-panel__copy'>
 						<h2>One clear view of how people, roles, and teams fit together.</h2>
-						<p>The interface is being connected to the platform services in stages. Start with the organization directory, then follow work into people, positions, locations, and auditable activity.</p>
+						<p>Navigate the organization hierarchy, manage people and catalogue data, and trace changes through the authenticated service boundary.</p>
 					</div>
 					<div aria-label='Organization data flows through platform services' className='platform-flow'>
 						<span><Building2 aria-hidden='true' size={16} /></span><i /><span><ArrowRight aria-hidden='true' size={15} /></span><i /><span><ShieldCheck aria-hidden='true' size={16} /></span>
@@ -37,8 +37,8 @@ export default function OverviewPage() {
 
 			<section aria-label='Workspace areas' className='feature-grid'>
 				<article className='feature-card'><span className='feature-card__number'>01</span><h2>Organization directory</h2><p>Browse the current department hierarchy from the directory service.</p></article>
-				<article className='feature-card'><span className='feature-card__number'>02</span><h2>Role-based workspace</h2><p>Session and permissions will shape each action as the secured client integration lands.</p></article>
-				<article className='feature-card'><span className='feature-card__number'>03</span><h2>Change visibility</h2><p>Activity will surface the history behind organizational changes from the audit service.</p></article>
+				<article className='feature-card'><span className='feature-card__number'>02</span><h2>Role-based workspace</h2><p>A server-side session protects service tokens while role-aware authorization governs every mutation.</p></article>
+				<article className='feature-card'><span className='feature-card__number'>03</span><h2>Change visibility</h2><p>Review the history behind organizational changes through the platform audit service.</p></article>
 			</section>
 		</div>
 	)
