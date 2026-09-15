@@ -57,8 +57,19 @@ public static class AuthenticationConfiguration
                 ? CookieSecurePolicy.SameAsRequest
                 : CookieSecurePolicy.Always;
             options.Cookie.SameSite = SameSiteMode.Lax;
+            options.LoginPath = "/auth/sign-in";
             options.Events.OnRedirectToLogin = context =>
             {
+                // An unauthenticated /connect/authorize request is a browser
+                // navigation, not an API call - redirect to the sign-in page like
+                // any other cookie-authenticated route, instead of 401ing a request
+                // the browser can't retry with credentials on its own.
+                if (context.Request.Path.StartsWithSegments("/connect/authorize"))
+                {
+                    context.Response.Redirect(context.RedirectUri);
+                    return Task.CompletedTask;
+                }
+
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return Task.CompletedTask;
             };

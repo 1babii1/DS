@@ -25,8 +25,16 @@ builder.Host.UseSerilog((context, _, configuration) =>
 builder.Services.AddObservability(builder.Configuration, "auth-service");
 
 builder.Services.AddControllers();
+builder.Services.AddRazorPages();
 builder.Services.AddEnvelopeModelStateValidation();
 builder.Services.AddOpenApi();
+
+builder.Services.AddOptions<WebClientOptions>()
+    .Bind(builder.Configuration.GetSection(WebClientOptions.SectionName))
+    .Validate(
+        options => options.IsValid(builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Docker")),
+        "Enabled web client requires a strong client secret and an HTTPS frontend origin (loopback HTTP is local-only).")
+    .ValidateOnStart();
 
 builder.Services.AddFrameworkCors(builder.Configuration);
 
@@ -103,9 +111,11 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapControllers();
+app.MapRazorPages();
 app.MapDefaultHealthChecks();
 
 await OpenIddictSeeder.SeedAsync(app.Services);
+await WebClientSeeder.SeedAsync(app.Services);
 
 app.Run();
 
