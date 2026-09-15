@@ -17,9 +17,13 @@ function TimelineItem({ entry }: { entry: AuditEntry }) {
 	const time = new Intl.DateTimeFormat('en', { timeStyle: 'short' }).format(new Date(entry.occurredAt))
 	return <article className='audit-item'><div className='audit-item__rail'><span /><i /></div><div className='audit-item__body'><div className='audit-item__meta'><span>{entry.sourceService}</span><time dateTime={entry.occurredAt}>{time}</time></div><h2>{eventLabel(entry.eventType)}</h2><p><span className='audit-event-tag'>{entry.eventType}</span> Aggregate <code>{entry.aggregateId}</code></p></div></article>
 }
+function localDayDate(day: string) {
+	return new Date(`${day}T12:00:00`)
+}
+
 function Timeline({ entries }: { entries: AuditEntry[] }) {
 	const groups = entries.reduce<Record<string, AuditEntry[]>>((result, entry) => { const key = dayKey(entry.occurredAt); (result[key] ??= []).push(entry); return result }, {})
-	return <section aria-label='Audit timeline' className='audit-timeline'>{Object.entries(groups).map(([day, events]) => <section className='audit-day' key={day}><h2><time dateTime={day}>{new Intl.DateTimeFormat('en', { dateStyle: 'full' }).format(new Date(`${day}T12:00:00Z`))}</time><span>{events.length} event{events.length === 1 ? '' : 's'}</span></h2>{events.map(entry => <TimelineItem entry={entry} key={entry.id} />)}</section>)}</section>
+	return <section aria-label='Audit timeline' className='audit-timeline'>{Object.entries(groups).map(([day, events]) => <section className='audit-day' key={day}><h2><time dateTime={day}>{new Intl.DateTimeFormat('en', { dateStyle: 'full' }).format(localDayDate(day))}</time><span>{events.length} event{events.length === 1 ? '' : 's'}</span></h2>{events.map(entry => <TimelineItem entry={entry} key={entry.id} />)}</section>)}</section>
 }
 
 export default function ActivityPage() {
