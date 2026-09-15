@@ -59,6 +59,10 @@ services:
       - ASPNETCORE_URLS=http://*:5130
       - ConnectionStrings__AuthServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=auth,public
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - SigningKeys__SigningKeyBase64=${SIGNINGKEYS_SIGNING_KEY_BASE64:-}
+      - SigningKeys__EncryptionKeyBase64=${SIGNINGKEYS_ENCRYPTION_KEY_BASE64:-}
+      - Auth__SeedAdmin__Email=${SEED_ADMIN_EMAIL:-admin@portfolio.local}
+      - Auth__SeedAdmin__Password=${SEED_ADMIN_PASSWORD:-ChangeMe123!}
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5130/health/ready || exit 1"]
       interval: 10s

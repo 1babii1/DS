@@ -31,8 +31,9 @@ builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection(AuthOpt
 
 builder.Services.AddInfrastructurePostgres(builder.Configuration);
 
-builder.Services.AddIdentityServices();
+builder.Services.AddIdentityServices(builder.Environment);
 builder.Services.AddOpenIddictServer(builder.Environment, builder.Configuration);
+builder.Services.AddOpenIddictQuartzScheduler();
 
 builder.Services.AddDatabaseHealthCheck<AuthDbContext>();
 
