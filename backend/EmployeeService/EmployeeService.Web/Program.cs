@@ -1,10 +1,12 @@
-﻿using EmployeeService.Application.Database;
+﻿using System.Threading.RateLimiting;
+using EmployeeService.Application.Database;
 using EmployeeService.Application.Employees.Commands;
 using EmployeeService.Application.Employees.Queries;
 using EmployeeService.Infrastructure.DirectoryGrpc;
 using EmployeeService.Infrastructure.Postgres;
 using EmployeeService.Web.Consumers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using Shared.Cors;
 using Shared.HealthChecks;
@@ -76,6 +78,27 @@ builder.Services.AddScoped<ListEmployeesHandler>();
 
 builder.Services.AddDatabaseHealthCheck<EmployeeDbContext>();
 
+// Hire/Transfer/Terminate were unthrottled - CanEdit keeps out unauthenticated
+// callers, but not a compromised or buggy admin/editor token. Same
+// IP-partitioned fixed window as DirectoryService's "write" policy, config-driven
+// for the same reason: TestServer never populates RemoteIpAddress.
+var writeRateLimit = builder.Configuration.GetValue("RateLimiting:Write:PermitLimit", 30);
+var writeRateLimitWindow = builder.Configuration.GetValue("RateLimiting:Write:WindowSeconds", 60);
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("write", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = writeRateLimit,
+            Window = TimeSpan.FromSeconds(writeRateLimitWindow),
+            QueueLimit = 0,
+        }));
+});
+
 var app = builder.Build();
 
 app.UseRequestCorrelationId();
@@ -90,6 +113,7 @@ app.ConfigureCors();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 app.MapDefaultHealthChecks();

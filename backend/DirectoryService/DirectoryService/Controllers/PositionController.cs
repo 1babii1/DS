@@ -4,6 +4,7 @@ using DirectoryService.Contracts.Request.Position;
 using DirectoryService.Contracts.Response.Position;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Shared;
 using Shared.EndpointResults;
 
@@ -16,6 +17,7 @@ public class PositionController : ControllerBase
 {
     [HttpPost]
     [Authorize(Policy = "CanEdit")]
+    [EnableRateLimiting("write")]
     public async Task<EndpointResult<Guid>> Create(
         [FromServices] CreatePositionHandle handler,
         CreatePositionCommand request, CancellationToken cancellationToken) => await handler.Handle(request, cancellationToken);
