@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { registerViewer, type RegistrationValues } from "@/app/register/actions";
+import { PasswordInput } from "@/shared/ui/password-input";
 
 const registrationSchema = z
   .object({
@@ -62,10 +63,10 @@ export function RegistrationForm() {
           <input aria-describedby={form.formState.errors.email ? "registration-email-error" : undefined} aria-invalid={Boolean(form.formState.errors.email)} autoComplete="email" className="mt-2 w-full rounded-lg border bg-background px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring" id="registration-email" type="email" {...form.register("email")} />
           <FieldError message={form.formState.errors.email?.message} name="registration-email" />
           <label className="block text-sm font-medium" htmlFor="registration-password">Password</label>
-          <input aria-describedby={form.formState.errors.password ? "registration-password-error" : undefined} aria-invalid={Boolean(form.formState.errors.password)} autoComplete="new-password" className="mt-2 w-full rounded-lg border bg-background px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring" id="registration-password" type="password" {...form.register("password")} />
+          <div className="mt-2"><PasswordInput aria-describedby={form.formState.errors.password ? "registration-password-error" : undefined} aria-invalid={Boolean(form.formState.errors.password)} autoComplete="new-password" id="registration-password" showLabel="Show password" hideLabel="Hide password" {...form.register("password")} /></div>
           <FieldError message={form.formState.errors.password?.message} name="registration-password" />
           <label className="block text-sm font-medium" htmlFor="registration-confirm-password">Confirm password</label>
-          <input aria-describedby={form.formState.errors.confirmPassword ? "registration-confirm-password-error" : undefined} aria-invalid={Boolean(form.formState.errors.confirmPassword)} autoComplete="new-password" className="mt-2 w-full rounded-lg border bg-background px-3 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-ring" id="registration-confirm-password" type="password" {...form.register("confirmPassword")} />
+          <div className="mt-2"><PasswordInput aria-describedby={form.formState.errors.confirmPassword ? "registration-confirm-password-error" : undefined} aria-invalid={Boolean(form.formState.errors.confirmPassword)} autoComplete="new-password" id="registration-confirm-password" showLabel="Show confirm password" hideLabel="Hide confirm password" {...form.register("confirmPassword")} /></div>
           <FieldError message={form.formState.errors.confirmPassword?.message} name="registration-confirm-password" />
           {form.formState.errors.root ? <p className="text-sm text-red-300" role="alert">{form.formState.errors.root.message}</p> : null}
           <button className="w-full rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-60" disabled={isPending} type="submit">{isPending ? "Creating account…" : "Create viewer account"}</button>
