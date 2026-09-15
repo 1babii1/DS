@@ -17,7 +17,13 @@ public class EmployeeDbContext(DbContextOptions<EmployeeDbContext> options) : Db
 
         builder.Entity<Employee>(entity =>
         {
-            entity.ToTable("employees");
+            // A CHECK constraint alongside the C# enum - the column is a plain
+            // varchar(20) at rest (HasConversion<string>), so nothing else stops a
+            // manual UPDATE or a future typo in a new enum member's string value from
+            // writing a status this database now silently disagrees with.
+            entity.ToTable(
+                "employees",
+                t => t.HasCheckConstraint("ck_employees_status", "\"Status\" IN ('Active', 'Terminated')"));
             entity.HasKey(e => e.Id);
 
             entity.Property(e => e.FullName).HasMaxLength(200).IsRequired();
