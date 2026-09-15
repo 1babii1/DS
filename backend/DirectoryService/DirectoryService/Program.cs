@@ -185,6 +185,15 @@ builder.Services.AddDatabaseHealthCheck<DirectoryServiceDbContext>();
 var searchRateLimit = builder.Configuration.GetValue("RateLimiting:Search:PermitLimit", 30);
 var searchRateLimitWindow = builder.Configuration.GetValue("RateLimiting:Search:WindowSeconds", 60);
 
+// Every Create/Update/Delete on Department/Location/Position was previously
+// unthrottled - CanEdit already keeps out unauthenticated callers, but a
+// compromised or simply buggy admin/editor token could still hammer writes with
+// nothing to blunt it. Same IP-partitioned fixed window as "search" and
+// AuthService's "auth" policy, config-driven for the same reason: TestServer
+// never populates RemoteIpAddress, so a real test suite needs to raise this.
+var writeRateLimit = builder.Configuration.GetValue("RateLimiting:Write:PermitLimit", 30);
+var writeRateLimitWindow = builder.Configuration.GetValue("RateLimiting:Write:WindowSeconds", 60);
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -195,6 +204,15 @@ builder.Services.AddRateLimiter(options =>
         {
             PermitLimit = searchRateLimit,
             Window = TimeSpan.FromSeconds(searchRateLimitWindow),
+            QueueLimit = 0,
+        }));
+
+    options.AddPolicy("write", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = writeRateLimit,
+            Window = TimeSpan.FromSeconds(writeRateLimitWindow),
             QueueLimit = 0,
         }));
 });

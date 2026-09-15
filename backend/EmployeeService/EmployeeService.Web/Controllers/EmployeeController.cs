@@ -2,6 +2,7 @@
 using EmployeeService.Application.Employees.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Shared;
 using Shared.EndpointResults;
 
@@ -14,6 +15,7 @@ public class EmployeeController : ControllerBase
 {
     [HttpPost]
     [Authorize(Policy = "CanEdit")]
+    [EnableRateLimiting("write")]
     public async Task<EndpointResult<Guid>> Hire(
         [FromServices] HireEmployeeHandler handler,
         HireEmployeeCommand command,
@@ -22,6 +24,7 @@ public class EmployeeController : ControllerBase
 
     [HttpPut("{employeeId:guid}/transfer")]
     [Authorize(Policy = "CanEdit")]
+    [EnableRateLimiting("write")]
     public async Task<EndpointResult> Transfer(
         [FromRoute] Guid employeeId,
         [FromServices] TransferEmployeeHandler handler,
@@ -34,6 +37,7 @@ public class EmployeeController : ControllerBase
 
     [HttpDelete("{employeeId:guid}")]
     [Authorize(Policy = "CanEdit")]
+    [EnableRateLimiting("write")]
     public async Task<EndpointResult> Terminate(
         [FromRoute] Guid employeeId,
         [FromServices] TerminateEmployeeHandler handler,
