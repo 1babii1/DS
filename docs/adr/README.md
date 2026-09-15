@@ -9,6 +9,8 @@ descriptions as each phase shipped, not backfilled generically.
 |---|---|
 | [0001](0001-schema-per-service-shared-database.md) | Schema-per-service in one shared Postgres database |
 | [0002](0002-outbox-pattern-for-integration-events.md) | Transactional outbox for cross-service events |
+| [0003](0003-choreography-saga-for-hire-employee.md) | Choreography saga for the Hire Employee → provision account flow |
+| [0004](0004-no-api-gateway-aggregation.md) | No API Gateway aggregation / BFF, for now |
 
 Not yet written up, though each decision is already live in the codebase and explained
 in its own commit messages: gRPC for internal calls, local JWT validation via JWKS,
