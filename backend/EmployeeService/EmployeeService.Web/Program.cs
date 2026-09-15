@@ -77,6 +77,10 @@ builder.Services.AddScoped<GetEmployeeByIdHandler>();
 builder.Services.AddScoped<ListEmployeesHandler>();
 
 builder.Services.AddDatabaseHealthCheck<EmployeeDbContext>();
+builder.Services.AddKafkaHealthCheck(
+    builder.Configuration["Kafka:BootstrapServers"]
+        ?? throw new InvalidOperationException("Configuration 'Kafka:BootstrapServers' is not set."),
+    KafkaSecurityOptions.FromConfiguration(builder.Configuration));
 
 // Hire/Transfer/Terminate were unthrottled - CanEdit keeps out unauthenticated
 // callers, but not a compromised or buggy admin/editor token. Same
