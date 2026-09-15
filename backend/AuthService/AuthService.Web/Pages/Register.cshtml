@@ -1,9 +1,10 @@
-@page "/auth/sign-in"
-@model AuthService.Web.Pages.SignInModel
+@page "/auth/sign-up"
+@model AuthService.Web.Pages.RegisterModel
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @{
     Layout = null;
-    var passwordInput = new AuthService.Web.Pages.Shared.PasswordInputModel("current-password", "password-error", "Password", "Password", "Password");
+    var passwordInput = new AuthService.Web.Pages.Shared.PasswordInputModel("new-password", "password-error", "Password", "Password", "Password");
+    var confirmPasswordInput = new AuthService.Web.Pages.Shared.PasswordInputModel("new-password", "confirm-password-error", "ConfirmPassword", "Confirm password", "ConfirmPassword");
 }
 <!doctype html>
 <html lang="en">
@@ -11,7 +12,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="referrer" content="no-referrer" />
-    <title>Sign in · DS</title>
+    <title>Create account · DS</title>
     <style>
         :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #131a17; color: #f0f4f1; }
         body { margin: 0; min-height: 100dvh; display: grid; place-items: center; }
@@ -32,23 +33,27 @@
         .password-toggle[data-visible="true"] .password-toggle__icon::before { content: ""; position: absolute; top: 50%; left: 50%; width: 1.4rem; height: 2px; transform: translate(-50%, -50%) rotate(-45deg); background: #a8d7b8; }
         .validation-summary-errors, .field-validation-error { color: #ffb5b5; }
         .validation-summary-valid { display: none; }
+        .auth-switch { margin: 1.5rem 0 0; font-size: .9rem; }
+        .auth-switch a { color: #a8d7b8; font-weight: 600; }
     </style>
 </head>
 <body>
 <main>
     <div class="brand">DS / PEOPLE &amp; ORGANIZATION</div>
-    <h1>Welcome back.</h1>
-    <p>Sign in to your organization's workspace.</p>
+    <h1>Create your account.</h1>
+    <p>Start with viewer access. An administrator can grant additional permissions later.</p>
     <form method="post">
         <input type="hidden" asp-for="ReturnUrl" />
         <div asp-validation-summary="ModelOnly" role="alert"></div>
         <label asp-for="Email">Work email</label>
-        <input asp-for="Email" autocomplete="username" required aria-describedby="email-error" />
+        <input asp-for="Email" autocomplete="email" required aria-describedby="email-error" />
         <span asp-validation-for="Email" id="email-error"></span>
         <partial name="Shared/_PasswordInput" model="passwordInput" />
         <span asp-validation-for="Password" id="password-error"></span>
-        <button type="submit">Sign in</button>
-        <p class="auth-switch">New here? <a href="/auth/sign-up?ReturnUrl=@Uri.EscapeDataString(Model.ReturnUrl ?? "/")">Create a viewer account</a></p>
+        <partial name="Shared/_PasswordInput" model="confirmPasswordInput" />
+        <span asp-validation-for="ConfirmPassword" id="confirm-password-error"></span>
+        <button type="submit">Create viewer account</button>
+        <p class="auth-switch">Already have an account? <a href="/auth/sign-in?ReturnUrl=@Uri.EscapeDataString(Model.ReturnUrl ?? "/")">Sign in</a></p>
     </form>
 </main>
 <script>
