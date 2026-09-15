@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Serilog;
 using Shared.HealthChecks;
 using Shared.Middlewares;
+using Shared.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,7 +11,11 @@ builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 
 builder.Host.UseSerilog((context, _, configuration) =>
-    configuration.ReadFrom.Configuration(context.Configuration));
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .AddOtlpLogging(context.Configuration, "audit-service"));
+
+builder.Services.AddObservability(builder.Configuration, "audit-service");
 
 builder.Services.AddControllers();
 builder.Services.AddEnvelopeModelStateValidation();

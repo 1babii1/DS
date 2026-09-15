@@ -3,10 +3,13 @@ using McpServer.HealthChecks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using Shared.Observability;
 
 Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddObservability(builder.Configuration, "mcp-server");
 
 builder.Services.AddOptions<EmbeddingsOptions>()
     .Bind(builder.Configuration.GetSection(EmbeddingsOptions.SectionName));

@@ -27,6 +27,7 @@ using Shared;
 using Shared.Cors;
 using Shared.HealthChecks;
 using Shared.Middlewares;
+using Shared.Observability;
 using Shared.Outbox;
 using Shared.Security;
 
@@ -53,7 +54,11 @@ builder.Logging.AddConsole();
 builder.Logging.SetMinimumLevel(LogLevel.Debug);
 
 builder.Host.UseSerilog((context, _, configuration) =>
-    configuration.ReadFrom.Configuration(context.Configuration));
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .AddOtlpLogging(context.Configuration, "directory-service"));
+
+builder.Services.AddObservability(builder.Configuration, "directory-service");
 
 builder.Services.AddOpenApi();
 

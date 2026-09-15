@@ -24,4 +24,12 @@
     <PackageReference Include="Pgvector" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Observability is cross-cutting ops tooling, not a domain abstraction - unlike
+         Envelope/Error/Outbox (why this service otherwise stays off Shared, see
+         docs/adr/0001), tracing applies the same way to every JWT-authenticated
+         network service, McpServer included. -->
+    <ProjectReference Include="..\Shared\Shared.csproj" />
+  </ItemGroup>
+
 </Project>
