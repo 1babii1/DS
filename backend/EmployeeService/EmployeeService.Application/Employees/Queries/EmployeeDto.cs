@@ -9,4 +9,5 @@ public record EmployeeDto(
     Guid PositionId,
     string PositionName,
     string Status,
+    string? ProvisioningFailureReason,
     DateTime HiredAt);

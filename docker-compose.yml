@@ -68,6 +68,14 @@ services:
       - SigningKeys__EncryptionKeyBase64=${SIGNINGKEYS_ENCRYPTION_KEY_BASE64:-}
       - Auth__SeedAdmin__Email=${SEED_ADMIN_EMAIL:-admin@portfolio.local}
       - Auth__SeedAdmin__Password=${SEED_ADMIN_PASSWORD:-ChangeMe123!}
+      - Email__SmtpHost=${EMAIL_SMTP_HOST:-mailpit}
+      - Email__SmtpPort=${EMAIL_SMTP_PORT:-1025}
+      - Email__UseSsl=${EMAIL_SMTP_USE_SSL:-false}
+      - Email__SmtpUsername=${EMAIL_SMTP_USERNAME:-}
+      - Email__SmtpPassword=${EMAIL_SMTP_PASSWORD:-}
+      - Email__FromAddress=${EMAIL_FROM_ADDRESS:-no-reply@portfolio.local}
+      - Kafka__SaslUsername=kafka
+      - Kafka__SaslPassword=${KAFKA_PASSWORD:-changeme-kafka}
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5130/health/ready || exit 1"]
       interval: 10s
@@ -79,6 +87,8 @@ services:
         condition: service_healthy
       auth_service_migrations:
         condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
 
   auth_service_migrations:
     container_name: auth_service_migrations
@@ -369,6 +379,18 @@ services:
       - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
+
+  # Local SMTP catch-all: AuthService always has somewhere to send account-
+  # provisioning emails without needing real Yandex credentials for local/docker
+  # use. Point EMAIL_SMTP_HOST at the real provider (see .env.example) to send for
+  # real; mail sent here never leaves the host - view it at localhost:8025.
+  mailpit:
+    container_name: mailpit
+    image: axllent/mailpit
+    restart: always
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
 
   # Distributed tracing/metrics/log-correlation stack. Opt-in via
   # `docker compose --profile obs up`: the main services already point at

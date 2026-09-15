@@ -3,6 +3,7 @@ using EmployeeService.Application.Employees.Commands;
 using EmployeeService.Application.Employees.Queries;
 using EmployeeService.Infrastructure.DirectoryGrpc;
 using EmployeeService.Infrastructure.Postgres;
+using EmployeeService.Web.Consumers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Serilog;
 using Shared.Cors;
@@ -55,6 +56,17 @@ builder.Services.AddDirectoryGrpcClient(builder.Configuration);
 
 builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
 builder.Services.AddOutboxPublisher<EmployeeDbContext>(builder.Configuration, "employee.events");
+
+builder.Services.Configure<EmployeeConsumerOptions>(options =>
+{
+    options.BootstrapServers = builder.Configuration["Kafka:BootstrapServers"]
+        ?? throw new InvalidOperationException("Configuration 'Kafka:BootstrapServers' is not set.");
+    options.Security = KafkaSecurityOptions.FromConfiguration(builder.Configuration);
+    options.Topics = builder.Configuration.GetSection("Kafka:Topics").Get<string[]>()
+        ?? throw new InvalidOperationException("Configuration 'Kafka:Topics' is not set.");
+    options.GroupId = builder.Configuration["Kafka:GroupId"] ?? "employee-service";
+});
+builder.Services.AddHostedService<AuthEventsConsumer>();
 
 builder.Services.AddScoped<HireEmployeeHandler>();
 builder.Services.AddScoped<TransferEmployeeHandler>();
