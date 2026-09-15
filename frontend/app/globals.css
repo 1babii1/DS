@@ -220,3 +220,10 @@ h1 { max-width: 46rem; margin: 0; font-size: clamp(2rem, 4vw, 3.6rem); font-weig
 .children-heading .retry-button { margin-top: 0; }
 .loading-note { color: var(--muted-foreground); font-size: .875rem; }
 @media (max-width: 500px) { .children-heading { align-items: start; flex-direction: column; } }
+
+.sign-in-link, .account-control { display: inline-flex; align-items: center; gap: .45rem; min-height: 2.25rem; padding: .35rem .55rem; border: 1px solid var(--border); border-radius: .35rem; background: var(--surface-raised); color: var(--foreground); font-size: .76rem; font-weight: 650; transition: border-color .15s ease, background-color .15s ease; }
+.sign-in-link:hover, .account-control:hover { border-color: var(--ring); background: var(--accent); }
+.account-control { max-width: 13rem; cursor: pointer; }
+.account-control__initials { display: grid; place-items: center; width: 1.4rem; height: 1.4rem; flex: 0 0 auto; border-radius: .25rem; background: var(--primary); color: var(--primary-foreground); font-size: .62rem; font-weight: 750; }
+.account-control__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 560px) { .account-control__label { display: none; } .account-control { padding: .35rem; } }
