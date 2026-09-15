@@ -120,7 +120,7 @@ function MobileNavigation() {
 
 export function AppShell({ accountControl, authenticated, children }: { accountControl: ReactNode; authenticated: boolean; children: ReactNode }) {
 	const pathname = usePathname()
-	if (pathname.startsWith('/login')) return <>{children}</>
+	if (pathname.startsWith('/login') || pathname.startsWith('/register')) return <>{children}</>
 
 	return (
 		<div className='app-frame'>
