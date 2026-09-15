@@ -1,13 +1,16 @@
 ﻿using System.Threading.RateLimiting;
 using AuthService.Application;
+using AuthService.Application.Database;
 using AuthService.Infrastructure.Postgres;
 using AuthService.Web.Configuration;
+using AuthService.Web.Consumers;
 using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using Shared.Cors;
 using Shared.HealthChecks;
 using Shared.Middlewares;
 using Shared.Observability;
+using Shared.Outbox;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,6 +39,26 @@ builder.Services.AddOpenIddictServer(builder.Environment, builder.Configuration)
 builder.Services.AddOpenIddictQuartzScheduler();
 
 builder.Services.AddDatabaseHealthCheck<AuthDbContext>();
+
+builder.Services.AddOptions<EmailOptions>()
+    .BindConfiguration(EmailOptions.SectionName)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+
+builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
+builder.Services.AddOutboxPublisher<AuthDbContext>(builder.Configuration, "auth.events");
+
+builder.Services.Configure<AuthConsumerOptions>(options =>
+{
+    options.BootstrapServers = builder.Configuration["Kafka:BootstrapServers"]
+        ?? throw new InvalidOperationException("Configuration 'Kafka:BootstrapServers' is not set.");
+    options.Security = KafkaSecurityOptions.FromConfiguration(builder.Configuration);
+    options.Topics = builder.Configuration.GetSection("Kafka:Topics").Get<string[]>()
+        ?? throw new InvalidOperationException("Configuration 'Kafka:Topics' is not set.");
+    options.GroupId = builder.Configuration["Kafka:GroupId"] ?? "auth-service";
+});
+builder.Services.AddHostedService<EmployeeEventsConsumer>();
 
 // Partitioned by client IP, not global: a global limiter would let one abusive IP
 // lock out every other user sharing the same bucket. Five attempts a minute is

@@ -46,6 +46,7 @@ public class ListEmployeesHandler(IReadDbContext readDbContext)
                 e.PositionId,
                 e.PositionName,
                 e.Status.ToString(),
+                e.ProvisioningFailureReason,
                 e.HiredAt))
             .ToListAsync(cancellationToken);
 

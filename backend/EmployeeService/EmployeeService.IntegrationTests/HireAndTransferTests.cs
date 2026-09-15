@@ -28,7 +28,7 @@ public class HireAndTransferTests : IClassFixture<EmployeeTestWebFactory>, IAsyn
         Assert.True(result.IsSuccess);
 
         var stored = await ExecuteInDb(db => db.Employees.SingleAsync(e => e.Id == result.Value));
-        Assert.Equal(EmployeeStatus.Active, stored.Status);
+        Assert.Equal(EmployeeStatus.PendingProvisioning, stored.Status);
     }
 
     [Fact]
@@ -97,6 +97,7 @@ public class HireAndTransferTests : IClassFixture<EmployeeTestWebFactory>, IAsyn
     {
         var hired = await ExecuteHireAsync(NewHireCommand());
         Assert.True(hired.IsSuccess);
+        await CompleteProvisioningAsync(hired.Value);
 
         var newDepartmentId = Guid.NewGuid();
         var newPositionId = Guid.NewGuid();
@@ -144,6 +145,7 @@ public class HireAndTransferTests : IClassFixture<EmployeeTestWebFactory>, IAsyn
         var hired = await ExecuteHireAsync(NewHireCommand());
         Assert.True(hired.IsSuccess);
         var employeeId = hired.Value;
+        await CompleteProvisioningAsync(employeeId);
 
         await using var scopeA = Services.CreateAsyncScope();
         await using var scopeB = Services.CreateAsyncScope();
@@ -263,5 +265,18 @@ public class HireAndTransferTests : IClassFixture<EmployeeTestWebFactory>, IAsyn
         await using var scope = Services.CreateAsyncScope();
         var sut = scope.ServiceProvider.GetRequiredService<EmployeeService.Infrastructure.Postgres.EmployeeDbContext>();
         return await action(sut);
+    }
+
+    // Stands in for AuthEventsConsumer's AccountProvisioned handling (added in a
+    // later step of the Hire Employee saga) - moves a freshly hired employee past
+    // PendingProvisioning so tests that only care about Transfer/Terminate behavior
+    // don't need to wire up the whole saga.
+    private async Task CompleteProvisioningAsync(Guid employeeId)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<EmployeeService.Application.Database.IEmployeeRepository>();
+        var employee = await repository.GetById(employeeId, CancellationToken.None);
+        employee.Value.CompleteProvisioning();
+        await repository.Save(CancellationToken.None);
     }
 }

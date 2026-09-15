@@ -9,6 +9,8 @@ public class EmployeeDbContext(DbContextOptions<EmployeeDbContext> options) : Db
 {
     public DbSet<Employee> Employees => Set<Employee>();
 
+    public DbSet<DeadLetterEntry> DeadLetters => Set<DeadLetterEntry>();
+
     public IQueryable<Employee> EmployeesRead => Employees.AsNoTracking();
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -23,7 +25,9 @@ public class EmployeeDbContext(DbContextOptions<EmployeeDbContext> options) : Db
             // writing a status this database now silently disagrees with.
             entity.ToTable(
                 "employees",
-                t => t.HasCheckConstraint("ck_employees_status", "\"Status\" IN ('Active', 'Terminated')"));
+                t => t.HasCheckConstraint(
+                    "ck_employees_status",
+                    "\"Status\" IN ('PendingProvisioning', 'Active', 'Terminated', 'ProvisioningFailed')"));
             entity.HasKey(e => e.Id);
 
             entity.Property(e => e.FullName).HasMaxLength(200).IsRequired();
@@ -31,6 +35,7 @@ public class EmployeeDbContext(DbContextOptions<EmployeeDbContext> options) : Db
             entity.Property(e => e.DepartmentName).HasMaxLength(150).IsRequired();
             entity.Property(e => e.PositionName).HasMaxLength(150).IsRequired();
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(e => e.ProvisioningFailureReason).HasMaxLength(500);
 
             entity.HasIndex(e => e.DepartmentId);
             entity.HasIndex(e => e.Email).IsUnique();
@@ -53,6 +58,20 @@ public class EmployeeDbContext(DbContextOptions<EmployeeDbContext> options) : Db
             entity.Property(m => m.Payload).HasColumnType("jsonb").IsRequired();
 
             entity.HasIndex(m => m.ProcessedAt);
+        });
+
+        builder.Entity<DeadLetterEntry>(entity =>
+        {
+            entity.ToTable("dead_letters");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Topic).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.MessageKey).IsRequired();
+            entity.Property(e => e.Payload).HasColumnType("jsonb").IsRequired();
+            entity.Property(e => e.Error).IsRequired();
+
+            entity.HasIndex(e => e.MessageId).IsUnique();
+            entity.HasIndex(e => e.FailedAt);
         });
     }
 }

@@ -1,5 +1,7 @@
 ﻿using System.Data.Common;
+using AuthService.IntegrationTests.Infrastructure;
 using AuthService.Infrastructure.Postgres;
+using AuthService.Web.Configuration;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -34,6 +36,8 @@ public class AuthTestWebFactory : WebApplicationFactory<Program>, IAsyncLifetime
     private DbConnection _dbConnection = null!;
 
     protected virtual int RateLimitPermits => 1000;
+
+    public FakeEmailSender EmailSender { get; } = new();
 
     public async Task InitializeAsync()
     {
@@ -85,6 +89,9 @@ public class AuthTestWebFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.RemoveAll<DbContextOptions<AuthDbContext>>();
             services.RemoveAll<AuthDbContext>();
             services.AddDbContext<AuthDbContext>(options => options.UseNpgsql(_dbContainer.GetConnectionString()));
+
+            services.RemoveAll<IEmailSender>();
+            services.AddSingleton<IEmailSender>(EmailSender);
         });
     }
 

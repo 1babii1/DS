@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Analyzers -->
+    <PackageVersion Include="MailKit" Version="4.16.0" />
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
     <PackageVersion Include="OpenIddict.Quartz" Version="7.7.0" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.18.0" />
