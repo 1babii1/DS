@@ -30,7 +30,7 @@ public class AuditConsumer(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await KafkaTopicProvisioner.WaitForTopicsAsync(
-            _options.BootstrapServers, logger, stoppingToken, _options.Topics);
+            _options.BootstrapServers, _options.Security, logger, stoppingToken, _options.Topics);
 
         if (stoppingToken.IsCancellationRequested)
         {
@@ -49,6 +49,7 @@ public class AuditConsumer(
             AutoOffsetReset = AutoOffsetReset.Earliest,
             EnableAutoCommit = false,
         };
+        _options.Security.ApplyTo(config);
 
         using var consumer = new ConsumerBuilder<string, string>(config).Build();
         consumer.Subscribe(_options.Topics);

@@ -14,6 +14,8 @@ services:
       - ConnectionStrings__DirectoryServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=directory,public
       - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:-changeme-redis}
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
+      - Kafka__SaslUsername=kafka
+      - Kafka__SaslPassword=${KAFKA_PASSWORD:-changeme-kafka}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5129/health/ready || exit 1"]
@@ -108,6 +110,8 @@ services:
       - ASPNETCORE_URLS=http://*:5131
       - ConnectionStrings__EmployeeServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=employee,public
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
+      - Kafka__SaslUsername=kafka
+      - Kafka__SaslPassword=${KAFKA_PASSWORD:-changeme-kafka}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5131/health/ready || exit 1"]
@@ -157,6 +161,8 @@ services:
       - ASPNETCORE_URLS=http://*:5132
       - ConnectionStrings__AuditServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=audit,public
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
+      - Kafka__SaslUsername=kafka
+      - Kafka__SaslPassword=${KAFKA_PASSWORD:-changeme-kafka}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5132/health/ready || exit 1"]
@@ -233,6 +239,8 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://*:5133
+      - Kafka__SaslUsername=kafka
+      - Kafka__SaslPassword=${KAFKA_PASSWORD:-changeme-kafka}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
       kafka:
@@ -248,23 +256,42 @@ services:
     container_name: kafka
     image: apache/kafka:3.9.0
     restart: always
+    # Loopback-only, same reasoning as redis: every consumer/producer in this
+    # stack reaches Kafka over the docker network via the "kafka" hostname,
+    # not through this published port - it exists only for a local CLI/GUI
+    # to inspect topics from the host.
     ports:
-      - "9092:9092"
+      - "127.0.0.1:9092:9092"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: SASL_PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: SASL_PLAINTEXT://kafka:9092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: SASL_PLAINTEXT
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       CLUSTER_ID: MTIzNDU2Nzg5MGFiY2RlZg==
+    # kafka_jaas (below) defines the single shared "kafka" account (no ACLs, no
+    # per-service identity - proportional to a single-broker deployment with no
+    # external access) that both this broker's own KafkaServer login context and
+    # every producer/consumer authenticate with.
+    configs:
+      - source: kafka_jaas
+        target: /etc/kafka/secrets/kafka_server_jaas.conf
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
+      test:
+        - "CMD-SHELL"
+        - >-
+          printf 'security.protocol=SASL_PLAINTEXT\nsasl.mechanism=PLAIN\nsasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="kafka" password="${KAFKA_PASSWORD:-changeme-kafka}";\n'
+          > /tmp/health-client.properties &&
+          /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 --command-config /tmp/health-client.properties
       interval: 10s
       timeout: 10s
       retries: 10
@@ -426,6 +453,21 @@ services:
       - loki
       - tempo
     restart: always
+
+configs:
+  # Kafka's own startup validates the inter-broker listener's JAAS config eagerly -
+  # even for a single-node broker with no peer to replicate to - so this KafkaServer
+  # entry has to exist, on top of the per-listener PLAIN config set directly as a
+  # broker property below. Compose interpolates KAFKA_PASSWORD into this content at
+  # `up` time; nothing secret is written to disk in the repo.
+  kafka_jaas:
+    content: |
+      KafkaServer {
+         org.apache.kafka.common.security.plain.PlainLoginModule required
+         username="kafka"
+         password="${KAFKA_PASSWORD:-changeme-kafka}"
+         user_kafka="${KAFKA_PASSWORD:-changeme-kafka}";
+      };
 
 volumes:
   postgres_data:

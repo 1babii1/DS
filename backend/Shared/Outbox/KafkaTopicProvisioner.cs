@@ -11,9 +11,12 @@ namespace Shared.Outbox;
 // before anyone subscribes or produces avoids the whole class of race.
 public static class KafkaTopicProvisioner
 {
-    public static async Task EnsureTopicsExistAsync(string bootstrapServers, params string[] topics)
+    public static async Task EnsureTopicsExistAsync(
+        string bootstrapServers, KafkaSecurityOptions security, params string[] topics)
     {
-        using var admin = new AdminClientBuilder(new AdminClientConfig { BootstrapServers = bootstrapServers }).Build();
+        var config = new AdminClientConfig { BootstrapServers = bootstrapServers };
+        security.ApplyTo(config);
+        using var admin = new AdminClientBuilder(config).Build();
 
         try
         {
@@ -40,6 +43,7 @@ public static class KafkaTopicProvisioner
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     public static async Task WaitForTopicsAsync(
         string bootstrapServers,
+        KafkaSecurityOptions security,
         ILogger logger,
         CancellationToken cancellationToken,
         params string[] topics)
@@ -51,7 +55,7 @@ public static class KafkaTopicProvisioner
         {
             try
             {
-                await EnsureTopicsExistAsync(bootstrapServers, topics);
+                await EnsureTopicsExistAsync(bootstrapServers, security, topics);
                 return;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
