@@ -6,7 +6,12 @@ import { authConfiguration } from "@/shared/auth/config";
 
 const registrationSchema = z.object({
   email: z.string().trim().email("Enter a valid work email."),
-  password: z.string().min(8, "Use at least 8 characters."),
+  password: z
+    .string()
+    .min(8, "Use at least 8 characters.")
+    .regex(/[A-Z]/, "Include an uppercase letter.")
+    .regex(/[a-z]/, "Include a lowercase letter.")
+    .regex(/[0-9]/, "Include a number."),
 });
 
 export type RegistrationValues = z.infer<typeof registrationSchema>;
