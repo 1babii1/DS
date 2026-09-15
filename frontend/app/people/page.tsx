@@ -1,3 +1,14 @@
-import { UsersRound } from 'lucide-react'
-import { WorkspaceState } from '@/features/workspace-state/ui/workspace-state'
-export default function PeoplePage() { return <WorkspaceState description='The employee service will provide a searchable, permission-aware people directory here.' icon={UsersRound} label='Directory' title='People' /> }
+'use client'
+import { isAxiosError } from 'axios'
+import { Building2, LogIn, RefreshCw, UsersRound } from 'lucide-react'
+import Link from 'next/link'
+import { useQuery } from '@tanstack/react-query'
+import { employeesApi } from '@/entities/employees/api/employees.api'
+import type { Employee } from '@/entities/employees/types/employee.types'
+
+function initials(name: string) { return name.split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase() }
+function PersonCard({ employee }: { employee: Employee }) { return <article className='person-card'><div className='person-card__avatar'>{initials(employee.fullName)}</div><div className='person-card__top'><div><h2>{employee.fullName}</h2><a href={`mailto:${employee.email}`}>{employee.email}</a></div><span className='status-badge'>{employee.status}</span></div><dl><div><dt>Position</dt><dd>{employee.positionName}</dd></div><div><dt>Department</dt><dd>{employee.departmentName}</dd></div><div><dt>Joined</dt><dd>{new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(employee.hiredAt))}</dd></div></dl></article> }
+export default function PeoplePage() {
+ const { data, error, isPending, refetch } = useQuery({ queryKey: ['employees'], queryFn: () => employeesApi.list() }); const requiresSignIn = isAxiosError(error) && error.response?.status === 401
+ return <div className='page'><header className='page-heading'><div><p className='eyebrow'>Employee service</p><h1>People</h1></div><p className='page-heading__description'>People records are retrieved through the authenticated service boundary.</p></header>{isPending ? <section aria-busy='true' className='empty-state'><div className='empty-state__icon'><UsersRound aria-hidden='true' size={21}/></div><h2>Loading people</h2><p>Retrieving the employee directory.</p></section> : null}{requiresSignIn ? <section className='empty-state'><div className='empty-state__icon'><LogIn aria-hidden='true' size={21}/></div><h2>Sign in to view people</h2><p>Your workspace session authorizes this protected employee directory.</p><Link className='retry-button' href='/login'><LogIn aria-hidden='true' size={16}/>Continue to sign in</Link></section> : null}{error && !requiresSignIn ? <section className='empty-state' role='alert'><div className='empty-state__icon'><Building2 aria-hidden='true' size={21}/></div><h2>People data is unavailable</h2><p>Check that the employee service is running, then try again.</p><button className='retry-button' onClick={() => refetch()} type='button'><RefreshCw aria-hidden='true' size={16}/>Retry request</button></section> : null}{data?.length === 0 ? <section className='empty-state'><div className='empty-state__icon'><UsersRound aria-hidden='true' size={21}/></div><h2>No people yet</h2><p>Employee records will appear here after they are added to the platform.</p></section> : null}{data?.length ? <section aria-label='People directory' className='people-grid'>{data.map(employee => <PersonCard employee={employee} key={employee.id}/>)}</section> : null}</div>
+}
