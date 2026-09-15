@@ -115,7 +115,7 @@ function MobileNavigation() {
 	)
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ accountControl, children }: { accountControl: ReactNode; children: ReactNode }) {
 	const pathname = usePathname()
 	if (pathname.startsWith('/login')) return <>{children}</>
 
@@ -129,6 +129,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 					<p className='app-topbar__context'>People operations workspace</p>
 					<div className='app-topbar__actions'>
 						<span className='environment-badge'><span aria-hidden='true' />Local environment</span>
+						{accountControl}
 						<ThemeToggle />
 					</div>
 				</header>
