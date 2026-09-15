@@ -17,6 +17,7 @@ public class DepartmentController : ControllerBase
 {
     [HttpPost]
     [Authorize(Policy = "CanEdit")]
+    [EnableRateLimiting("write")]
     public async Task<EndpointResult<Guid>> Create(
         [FromServices] CreateDepartmentHandler handler,
         CreateDepartmentCommand request, CancellationToken cancellationToken) =>
@@ -24,6 +25,7 @@ public class DepartmentController : ControllerBase
 
     [HttpPatch("locations")]
     [Authorize(Policy = "CanEdit")]
+    [EnableRateLimiting("write")]
     public async Task<EndpointResult<DepartmentId>> UpdateLocations(
         [FromServices] UpdateDepartmentLocationsHandler handler,
         UpdateDepartmentLocationsCommand request, CancellationToken cancellationToken) =>
@@ -31,6 +33,7 @@ public class DepartmentController : ControllerBase
 
     [HttpPut("{departmentId:guid}/parent")]
     [Authorize(Policy = "CanEdit")]
+    [EnableRateLimiting("write")]
     public async Task<EndpointResult<DepartmentId>> UpdateParent(
         [FromRoute] Guid departmentId,
         [FromServices] UpdateParentDepartmentHandler handler,
@@ -93,6 +96,7 @@ public class DepartmentController : ControllerBase
 
     [HttpDelete("{departmentId:guid}")]
     [Authorize(Policy = "CanEdit")]
+    [EnableRateLimiting("write")]
     public async Task<EndpointResult<DepartmentId>> SoftDeleteDepartments(
         [FromRoute] SoftDeleteDepartmentRequest request,
         [FromServices] SoftDeleteDepartmentHandler handler,

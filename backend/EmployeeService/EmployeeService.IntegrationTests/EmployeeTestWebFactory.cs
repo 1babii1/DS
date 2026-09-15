@@ -63,24 +63,34 @@ public class EmployeeTestWebFactory : WebApplicationFactory<Program>, IAsyncLife
         DirectoryLookup.NextValidation = FakeDirectoryLookupClient.ValidAssignment;
     }
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.ConfigureTestServices(services =>
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Background services (the outbox publisher) need Kafka, which isn't running
-        // for these tests and isn't what they're testing - same reasoning as
-        // DirectoryService's test factory.
-        services.RemoveAll<IHostedService>();
+        // TestServer never populates RemoteIpAddress, so every request in the whole
+        // suite shares one rate-limit partition - the real default (30/min) would
+        // trip well before this suite's write-heavy tests finish. Same reasoning as
+        // AuthTestWebFactory's RateLimitPermits.
+        builder.UseSetting("RateLimiting:Write:PermitLimit", "1000");
+        builder.UseSetting("RateLimiting:Write:WindowSeconds", "60");
 
-        // EmployeeDbContext only exposes the standard DbContextOptions<T> constructor
-        // (no raw-connection-string overload like DirectoryServiceDbContext), so the
-        // registration itself needs replacing rather than just the connection string
-        // argument to a custom constructor.
-        services.RemoveAll<DbContextOptions<EmployeeDbContext>>();
-        services.RemoveAll<EmployeeDbContext>();
-        services.AddDbContext<EmployeeDbContext>(options => options.UseNpgsql(_dbContainer.GetConnectionString()));
+        builder.ConfigureTestServices(services =>
+        {
+            // Background services (the outbox publisher) need Kafka, which isn't running
+            // for these tests and isn't what they're testing - same reasoning as
+            // DirectoryService's test factory.
+            services.RemoveAll<IHostedService>();
 
-        services.RemoveAll<IDirectoryLookupClient>();
-        services.AddSingleton<IDirectoryLookupClient>(DirectoryLookup);
-    });
+            // EmployeeDbContext only exposes the standard DbContextOptions<T> constructor
+            // (no raw-connection-string overload like DirectoryServiceDbContext), so the
+            // registration itself needs replacing rather than just the connection string
+            // argument to a custom constructor.
+            services.RemoveAll<DbContextOptions<EmployeeDbContext>>();
+            services.RemoveAll<EmployeeDbContext>();
+            services.AddDbContext<EmployeeDbContext>(options => options.UseNpgsql(_dbContainer.GetConnectionString()));
+
+            services.RemoveAll<IDirectoryLookupClient>();
+            services.AddSingleton<IDirectoryLookupClient>(DirectoryLookup);
+        });
+    }
 
     private async Task InitializeRespawner()
     {

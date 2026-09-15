@@ -88,6 +88,13 @@ public class DirectoryTestWEbFactory : WebApplicationFactory<Program>, IAsyncLif
             "ConnectionStrings:DirectoryServiceDb",
             _dbContainer.GetConnectionString() + ";Search Path=directory,public");
 
+        // TestServer never populates RemoteIpAddress, so every request in the whole
+        // suite shares one rate-limit partition - the real default (30/min) would
+        // trip well before this suite's write-heavy tests finish. Same reasoning as
+        // AuthTestWebFactory's RateLimitPermits.
+        builder.UseSetting("RateLimiting:Write:PermitLimit", "1000");
+        builder.UseSetting("RateLimiting:Write:WindowSeconds", "60");
+
         builder.ConfigureTestServices(service =>
         {
             // Тесты вызывают хендлеры напрямую, фоновые сервисы в них не участвуют, но
