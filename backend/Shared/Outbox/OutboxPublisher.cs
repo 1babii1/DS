@@ -22,15 +22,16 @@ public class OutboxPublisher<TContext>(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await KafkaTopicProvisioner.WaitForTopicsAsync(
-            _options.BootstrapServers, logger, stoppingToken, _options.Topic);
+            _options.BootstrapServers, _options.Security, logger, stoppingToken, _options.Topic);
 
         if (stoppingToken.IsCancellationRequested)
         {
             return;
         }
 
-        _producer = new ProducerBuilder<string, string>(
-            new ProducerConfig { BootstrapServers = _options.BootstrapServers }).Build();
+        var producerConfig = new ProducerConfig { BootstrapServers = _options.BootstrapServers };
+        _options.Security.ApplyTo(producerConfig);
+        _producer = new ProducerBuilder<string, string>(producerConfig).Build();
 
         while (!stoppingToken.IsCancellationRequested)
         {
