@@ -42,7 +42,7 @@ builder.Services
         options.MetadataAddress = builder.Configuration["Auth:MetadataAddress"];
         options.RequireHttpsMetadata = builder.Environment.IsProduction();
         options.TokenValidationParameters.ValidIssuer = builder.Configuration["Auth:Issuer"];
-        options.TokenValidationParameters.ValidateAudience = false;
+        options.TokenValidationParameters.ValidAudience = builder.Configuration["Auth:Audience"];
         options.TokenValidationParameters.RoleClaimType = "role";
         options.TokenValidationParameters.NameClaimType = "name";
     });
