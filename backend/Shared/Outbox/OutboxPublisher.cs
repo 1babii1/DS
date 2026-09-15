@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -21,10 +21,17 @@ public class OutboxPublisher<TContext>(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await KafkaTopicProvisioner.EnsureTopicsExistAsync(_options.BootstrapServers, _options.Topic);
+        await KafkaTopicProvisioner.WaitForTopicsAsync(
+            _options.BootstrapServers, _options.Security, logger, stoppingToken, _options.Topic);
 
-        _producer = new ProducerBuilder<string, string>(
-            new ProducerConfig { BootstrapServers = _options.BootstrapServers }).Build();
+        if (stoppingToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        var producerConfig = new ProducerConfig { BootstrapServers = _options.BootstrapServers };
+        _options.Security.ApplyTo(producerConfig);
+        _producer = new ProducerBuilder<string, string>(producerConfig).Build();
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -32,12 +39,21 @@ public class OutboxPublisher<TContext>(
             {
                 await PublishPendingAsync(stoppingToken);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogError(ex, "Outbox publish cycle failed for topic {Topic}", _options.Topic);
             }
 
-            await Task.Delay(_options.PollInterval, stoppingToken);
+            // Отмена при остановке - это штатное завершение, а не сбой: вылетевшее
+            // отсюда исключение тоже остановило бы хост.
+            try
+            {
+                await Task.Delay(_options.PollInterval, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
         }
     }
 

@@ -1,26 +1,35 @@
+﻿using System.Threading.RateLimiting;
 using DirectoryService.Application.Database;
 using DirectoryService.Application.Department.Commands;
 using DirectoryService.Application.Department.Queries;
 using DirectoryService.Application.Location.Commands;
 using DirectoryService.Application.Location.Queries;
 using DirectoryService.Application.Position;
+using DirectoryService.Application.Position.Queries;
+using DirectoryService.Application.Search;
 using DirectoryService.Grpc;
 using DirectoryService.Infrastructure.Postgres;
 using DirectoryService.Infrastructure.Postgres.Backgrounds;
 using DirectoryService.Infrastructure.Postgres.Database;
+using DirectoryService.Infrastructure.Postgres.Embeddings;
 using DirectoryService.Infrastructure.Postgres.Repositories.Departments;
 using DirectoryService.Infrastructure.Postgres.Repositories.Locations;
 using DirectoryService.Infrastructure.Postgres.Repositories.Positions;
-using DirectoryService.Middleware;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Json;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Shared;
+using Shared.Cors;
+using Shared.HealthChecks;
+using Shared.Middlewares;
+using Shared.Observability;
 using Shared.Outbox;
+using Shared.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,22 +54,18 @@ builder.Logging.AddConsole();
 builder.Logging.SetMinimumLevel(LogLevel.Debug);
 
 builder.Host.UseSerilog((context, _, configuration) =>
-    configuration.ReadFrom.Configuration(context.Configuration));
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .AddOtlpLogging(context.Configuration, "directory-service"));
+
+builder.Services.AddObservability(builder.Configuration, "directory-service");
 
 builder.Services.AddOpenApi();
 
-builder.Services.AddCors(options =>
-{
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.WithOrigins("http://localhost:3000")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
-    });
-});
+builder.Services.AddFrameworkCors(builder.Configuration);
 
 builder.Services.AddControllers();
+builder.Services.AddEnvelopeModelStateValidation();
 
 builder.Services.AddGrpc();
 
@@ -74,23 +79,27 @@ builder.Services
         options.MetadataAddress = builder.Configuration["Auth:MetadataAddress"];
         options.RequireHttpsMetadata = builder.Environment.IsProduction();
         options.TokenValidationParameters.ValidIssuer = builder.Configuration["Auth:Issuer"];
-        options.TokenValidationParameters.ValidateAudience = false;
+        options.TokenValidationParameters.ValidAudience = builder.Configuration["Auth:Audience"];
         options.TokenValidationParameters.RoleClaimType = "role";
         options.TokenValidationParameters.NameClaimType = "name";
     });
 
 builder.Services.AddAuthorizationBuilder()
-    .AddPolicy("CanEdit", policy => policy.RequireRole("admin", "editor"));
+    .AddPolicy("CanEdit", policy => policy.RequireRole(RoleNames.Admin, RoleNames.Editor));
 
 builder.Services.AddValidatorsFromAssemblyContaining<CreateDepartmentValidation>();
 
 builder.Services.AddSingleton<IConfigureOptions<JsonOptions>, InjectJSONSerializeConfig>();
 
-builder.Services.AddScoped<DirectoryServiceDbContext>(_ =>
-    new DirectoryServiceDbContext(builder.Configuration.GetConnectionString("DirectoryServiceDb")!));
+builder.Services.AddScoped<DirectoryServiceDbContext>(sp =>
+    new DirectoryServiceDbContext(
+        builder.Configuration.GetConnectionString("DirectoryServiceDb")!,
+        sp.GetRequiredService<ILoggerFactory>()));
 
-builder.Services.AddScoped<IReadDbContext, DirectoryServiceDbContext>(_ =>
-    new DirectoryServiceDbContext(builder.Configuration.GetConnectionString("DirectoryServiceDb")!));
+builder.Services.AddScoped<IReadDbContext, DirectoryServiceDbContext>(sp =>
+    new DirectoryServiceDbContext(
+        builder.Configuration.GetConnectionString("DirectoryServiceDb")!,
+        sp.GetRequiredService<ILoggerFactory>()));
 
 builder.Services.Configure<ClearDbOptions>(builder.Configuration.GetSection("ClearDbOptions"));
 
@@ -104,27 +113,46 @@ builder.Services.AddScoped<ITransactionManager, TransactionManager>();
 builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
 builder.Services.AddOutboxPublisher<DirectoryServiceDbContext>(builder.Configuration, "directory.events");
 
+builder.Services.AddKafkaHealthCheck(
+    builder.Configuration["Kafka:BootstrapServers"]
+        ?? throw new InvalidOperationException("Configuration 'Kafka:BootstrapServers' is not set."),
+    KafkaSecurityOptions.FromConfiguration(builder.Configuration));
+
+builder.Services.AddOptions<EmbeddingsOptions>()
+    .Bind(builder.Configuration.GetSection(EmbeddingsOptions.SectionName));
+builder.Services.AddHttpClient<IEmbeddingClient, OllamaEmbeddingClient>((sp, client) =>
+{
+    var options = sp.GetRequiredService<IOptions<EmbeddingsOptions>>().Value;
+    client.BaseAddress = new Uri(options.OllamaBaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddHostedService<DepartmentEmbeddingWorker>();
+builder.Services.AddScoped<IDepartmentSemanticSearch, DepartmentSemanticSearchService>();
+builder.Services.AddScoped<SearchDepartmentsSemanticHandler>();
+
 builder.Services.AddScoped<ILocationsRepository, EfCoreLocationsRepository>();
 
-// builder.Services.AddScoped<ILocationsRepository, NpgsqlLocationsRepository>();
 builder.Services.AddScoped<IPositionRepository, EfCorePositionRepository>();
 
 builder.Services.AddScoped<IDepartmentRepository, EfCoreDepartmentsRepository>();
 
-// builder.Services.AddScoped<IReadDbContext, DirectoryServiceDbContext>();
 builder.Services.AddScoped<CreateLocationHandle>();
 
 builder.Services.AddScoped<CreatePositionHandle>();
 
 builder.Services.AddScoped<CreateDepartmentHandler>();
 
-builder.Services.AddScoped<UpdateDepartmentLocationsHadler>();
+builder.Services.AddScoped<UpdateDepartmentLocationsHandler>();
 
 builder.Services.AddScoped<UpdateParentDepartmentHandler>();
 
 builder.Services.AddScoped<GetLocationByIdHandle>();
 
 builder.Services.AddScoped<GetLocationByDepartmentHandle>();
+
+builder.Services.AddScoped<GetLocationsHandler>();
+
+builder.Services.AddScoped<GetPositionsHandler>();
 
 builder.Services.AddScoped<GetDepartmentByIdHandler>();
 
@@ -140,21 +168,68 @@ builder.Services.AddScoped<SoftDeleteDepartmentHandler>();
 
 builder.Services.AddStackExchangeRedisCache(setup =>
 {
-    setup.Configuration = "localhost:6379";
+    setup.Configuration = builder.Configuration.GetConnectionString("Redis");
 });
 
 builder.Services.AddHybridCache(options => options.DefaultEntryOptions = new HybridCacheEntryOptions
 {
-    LocalCacheExpiration = TimeSpan.FromMinutes(5), Expiration = TimeSpan.FromMinutes(30),
+    LocalCacheExpiration = TimeSpan.FromMinutes(5),
+    Expiration = TimeSpan.FromMinutes(30),
+});
+
+builder.Services.AddDatabaseHealthCheck<DirectoryServiceDbContext>();
+
+// Semantic search does an Ollama round trip plus a vector-distance query on every
+// call - an authenticated caller in a tight loop (a buggy client, a compromised
+// token) can still drive real load per request, unlike a plain indexed read.
+// 30/min per IP is generous for real usage, tight enough to blunt a loop.
+// Bound to configuration, not hardcoded - same reasoning as AuthService's "auth"
+// policy: a future test suite that exercises /api/departments/search through real
+// HTTP needs to be able to raise this, since TestServer never populates
+// RemoteIpAddress and every call would otherwise share one partition.
+var searchRateLimit = builder.Configuration.GetValue("RateLimiting:Search:PermitLimit", 30);
+var searchRateLimitWindow = builder.Configuration.GetValue("RateLimiting:Search:WindowSeconds", 60);
+
+// Every Create/Update/Delete on Department/Location/Position was previously
+// unthrottled - CanEdit already keeps out unauthenticated callers, but a
+// compromised or simply buggy admin/editor token could still hammer writes with
+// nothing to blunt it. Same IP-partitioned fixed window as "search" and
+// AuthService's "auth" policy, config-driven for the same reason: TestServer
+// never populates RemoteIpAddress, so a real test suite needs to raise this.
+var writeRateLimit = builder.Configuration.GetValue("RateLimiting:Write:PermitLimit", 30);
+var writeRateLimitWindow = builder.Configuration.GetValue("RateLimiting:Write:WindowSeconds", 60);
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("search", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = searchRateLimit,
+            Window = TimeSpan.FromSeconds(searchRateLimitWindow),
+            QueueLimit = 0,
+        }));
+
+    options.AddPolicy("write", httpContext => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = writeRateLimit,
+            Window = TimeSpan.FromSeconds(writeRateLimitWindow),
+            QueueLimit = 0,
+        }));
 });
 
 var app = builder.Build();
 
+app.UseRequestCorrelationId();
+app.UseExceptionMiddleware();
+
 app.UseSerilogRequestLogging();
 
 app.UseHttpLogging();
-
-app.UseMiddleware<ExeptionHandlingMiddleware>();
 
 // Configure the HTTP request pipeline.
 // if (app.Environment.IsDevelopment() || app.Environment.Is)
@@ -162,12 +237,14 @@ app.MapOpenApi("/openapi/v1/swagger.json");
 
 app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1/swagger.json", "DirectoryService"));
 
-app.UseCors();
+app.ConfigureCors();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
+app.MapDefaultHealthChecks();
 app.MapGrpcService<DirectoryLookupService>();
 
 app.Run();

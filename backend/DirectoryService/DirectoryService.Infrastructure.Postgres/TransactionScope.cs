@@ -1,6 +1,6 @@
-﻿using System.Data;
-using CSharpFunctionalExtensions;
+﻿using CSharpFunctionalExtensions;
 using DirectoryService.Application.Database;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using Shared;
 
@@ -8,45 +8,45 @@ namespace DirectoryService.Infrastructure.Postgres;
 
 public class TransactionScope : ITransactionScope
 {
-    private readonly IDbTransaction _transaction;
+    private readonly IDbContextTransaction _transaction;
     private readonly ILogger<TransactionScope> _logger;
 
-    public TransactionScope(IDbTransaction transaction, ILogger<TransactionScope> logger)
+    public TransactionScope(IDbContextTransaction transaction, ILogger<TransactionScope> logger)
     {
         _transaction = transaction;
         _logger = logger;
     }
 
-    public UnitResult<Error> Commit()
+    public async Task<UnitResult<Error>> CommitAsync(CancellationToken cancellationToken)
     {
         try
         {
-            _transaction.Commit();
+            await _transaction.CommitAsync(cancellationToken);
             return UnitResult.Success<Error>();
         }
         catch (Exception e)
         {
             _logger.LogError(e, "Error committing transaction");
-            return UnitResult.Failure<Error>(Error.Failure());
+            return UnitResult.Failure<Error>(Error.Failure("transaction.commit", "Failed to commit transaction"));
         }
     }
 
-    public UnitResult<Error> Rollback()
+    public async Task<UnitResult<Error>> RollbackAsync(CancellationToken cancellationToken)
     {
         try
         {
-            _transaction.Rollback();
+            await _transaction.RollbackAsync(cancellationToken);
             return UnitResult.Success<Error>();
         }
         catch (Exception e)
         {
             _logger.LogError(e, "Error rolling back transaction");
-            return UnitResult.Failure<Error>(Error.Failure());
+            return UnitResult.Failure<Error>(Error.Failure("transaction.rollback", "Failed to roll back transaction"));
         }
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
-        _transaction.Dispose();
+        await _transaction.DisposeAsync();
     }
 }

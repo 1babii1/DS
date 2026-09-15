@@ -20,9 +20,9 @@ public class LocationConfigurations : IEntityTypeConfiguration<Locations>
             .HasColumnName("id");
 
         builder.Property(l => l.Name)
-            .HasConversion(l => l.Value, name => LocationName.Create(name).Value)
+            .HasConversion(l => l.Value, value => LocationName.FromPersisted(value))
             .IsRequired()
-            .HasMaxLength(LenghtConstants.LENGTH120)
+            .HasMaxLength(LengthConstants.MaxLocationNameLength)
             .HasColumnName("name");
 
         builder.HasIndex(l => l.Name)
@@ -30,7 +30,7 @@ public class LocationConfigurations : IEntityTypeConfiguration<Locations>
             .HasDatabaseName("ux_locations_name");
 
         builder.Property(l => l.Timezone)
-            .HasConversion(l => l.Value, timezone => Timezone.Create(timezone).Value)
+            .HasConversion(l => l.Value, value => Timezone.FromPersisted(value))
             .IsRequired()
             .HasColumnName("timezone");
 
@@ -38,17 +38,17 @@ public class LocationConfigurations : IEntityTypeConfiguration<Locations>
         {
             adressBuilder.Property(a => a.Street)
                 .IsRequired()
-                .HasMaxLength(LenghtConstants.LENGTH100)
+                .HasMaxLength(LengthConstants.MaxStreetLength)
                 .HasColumnName("street");
 
             adressBuilder.Property(a => a.City)
                 .IsRequired()
-                .HasMaxLength(LenghtConstants.LENGTH60)
+                .HasMaxLength(LengthConstants.MaxCityLength)
                 .HasColumnName("city");
 
             adressBuilder.Property(a => a.Country)
                 .IsRequired()
-                .HasMaxLength(LenghtConstants.LENGTH60)
+                .HasMaxLength(LengthConstants.MaxCountryLength)
                 .HasColumnName("country");
 
             adressBuilder.HasIndex(a => new { a.Street, a.City, a.Country })

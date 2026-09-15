@@ -20,14 +20,14 @@ public class PositionConfigurations : IEntityTypeConfiguration<Position>
             .HasColumnName("id");
 
         builder.Property(p => p.Name)
-            .HasConversion(p => p.Value, name => PositionName.Create(name).Value)
+            .HasConversion(p => p.Value, value => PositionName.FromPersisted(value))
             .IsRequired()
-            .HasMaxLength(LenghtConstants.LENGTH100)
+            .HasMaxLength(LengthConstants.MaxPositionNameLength)
             .HasColumnName("name");
 
         builder.Property(p => p.Description)
-            .HasConversion(p => p!.Value, description => PositionDescription.Create(description).Value)
-            .HasMaxLength(LenghtConstants.LENGTH1000)
+            .HasConversion(p => p!.Value, value => PositionDescription.FromPersisted(value))
+            .HasMaxLength(LengthConstants.MaxPositionDescriptionLength)
             .HasColumnName("description");
 
         builder.Property(p => p.IsActive)

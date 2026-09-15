@@ -33,57 +33,33 @@ public class CreateLocationHandle
         LocationId locationId = LocationId.NewLocationId();
         CreateLocationRequest locationRequest = createLocationCommand.locationRequest;
 
-        // Валидация входных данных
-        _logger.LogInformation("Validating department");
         ValidationResult validateResult = await _validator.ValidateAsync(locationRequest, cancellationToken);
         if (!validateResult.IsValid)
         {
-            _logger.LogError("Failed to validate location111");
-
+            _logger.LogWarning("Invalid location request for {LocationName}", locationRequest.Name);
             return validateResult.ToError();
         }
 
-        var locationNameResult = LocationName.Create(locationRequest.Name);
-        if (locationNameResult.IsFailure)
-        {
-            _logger.LogError("Failed to create location name");
-            return locationNameResult.Error;
-        }
-
-        LocationName locationName = locationNameResult.Value;
-
-        var locationAddressResult = Address.Create(
+        // Валидатор уже прогнал те же фабрики через MustBeValueObject, поэтому здесь
+        // остаётся только собрать значения: ветки IsFailure были недостижимы.
+        LocationName locationName = LocationName.Create(locationRequest.Name).Value;
+        Address locationAddress = Address.Create(
             locationRequest.Address.Street,
             locationRequest.Address.City,
-            locationRequest.Address.Country);
-        if (locationAddressResult.IsFailure)
-        {
-            _logger.LogError("Failed to create location address");
-            return locationAddressResult.Error;
-        }
-
-        Address locationAddress = locationAddressResult.Value;
-        var locationTimezoneResult = Timezone.Create(locationRequest.Timezone);
-        if (locationTimezoneResult.IsFailure)
-        {
-            _logger.LogError("Failed to create location timezone");
-            return locationTimezoneResult.Error;
-        }
-
-        Timezone locationTimezone = locationTimezoneResult.Value;
+            locationRequest.Address.Country).Value;
+        Timezone locationTimezone = Timezone.Create(locationRequest.Timezone).Value;
 
         Locations locations = new Locations(locationId, locationName, locationTimezone, locationAddress,
             new List<DepartmentLocation>());
 
         var result = await _locationsRepository.Add(locations, cancellationToken);
-        _logger.LogInformation("Location created successfully");
-
         if (result.IsFailure)
         {
-            _logger.LogError("Location created fail");
+            _logger.LogError("Failed to persist location {LocationId}", locationId.Value);
             return result.Error;
         }
 
+        _logger.LogInformation("Location {LocationId} created", locationId.Value);
         return result;
     }
 }

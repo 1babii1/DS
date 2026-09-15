@@ -5,6 +5,7 @@ using DirectoryService.Contracts.Response.Department;
 using DirectoryService.Domain.Departments.ValueObjects;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Shared.EndpointResults;
 
 namespace DirectoryService.Controllers;
@@ -16,6 +17,7 @@ public class DepartmentController : ControllerBase
 {
     [HttpPost]
     [Authorize(Policy = "CanEdit")]
+    [EnableRateLimiting("write")]
     public async Task<EndpointResult<Guid>> Create(
         [FromServices] CreateDepartmentHandler handler,
         CreateDepartmentCommand request, CancellationToken cancellationToken) =>
@@ -23,13 +25,15 @@ public class DepartmentController : ControllerBase
 
     [HttpPatch("locations")]
     [Authorize(Policy = "CanEdit")]
+    [EnableRateLimiting("write")]
     public async Task<EndpointResult<DepartmentId>> UpdateLocations(
-        [FromServices] UpdateDepartmentLocationsHadler handler,
+        [FromServices] UpdateDepartmentLocationsHandler handler,
         UpdateDepartmentLocationsCommand request, CancellationToken cancellationToken) =>
         await handler.Handle(request, cancellationToken);
 
     [HttpPut("{departmentId:guid}/parent")]
     [Authorize(Policy = "CanEdit")]
+    [EnableRateLimiting("write")]
     public async Task<EndpointResult<DepartmentId>> UpdateParent(
         [FromRoute] Guid departmentId,
         [FromServices] UpdateParentDepartmentHandler handler,
@@ -40,7 +44,7 @@ public class DepartmentController : ControllerBase
     }
 
     [HttpGet("department/{departmentId:guid}")]
-    public async Task<ActionResult<ReadDepartmentWithChildrenDto?>> GetDepartmentById(
+    public async Task<EndpointResult<ReadDepartmentWithChildrenDto?>> GetDepartmentById(
         [FromRoute] Guid departmentId,
         [FromServices] GetDepartmentByIdHandler handler,
         CancellationToken cancellationToken) =>
@@ -53,6 +57,19 @@ public class DepartmentController : ControllerBase
         CancellationToken cancellationToken) =>
         await handler.Handle(request, cancellationToken);
 
+    [HttpGet("search")]
+    [EnableRateLimiting("search")]
+    public async Task<EndpointResult<List<DepartmentSearchResultDto>>> SearchSemantic(
+        [FromQuery] string query,
+        [FromQuery] int limit,
+        [FromServices] SearchDepartmentsSemanticHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var effectiveLimit = limit <= 0 ? 10 : limit;
+        var request = new SearchDepartmentsSemanticRequest(query, effectiveLimit);
+        return await handler.Handle(request, cancellationToken);
+    }
+
     [HttpGet("top-positions")]
     public async Task<ActionResult<List<ReadDepartmentsTopDto>?>> GetDepartmentsTopForPositions(
         [FromServices] GetDepartmentsTopByPositionsHandler handler,
@@ -60,14 +77,14 @@ public class DepartmentController : ControllerBase
         await handler.Handle(cancellationToken);
 
     [HttpGet("roots")]
-    public async Task<ActionResult<List<ReadDepartmentHierarchyDto>?>> GetRootDepartments(
+    public async Task<EndpointResult<List<ReadDepartmentHierarchyDto>>> GetRootDepartments(
         [FromQuery] GetParentDepartmentsRequest request,
         [FromServices] GetParentDepartmentsHandler handler,
         CancellationToken cancellationToken) =>
         await handler.Handle(request, cancellationToken);
 
     [HttpGet("{parentId:guid}/children")]
-    public async Task<ActionResult<List<ReadDepartmentHierarchyDto>?>> GetChildrenLazy(
+    public async Task<EndpointResult<List<ReadDepartmentHierarchyDto>>> GetChildrenLazy(
         [FromRoute] Guid parentId,
         [FromQuery] GetChildrenLazyRequest request,
         [FromServices] GetChildrenLazyHandler handler,
@@ -79,6 +96,7 @@ public class DepartmentController : ControllerBase
 
     [HttpDelete("{departmentId:guid}")]
     [Authorize(Policy = "CanEdit")]
+    [EnableRateLimiting("write")]
     public async Task<EndpointResult<DepartmentId>> SoftDeleteDepartments(
         [FromRoute] SoftDeleteDepartmentRequest request,
         [FromServices] SoftDeleteDepartmentHandler handler,

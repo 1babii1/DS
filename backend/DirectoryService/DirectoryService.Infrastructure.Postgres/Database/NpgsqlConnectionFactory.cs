@@ -10,11 +10,13 @@ public class NpgsqlConnectionFactory : IDisposable, IAsyncDisposable, IDbConnect
 {
     private readonly NpgsqlDataSource _dataSource;
 
-    public NpgsqlConnectionFactory(IConfiguration configuration)
+    // Фабрика логгеров берётся из DI, а не создаётся здесь: LoggerFactory.Create
+    // возвращает IDisposable, владеющий провайдерами и потоком консольного вывода,
+    // и каждый вызов создавал новый, который никто не освобождал.
+    public NpgsqlConnectionFactory(IConfiguration configuration, ILoggerFactory loggerFactory)
     {
         var dataSourceBuilder = new NpgsqlDataSourceBuilder(configuration.GetConnectionString("DirectoryServiceDb"));
-        dataSourceBuilder
-            .UseLoggerFactory(LoggerFactory); // Configure logging
+        dataSourceBuilder.UseLoggerFactory(loggerFactory);
         _dataSource = dataSourceBuilder.Build();
     }
 
@@ -22,8 +24,6 @@ public class NpgsqlConnectionFactory : IDisposable, IAsyncDisposable, IDbConnect
     {
         return await _dataSource.OpenConnectionAsync(cancellationToken);
     }
-
-    private ILoggerFactory LoggerFactory => Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddConsole());
 
     public void Dispose() => _dataSource.Dispose();
 

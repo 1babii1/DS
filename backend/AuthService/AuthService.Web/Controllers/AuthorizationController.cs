@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using System.Security.Claims;
 using AuthService.Domain;
 using Microsoft.AspNetCore;

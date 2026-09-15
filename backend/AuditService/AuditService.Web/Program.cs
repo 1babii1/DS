@@ -1,6 +1,9 @@
-using AuditService.Infrastructure;
+﻿using AuditService.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Serilog;
+using Shared.HealthChecks;
+using Shared.Middlewares;
+using Shared.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,9 +11,14 @@ builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 
 builder.Host.UseSerilog((context, _, configuration) =>
-    configuration.ReadFrom.Configuration(context.Configuration));
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .AddOtlpLogging(context.Configuration, "audit-service"));
+
+builder.Services.AddObservability(builder.Configuration, "audit-service");
 
 builder.Services.AddControllers();
+builder.Services.AddEnvelopeModelStateValidation();
 builder.Services.AddOpenApi();
 
 builder.Services
@@ -21,7 +29,7 @@ builder.Services
         options.MetadataAddress = builder.Configuration["Auth:MetadataAddress"];
         options.RequireHttpsMetadata = builder.Environment.IsProduction();
         options.TokenValidationParameters.ValidIssuer = builder.Configuration["Auth:Issuer"];
-        options.TokenValidationParameters.ValidateAudience = false;
+        options.TokenValidationParameters.ValidAudience = builder.Configuration["Auth:Audience"];
         options.TokenValidationParameters.RoleClaimType = "role";
         options.TokenValidationParameters.NameClaimType = "name";
     });
@@ -30,7 +38,12 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddAuditInfrastructure(builder.Configuration);
 
+builder.Services.AddDatabaseHealthCheck<AuditDbContext>();
+
 var app = builder.Build();
+
+app.UseRequestCorrelationId();
+app.UseExceptionMiddleware();
 
 app.UseSerilogRequestLogging();
 
@@ -41,6 +54,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapDefaultHealthChecks();
 
 app.Run();
 

@@ -1,5 +1,6 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Confluent.Kafka.Admin;
+using Microsoft.Extensions.Logging;
 
 namespace Shared.Outbox;
 
@@ -10,9 +11,12 @@ namespace Shared.Outbox;
 // before anyone subscribes or produces avoids the whole class of race.
 public static class KafkaTopicProvisioner
 {
-    public static async Task EnsureTopicsExistAsync(string bootstrapServers, params string[] topics)
+    public static async Task EnsureTopicsExistAsync(
+        string bootstrapServers, KafkaSecurityOptions security, params string[] topics)
     {
-        using var admin = new AdminClientBuilder(new AdminClientConfig { BootstrapServers = bootstrapServers }).Build();
+        var config = new AdminClientConfig { BootstrapServers = bootstrapServers };
+        security.ApplyTo(config);
+        using var admin = new AdminClientBuilder(config).Build();
 
         try
         {
@@ -26,6 +30,53 @@ public static class KafkaTopicProvisioner
         catch (CreateTopicsException ex) when (ex.Results.All(r => r.Error.Code == ErrorCode.TopicAlreadyExists))
         {
             // Fine - another service instance created it first.
+        }
+    }
+
+    /// <summary>
+    /// Повторяет провижининг, пока брокер не ответит. Вызывается первой строкой
+    /// ExecuteAsync у фоновых сервисов, а необработанное исключение оттуда по умолчанию
+    /// останавливает весь хост (BackgroundServiceExceptionBehavior.StopHost). Без этого
+    /// недоступная при старте Kafka уносила вместе с собой и HTTP-API сервиса, хотя
+    /// шина нужна только для асинхронной доставки событий.
+    /// </summary>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    public static async Task WaitForTopicsAsync(
+        string bootstrapServers,
+        KafkaSecurityOptions security,
+        ILogger logger,
+        CancellationToken cancellationToken,
+        params string[] topics)
+    {
+        var delay = TimeSpan.FromSeconds(1);
+        var maxDelay = TimeSpan.FromSeconds(30);
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await EnsureTopicsExistAsync(bootstrapServers, security, topics);
+                return;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Kafka at {BootstrapServers} is not reachable; retrying topic provisioning in {Delay}",
+                    bootstrapServers,
+                    delay);
+            }
+
+            try
+            {
+                await Task.Delay(delay, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            delay = TimeSpan.FromTicks(Math.Min(delay.Ticks * 2, maxDelay.Ticks));
         }
     }
 }

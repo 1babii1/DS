@@ -51,50 +51,49 @@ public class SoftDeleteDepartmentHandler
         SoftDeleteDepartmentRequest request,
         CancellationToken cancellationToken)
     {
+        // Валидация до открытия транзакции: иначе соединение из пула занято на всё
+        // время обработки запроса, который мог отсеяться на пустом идентификаторе.
+        var validateResult = await _validation.ValidateAsync(request, cancellationToken);
+        if (validateResult.IsValid == false)
+        {
+            _logger.LogWarning("Invalid soft delete request for department {DepartmentId}", request.departmentId);
+            return validateResult.ToError();
+        }
+
         var transaction = await _transactionManager.BeginTransactionAsync(cancellationToken);
         if (transaction.IsFailure)
         {
             return transaction.Error;
         }
 
-        using var transactionScope = transaction.Value;
-
-        // Валидация данных
-        var validateResult = await _validation.ValidateAsync(request, cancellationToken);
-        if (validateResult.IsValid == false)
-        {
-            transactionScope.Rollback();
-            _logger.LogError("Failed to validate update department locations");
-            return validateResult.ToError();
-        }
+        // Выход без Commit откатывает транзакцию при Dispose, поэтому явные Rollback
+        // на каждой ветке не нужны.
+        await using var transactionScope = transaction.Value;
 
         // Проверка на существование Департамента
         var department =
             await _departmentRepository.GetById(DepartmentId.FromValue(request.departmentId), cancellationToken);
         if (department.IsFailure)
         {
-            transactionScope.Rollback();
-            _logger.LogError("Failed to get department");
+            _logger.LogWarning("Department {DepartmentId} not found", request.departmentId);
             return department.Error;
         }
 
         if (department.Value.IsActive == false)
         {
-            transactionScope.Rollback();
-            _logger.LogError("department deleted");
-            return department.Error;
+            _logger.LogWarning("Department {DepartmentId} is already deleted", request.departmentId);
+            return Error.Conflict("department.already.deleted", "Department is already deleted");
         }
 
         // Мягкое удаление департамента
         department.Value.Delete();
 
-        // Получение осиротевших Локации
+        // Получение осиротевших локаций
         var locationOrphan =
             await _locationsRepository.GetOrphanLocationByDepartment(department.Value.Id, cancellationToken);
         if (locationOrphan.IsFailure)
         {
-            transactionScope.Rollback();
-            _logger.LogError("fail to get orphan locations");
+            _logger.LogError("Failed to load orphan locations for department {DepartmentId}", request.departmentId);
             return locationOrphan.Error;
         }
 
@@ -106,13 +105,12 @@ public class SoftDeleteDepartmentHandler
             }
         }
 
-        // Получение осиротевших Локации
+        // Получение осиротевших позиций
         var positionOrphan =
             await _positionRepository.GetOrphanPositionByDepartment(department.Value.Id, cancellationToken);
         if (positionOrphan.IsFailure)
         {
-            transactionScope.Rollback();
-            _logger.LogError("fail to get orphan locations");
+            _logger.LogError("Failed to load orphan positions for department {DepartmentId}", request.departmentId);
             return positionOrphan.Error;
         }
 
@@ -129,23 +127,40 @@ public class SoftDeleteDepartmentHandler
             department.Value.Id.Value.ToString(),
             new DepartmentDeletedEvent(department.Value.Id.Value));
 
-        await _transactionManager.SaveChangesAsync(cancellationToken);
-        var commitResult = transactionScope.Commit();
+        var save = await _transactionManager.SaveChangesAsync(cancellationToken);
+        if (save.IsFailure)
+        {
+            _logger.LogError("Failed to save soft delete of department {DepartmentId}", request.departmentId);
+            return save.Error;
+        }
+
+        var commitResult = await transactionScope.CommitAsync(cancellationToken);
         if (commitResult.IsFailure)
         {
-            transactionScope.Rollback();
-            _logger.LogError("Failed to commit transaction");
+            _logger.LogError("Failed to commit soft delete of department {DepartmentId}", request.departmentId);
             return commitResult.Error;
         }
 
+        // Удаление из кэша. Собственная запись департамента, его место в кэшированном
+        // списке детей родителя (иначе удалённый департамент продолжит там числиться
+        // до истечения TTL) и агрегат top-by-positions, который мог включать его.
+        await _cache.RemoveOrIgnoreAsync(
+            _logger, key: GetKey.DepartmentKey.ById(department.Value.Id), cancellationToken);
 
-        // Удаление из кэша
-        await _cache.RemoveAsync(key: GetKey.DepartmentKey.ById(department.Value.Id), cancellationToken);
+        if (department.Value.ParentId is not null)
+        {
+            await _cache.RemoveOrIgnoreAsync(
+                _logger, key: GetKey.DepartmentKey.Children(department.Value.ParentId.Value), cancellationToken);
+        }
+
+        await _cache.RemoveOrIgnoreAsync(
+            _logger, key: GetKey.DepartmentKey.TopByPositions(), cancellationToken);
 
         _logger.LogInformation(
-            "Департамент удален{0}{1}",
-            locationOrphan.Value?.Any() == true ? ", удалены связанные локации" : " ",
-            positionOrphan.Value?.Any() == true ? ", удалены связанные позиции" : " ");
+            "Department {DepartmentId} deleted (orphan locations removed: {LocationsRemoved}, orphan positions removed: {PositionsRemoved})",
+            department.Value.Id.Value,
+            locationOrphan.Value?.Any() == true,
+            positionOrphan.Value?.Any() == true);
 
         return department.Value.Id;
     }

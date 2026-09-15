@@ -28,7 +28,7 @@ public class UpdateDepartmentTests : IClassFixture<DirectoryTestWEbFactory>, IAs
         // Arrange
         var locationIdFirst = await CreateLocation();
         var cancellationToken = CancellationToken.None;
-        var result = await ExecuteHadler((sut) =>
+        var result = await ExecuteHandler((sut) =>
         {
             var command =
                 new CreateDepartmentCommand(new CreateDepartmentRequest(
@@ -44,7 +44,7 @@ public class UpdateDepartmentTests : IClassFixture<DirectoryTestWEbFactory>, IAs
         var locationIdSecond = await CreateLocation("1");
 
         // Act
-        var resultUpdate = await ExecuteHadler((sut) =>
+        var resultUpdate = await ExecuteHandler((sut) =>
         {
             var command =
                 new UpdateDepartmentLocationsCommand(new UpdateDepartmentLocationsRequest(
@@ -75,7 +75,7 @@ public class UpdateDepartmentTests : IClassFixture<DirectoryTestWEbFactory>, IAs
     private async Task<Guid> CreateDepartmentWithLocation()
     {
         var locationId = await CreateLocation("dept");
-        var result = await ExecuteHadler((CreateDepartmentHandler sut) =>
+        var result = await ExecuteHandler((CreateDepartmentHandler sut) =>
         {
             return sut.Handle(
                 new CreateDepartmentCommand(new CreateDepartmentRequest(
@@ -86,7 +86,6 @@ public class UpdateDepartmentTests : IClassFixture<DirectoryTestWEbFactory>, IAs
         });
         return result.Value;
     }
-
 
     public Task InitializeAsync() => Task.CompletedTask;
 
@@ -111,7 +110,7 @@ public class UpdateDepartmentTests : IClassFixture<DirectoryTestWEbFactory>, IAs
         });
     }
 
-    private async Task<T> ExecuteHadler<T>(Func<CreateDepartmentHandler, Task<T>> action)
+    private async Task<T> ExecuteHandler<T>(Func<CreateDepartmentHandler, Task<T>> action)
     {
         await using var scope = Services.CreateAsyncScope();
 
@@ -120,11 +119,11 @@ public class UpdateDepartmentTests : IClassFixture<DirectoryTestWEbFactory>, IAs
         return await action(sut);
     }
 
-    private async Task<T> ExecuteHadler<T>(Func<UpdateDepartmentLocationsHadler, Task<T>> action)
+    private async Task<T> ExecuteHandler<T>(Func<UpdateDepartmentLocationsHandler, Task<T>> action)
     {
         await using var scope = Services.CreateAsyncScope();
 
-        var sut = scope.ServiceProvider.GetRequiredService<UpdateDepartmentLocationsHadler>();
+        var sut = scope.ServiceProvider.GetRequiredService<UpdateDepartmentLocationsHandler>();
 
         return await action(sut);
     }

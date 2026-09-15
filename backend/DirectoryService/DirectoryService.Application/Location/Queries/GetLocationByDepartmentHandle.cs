@@ -9,16 +9,16 @@ public class GetLocationByDepartmentHandle
 {
     private readonly IDbConnectionFactory _dbConnectionFactory;
 
-    public GetLocationByDepartmentHandle(IDbConnectionFactory _dbConnectionFactory)
+    public GetLocationByDepartmentHandle(IDbConnectionFactory dbConnectionFactory)
     {
-        this._dbConnectionFactory = _dbConnectionFactory;
+        _dbConnectionFactory = dbConnectionFactory;
     }
 
     public async Task<List<ReadLocationDto>?> Handle(
         GetLocationByDepartmentRequest request,
         CancellationToken cancellationToken)
     {
-        var connection = await _dbConnectionFactory.CreateConnectionAsync(cancellationToken);
+        using var connection = await _dbConnectionFactory.CreateConnectionAsync(cancellationToken);
 
         var parameters = new DynamicParameters();
 
@@ -46,16 +46,17 @@ public class GetLocationByDepartmentHandle
 
         var whereClause = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : string.Empty;
 
-        Console.WriteLine(request);
         var departmentLocationDto = await connection.QueryAsync<ReadLocationDto>(
-            $"""
-            SELECT l.id, l.name, l.timezone, l.street, l.city, l.country, l.is_active, l.created_at, l.updated_at FROM department_locations dl
-            JOIN locations l ON dl.location_id = l.id
-            {whereClause}
-            ORDER BY l.is_active, l.name
-            LIMIT @limit OFFSET @offset                                                                                                                  
-            """,
-            parameters);
+            new CommandDefinition(
+                $"""
+                 SELECT l.id, l.name, l.timezone, l.street, l.city, l.country, l.is_active, l.created_at, l.updated_at FROM department_locations dl
+                 JOIN locations l ON dl.location_id = l.id
+                 {whereClause}
+                 ORDER BY l.is_active, l.name
+                 LIMIT @limit OFFSET @offset
+                 """,
+                parameters,
+                cancellationToken: cancellationToken));
 
         return departmentLocationDto.ToList();
     }

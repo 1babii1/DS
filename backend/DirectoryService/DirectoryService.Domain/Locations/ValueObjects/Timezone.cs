@@ -13,12 +13,21 @@ public partial record Timezone
         Value = value;
     }
 
+    /// <summary>
+    /// Восстанавливает значение из хранилища без проверок. Данные уже прошли валидацию
+    /// при записи, а повторная проверка на чтении означает, что любое ужесточение правила
+    /// делает ранее сохранённые строки нечитаемыми: EF вызывает фабрику при материализации,
+    /// и .Value на неуспешном результате бросает исключение прямо внутри запроса.
+    /// Использовать только в конвертерах EF.
+    /// </summary>
+    public static Timezone FromPersisted(string value) => new(value);
+
     public static Result<Timezone, Error> Create(string value)
     {
-        if(string.IsNullOrWhiteSpace(value))
+        if (string.IsNullOrWhiteSpace(value))
             return Error.Validation(null!, "Timezone is required");
 
-        if(!TimezoneRegex().IsMatch(value))
+        if (!TimezoneRegex().IsMatch(value))
             return Error.Validation(null!, "Timezone is invalid");
 
         Timezone timezone = new(value);

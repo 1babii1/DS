@@ -23,6 +23,48 @@ namespace EmployeeService.Infrastructure.Postgres.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("EmployeeService.Domain.DeadLetterEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Error")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("FailedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MessageKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FailedAt");
+
+                    b.HasIndex("MessageId")
+                        .IsUnique();
+
+                    b.ToTable("dead_letters", "employee");
+                });
+
             modelBuilder.Entity("EmployeeService.Domain.Employee", b =>
                 {
                     b.Property<Guid>("Id")
@@ -61,6 +103,10 @@ namespace EmployeeService.Infrastructure.Postgres.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<string>("ProvisioningFailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -69,6 +115,12 @@ namespace EmployeeService.Infrastructure.Postgres.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id");
 
                     b.HasIndex("DepartmentId");
@@ -76,7 +128,10 @@ namespace EmployeeService.Infrastructure.Postgres.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.ToTable("employees", "employee");
+                    b.ToTable("employees", "employee", t =>
+                        {
+                            t.HasCheckConstraint("ck_employees_status", "\"Status\" IN ('PendingProvisioning', 'Active', 'Terminated', 'ProvisioningFailed')");
+                        });
                 });
 
             modelBuilder.Entity("Shared.Outbox.OutboxMessage", b =>

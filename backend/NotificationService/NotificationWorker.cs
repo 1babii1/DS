@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using Confluent.Kafka;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -18,7 +18,14 @@ public class NotificationWorker(IOptions<NotificationOptions> options, ILogger<N
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await KafkaTopicProvisioner.EnsureTopicsExistAsync(_options.BootstrapServers, _options.Topics);
+        await KafkaTopicProvisioner.WaitForTopicsAsync(
+            _options.BootstrapServers, _options.Security, logger, stoppingToken, _options.Topics);
+
+        if (stoppingToken.IsCancellationRequested)
+        {
+            return;
+        }
+
         await Task.Run(() => Run(stoppingToken), stoppingToken);
     }
 
@@ -30,6 +37,7 @@ public class NotificationWorker(IOptions<NotificationOptions> options, ILogger<N
             GroupId = _options.GroupId,
             AutoOffsetReset = AutoOffsetReset.Earliest,
         };
+        _options.Security.ApplyTo(config);
 
         using var consumer = new ConsumerBuilder<string, string>(config).Build();
         consumer.Subscribe(_options.Topics);
@@ -84,6 +92,8 @@ public class NotificationWorker(IOptions<NotificationOptions> options, ILogger<N
 public class NotificationOptions
 {
     public string BootstrapServers { get; set; } = null!;
+
+    public KafkaSecurityOptions Security { get; set; } = new(null, null);
 
     public string[] Topics { get; set; } = [];
 

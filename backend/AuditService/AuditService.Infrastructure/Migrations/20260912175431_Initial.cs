@@ -26,7 +26,7 @@ namespace AuditService.Infrastructure.Migrations
                     AggregateId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     Payload = table.Column<string>(type: "jsonb", nullable: false),
                     OccurredAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    ReceivedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    ReceivedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                 },
                 constraints: table =>
                 {

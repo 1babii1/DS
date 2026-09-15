@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- McpServer.IntegrationTests lives under this project's own folder (matching
+         every other service's <Service>/<Service>.IntegrationTests layout) - without
+         this exclude, the SDK's default recursive glob would also compile the test
+         project's own files (and its generated obj/ output) into McpServer itself. -->
+    <Compile Remove="McpServer.IntegrationTests/**/*.cs" />
+    <Content Remove="McpServer.IntegrationTests/**/*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.AspNetCore" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Pgvector" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Observability is cross-cutting ops tooling, not a domain abstraction - unlike
+         Envelope/Error/Outbox (why this service otherwise stays off Shared, see
+         docs/adr/0001), tracing applies the same way to every JWT-authenticated
+         network service, McpServer included. -->
+    <ProjectReference Include="..\Shared\Shared.csproj" />
+  </ItemGroup>
+
+</Project>

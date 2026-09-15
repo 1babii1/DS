@@ -1,4 +1,4 @@
-namespace EmployeeService.Application.Employees.Queries;
+﻿namespace EmployeeService.Application.Employees.Queries;
 
 public record EmployeeDto(
     Guid Id,
@@ -9,4 +9,5 @@ public record EmployeeDto(
     Guid PositionId,
     string PositionName,
     string Status,
+    string? ProvisioningFailureReason,
     DateTime HiredAt);

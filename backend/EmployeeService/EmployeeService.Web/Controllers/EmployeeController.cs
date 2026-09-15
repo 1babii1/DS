@@ -1,8 +1,10 @@
-using EmployeeService.Application.Employees.Commands;
+﻿using EmployeeService.Application.Employees.Commands;
 using EmployeeService.Application.Employees.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Shared;
+using Shared.EndpointResults;
 
 namespace EmployeeService.Web.Controllers;
 
@@ -13,27 +15,34 @@ public class EmployeeController : ControllerBase
 {
     [HttpPost]
     [Authorize(Policy = "CanEdit")]
-    public async Task<IActionResult> Hire(
+    [EnableRateLimiting("write")]
+    public async Task<EndpointResult<Guid>> Hire(
         [FromServices] HireEmployeeHandler handler,
         HireEmployeeCommand command,
-        CancellationToken cancellationToken)
-    {
-        var result = await handler.Handle(command, cancellationToken);
-        return result.IsSuccess ? Ok(result.Value) : ToProblem(result.Error);
-    }
+        CancellationToken cancellationToken) =>
+        await handler.Handle(command, cancellationToken);
 
     [HttpPut("{employeeId:guid}/transfer")]
     [Authorize(Policy = "CanEdit")]
-    public async Task<IActionResult> Transfer(
+    [EnableRateLimiting("write")]
+    public async Task<EndpointResult> Transfer(
         [FromRoute] Guid employeeId,
         [FromServices] TransferEmployeeHandler handler,
         [FromBody] TransferEmployeeRequest request,
         CancellationToken cancellationToken)
     {
         var command = new TransferEmployeeCommand(employeeId, request.DepartmentId, request.PositionId);
-        var result = await handler.Handle(command, cancellationToken);
-        return result.IsSuccess ? NoContent() : ToProblem(result.Error);
+        return await handler.Handle(command, cancellationToken);
     }
+
+    [HttpDelete("{employeeId:guid}")]
+    [Authorize(Policy = "CanEdit")]
+    [EnableRateLimiting("write")]
+    public async Task<EndpointResult> Terminate(
+        [FromRoute] Guid employeeId,
+        [FromServices] TerminateEmployeeHandler handler,
+        CancellationToken cancellationToken) =>
+        await handler.Handle(new TerminateEmployeeCommand(employeeId), cancellationToken);
 
     [HttpGet("{employeeId:guid}")]
     public async Task<ActionResult<EmployeeDto>> GetById(
@@ -46,19 +55,13 @@ public class EmployeeController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<EmployeeDto>>> List(
+    public async Task<ActionResult<PagedResponse<EmployeeDto>>> List(
         [FromQuery] Guid? departmentId,
+        [FromQuery] int? page,
+        [FromQuery] int? size,
         [FromServices] ListEmployeesHandler handler,
         CancellationToken cancellationToken) =>
-        Ok(await handler.Handle(departmentId, cancellationToken));
-
-    private IActionResult ToProblem(Error error) => error.Type switch
-    {
-        ErrorType.NOT_FOUND => NotFound(error.Messages),
-        ErrorType.VALIDATION => BadRequest(error.Messages),
-        ErrorType.CONFLICT => Conflict(error.Messages),
-        _ => Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: error.Messages.FirstOrDefault()?.message),
-    };
+        Ok(await handler.Handle(departmentId, page, size, cancellationToken));
 }
 
 public record TransferEmployeeRequest(Guid DepartmentId, Guid PositionId);

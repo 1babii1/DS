@@ -1,4 +1,4 @@
-namespace DirectoryService.Application.Database;
+﻿namespace DirectoryService.Application.Database;
 
 // Stages an outbox row on the ambient DbContext - it commits together with whatever
 // SaveChanges call the handler makes next, in the same transaction as the domain write.

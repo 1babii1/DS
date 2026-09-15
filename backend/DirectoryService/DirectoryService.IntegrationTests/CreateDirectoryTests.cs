@@ -1,5 +1,6 @@
 ﻿using DirectoryService.Application.Department;
 using DirectoryService.Application.Department.Commands;
+using DirectoryService.Application.Department.Queries;
 using DirectoryService.Contracts.Request.Department;
 using DirectoryService.Domain.Departments.ValueObjects;
 using DirectoryService.Domain.Locations;
@@ -30,7 +31,7 @@ public class CreateDirectoryTests : IClassFixture<DirectoryTestWEbFactory>, IAsy
         var cancellationToken = CancellationToken.None;
 
         // act
-        var result = await ExecuteHadler((sut) =>
+        var result = await ExecuteHandler((sut) =>
         {
             var command =
                 new CreateDepartmentCommand(new CreateDepartmentRequest(
@@ -66,7 +67,7 @@ public class CreateDirectoryTests : IClassFixture<DirectoryTestWEbFactory>, IAsy
         var cancellationToken = CancellationToken.None;
 
         // act
-        var result = await ExecuteHadler((sut) =>
+        var result = await ExecuteHandler((sut) =>
         {
             var command =
                 new CreateDepartmentCommand(new CreateDepartmentRequest(
@@ -92,7 +93,7 @@ public class CreateDirectoryTests : IClassFixture<DirectoryTestWEbFactory>, IAsy
         var cancellationToken = CancellationToken.None;
 
         // act
-        var result = await ExecuteHadler((sut) =>
+        var result = await ExecuteHandler((sut) =>
         {
             var command =
                 new CreateDepartmentCommand(new CreateDepartmentRequest(
@@ -111,59 +112,106 @@ public class CreateDirectoryTests : IClassFixture<DirectoryTestWEbFactory>, IAsy
         Assert.NotNull(result.Error);
     }
 
+    /// <summary>
+    /// Written to check a hypothesis from this session's audit, not to demonstrate a
+    /// known bug: CreateDepartmentHandler never looks up an existing sibling before
+    /// inserting, and Path has no unique constraint or index in
+    /// DepartmentConfigurations - only a GiST index for query performance. Path is
+    /// built as parent.path + "." + identifier, so two children of the same parent
+    /// (or two roots) with the same identifier would get an identical path, which the
+    /// ltree hierarchy assumes can never happen.
+    /// </summary>
     [Fact]
-    public async Task CreateDepartment_with_lenght_less_three_name_and_identifier()
+    public async Task CreateDepartment_with_a_duplicate_identifier_is_rejected()
     {
-        // arrange
-        var locationId = await CreateLocation();
-        var cancellationToken = CancellationToken.None;
+        var locationId = await CreateLocation("dup");
 
-        // act
-        var result = await ExecuteHadler((sut) =>
-        {
-            var command =
-                new CreateDepartmentCommand(new CreateDepartmentRequest(
-                    DepartmentName.Create("по").Value,
-                    DepartmentIdentifier.Create("po").Value,
-                    null,
-                    null,
-                    [locationId], DepartmentId.NewDepartmentId()));
+        var first = await ExecuteHandler(sut => sut.Handle(
+            new CreateDepartmentCommand(new CreateDepartmentRequest(
+                DepartmentName.Create("First").Value,
+                DepartmentIdentifier.Create("dupident").Value,
+                null, null, [locationId], DepartmentId.NewDepartmentId())),
+            CancellationToken.None));
+        Assert.True(first.IsSuccess);
 
-            return sut.Handle(command, cancellationToken);
-        });
+        var second = await ExecuteHandler(sut => sut.Handle(
+            new CreateDepartmentCommand(new CreateDepartmentRequest(
+                DepartmentName.Create("Second").Value,
+                DepartmentIdentifier.Create("dupident").Value,
+                null, null, [locationId], DepartmentId.NewDepartmentId())),
+            CancellationToken.None));
 
-        // assert
-        Assert.True(result.IsFailure);
-        Assert.False(result.IsSuccess);
-        Assert.NotNull(result.Error);
+        Assert.True(second.IsFailure, "A second root department with the same identifier should not be allowed to collide on path with the first");
+    }
+
+    /// <summary>
+    /// Written to check a hypothesis from this session's audit, not to demonstrate a
+    /// known bug: GetChildrenLazyHandler caches its result keyed only by parentId with
+    /// a 30-minute expiration, and CreateDepartmentHandler never invalidates that key
+    /// (it only ever sets its own ById entry) - so a client that listed a parent's
+    /// children right before a new child was created would keep seeing the stale list
+    /// for up to half an hour.
+    /// </summary>
+    [Fact]
+    public async Task CreateDepartment_invalidates_the_parents_cached_children_list()
+    {
+        var locationId = await CreateLocation("cache");
+        var parentId = await ExecuteHandler<CSharpFunctionalExtensions.Result<Guid, Shared.Error>>(sut => sut.Handle(
+            new CreateDepartmentCommand(new CreateDepartmentRequest(
+                DepartmentName.Create("Parent").Value,
+                DepartmentIdentifier.Create("cacheparent").Value,
+                null, null, [locationId], DepartmentId.NewDepartmentId())),
+            CancellationToken.None));
+        Assert.True(parentId.IsSuccess);
+
+        // Warm the cache with an empty children list before the child exists.
+        var beforeChild = await ExecuteChildrenHandler(parentId.Value);
+        Assert.True(beforeChild.IsSuccess);
+        Assert.Empty(beforeChild.Value);
+
+        var childResult = await ExecuteHandler<CSharpFunctionalExtensions.Result<Guid, Shared.Error>>(sut => sut.Handle(
+            new CreateDepartmentCommand(new CreateDepartmentRequest(
+                DepartmentName.Create("Child").Value,
+                DepartmentIdentifier.Create("cachechild").Value,
+                DepartmentId.FromValue(parentId.Value), null, [locationId], DepartmentId.NewDepartmentId())),
+            CancellationToken.None));
+        Assert.True(childResult.IsSuccess);
+
+        var childRowParentId = await ExecuteInDb(async dbContext =>
+            (await dbContext.Departments.AsNoTracking().SingleAsync(
+                d => d.Id == DepartmentId.FromValue(childResult.Value), CancellationToken.None)).ParentId);
+        Assert.Equal(parentId.Value, childRowParentId!.Value);
+
+        var afterChild = await ExecuteChildrenHandler(parentId.Value);
+        Assert.True(afterChild.IsSuccess);
+        Assert.Contains(afterChild.Value, d => d.Id == childResult.Value);
+    }
+
+    private async Task<CSharpFunctionalExtensions.Result<List<DirectoryService.Contracts.Response.Department.ReadDepartmentHierarchyDto>, Shared.Error>> ExecuteChildrenHandler(Guid parentId)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var sut = scope.ServiceProvider.GetRequiredService<GetChildrenLazyHandler>();
+        return await sut.Handle(
+            new GetChildrenLazyCommand(parentId, new GetChildrenLazyRequest()), CancellationToken.None);
+    }
+
+    // Длина проверяется в value object, поэтому команду с некорректным именем
+    // собрать нельзя в принципе - правило проверяется там, где оно живёт.
+    [Fact]
+    public void DepartmentName_and_identifier_shorter_than_three_are_rejected()
+    {
+        Assert.True(DepartmentName.Create("по").IsFailure);
+        Assert.True(DepartmentIdentifier.Create("po").IsFailure);
     }
 
     [Fact]
-    public async Task CreateDepartment_with_lenght_more_150_name_and_identifier()
+    public void DepartmentName_and_identifier_longer_than_150_are_rejected()
     {
-        // arrange
-        var locationId = await CreateLocation();
-        var cancellationToken = CancellationToken.None;
+        var tooLongName = new string('я', 151);
+        var tooLongIdentifier = new string('a', 151);
 
-        // act
-        var result = await ExecuteHadler((sut) =>
-        {
-            var command =
-                new CreateDepartmentCommand(new CreateDepartmentRequest(
-                    DepartmentName
-                        .Create("подразделениекогдаоткрыливсеникакнеможемзакрытьноможетбытькогданибудьзакроемноэтонеточноведьсейчастяжелоевремяиниктонезнаетчтобудетзавтраазавтраможетслучитьсявсечтоугодно").Value,
-                    DepartmentIdentifier.Create("podrazdeleniekogdaotkrylivsenikaknemozhemzakryt'nomozhetbyt'kogdanibud'zakroemnoetonetochnoved'sejchastyazheloevremyainiktoneznaetchtobudetzavtraazavtramozhetsluchit'syavsechtougodno").Value,
-                    null,
-                    null,
-                    [locationId], null ));
-
-            return sut.Handle(command, cancellationToken);
-        });
-
-        // assert
-        Assert.True(result.IsFailure);
-        Assert.False(result.IsSuccess);
-        Assert.NotNull(result.Error);
+        Assert.True(DepartmentName.Create(tooLongName).IsFailure);
+        Assert.True(DepartmentIdentifier.Create(tooLongIdentifier).IsFailure);
     }
 
     public Task InitializeAsync() => Task.CompletedTask;
@@ -188,7 +236,7 @@ public class CreateDirectoryTests : IClassFixture<DirectoryTestWEbFactory>, IAsy
         });
     }
 
-    private async Task<T> ExecuteHadler<T>(Func<CreateDepartmentHandler, Task<T>> action)
+    private async Task<T> ExecuteHandler<T>(Func<CreateDepartmentHandler, Task<T>> action)
     {
         await using var scope = Services.CreateAsyncScope();
 

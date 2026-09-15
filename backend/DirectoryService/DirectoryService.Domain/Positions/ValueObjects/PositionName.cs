@@ -14,6 +14,15 @@ public record PositionName
         Value = value;
     }
 
+    /// <summary>
+    /// Восстанавливает значение из хранилища без проверок. Данные уже прошли валидацию
+    /// при записи, а повторная проверка на чтении означает, что любое ужесточение правила
+    /// делает ранее сохранённые строки нечитаемыми: EF вызывает фабрику при материализации,
+    /// и .Value на неуспешном результате бросает исключение прямо внутри запроса.
+    /// Использовать только в конвертерах EF.
+    /// </summary>
+    public static PositionName FromPersisted(string value) => new(value);
+
     public static Result<PositionName, Error> Create(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -21,7 +30,7 @@ public record PositionName
 
         string trimmed = value.Trim();
 
-        if (trimmed.Length is < LenghtConstants.LENGTH3 or > LenghtConstants.LENGTH100)
+        if (trimmed.Length is < LengthConstants.MinTextLength or > LengthConstants.MaxPositionNameLength)
             return Error.Validation("length.is.invalid", "Position name must be between 3 and 100 characters");
 
         PositionName name = new(trimmed);

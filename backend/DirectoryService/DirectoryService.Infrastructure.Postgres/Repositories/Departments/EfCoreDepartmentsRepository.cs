@@ -24,11 +24,6 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
         _logger = logger;
     }
 
-    public async Task Save()
-    {
-        await _dbContext.SaveChangesAsync();
-    }
-
     public async Task<Result<IReadOnlyList<Domain.Departments.Departments>, Error>> GetById(
         IReadOnlyList<DepartmentId> departmentIds,
         CancellationToken cancellationToken)
@@ -130,7 +125,7 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
         try
         {
             var department = await _dbContext.Departments
-                .FromSql($"SELECT * FROM departments WHERE id = {departmentId.Value} FOR UPDATE")
+                .FromSql($"SELECT * FROM directory.departments WHERE id = {departmentId.Value} FOR UPDATE")
                 .FirstOrDefaultAsync(d => d.Id == departmentId, cancellationToken);
             if (department is null)
             {
@@ -158,44 +153,10 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
         CancellationToken cancellationToken = default)
     {
         await _dbContext.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT * FROM departments WHERE path <@ {path.Value}::ltree AND path != {path.Value}::ltree FOR UPDATE");
+            $"SELECT * FROM directory.departments WHERE path <@ {path.Value}::ltree AND path != {path.Value}::ltree FOR UPDATE",
+            cancellationToken);
 
         return UnitResult.Success<Error>();
-    }
-
-    public async Task<List<DepartmentDto>> GetHierarchy(
-        DepartmentPath newDepartmentPath,
-        CancellationToken cancellationToken = default)
-    {
-        const string dapperSql = """
-                                 SELECT * FROM departments 
-                                 WHERE path <@ @path::ltree 
-                                 ORDER BY depth
-                                 """;
-
-        var dbCon = _dbContext.Database.GetDbConnection();
-
-        var departmentRaws = (await dbCon.QueryAsync<DepartmentDto>(
-                dapperSql,
-                new { path = newDepartmentPath.Value }))
-            .ToList();
-
-        var departmentDict = departmentRaws.ToDictionary(d => d.Id);
-        var roots = new List<DepartmentDto>();
-
-        foreach (var row in departmentRaws)
-        {
-            if (row.ParentId.HasValue && departmentDict.TryGetValue(row.ParentId.Value, out var department))
-            {
-                department.Children.Add(departmentDict[row.Id]);
-            }
-            else
-            {
-                roots.Add(departmentDict[row.Id]);
-            }
-        }
-
-        return roots;
     }
 
     public async Task<UnitResult<Error>> UpdateHierarchy(
@@ -203,19 +164,42 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
         DepartmentPath newParentPath,
         DepartmentId currentId,
         DepartmentPath oldPath,
-        short depth,
         CancellationToken cancellationToken)
     {
-        await _dbContext.Database.ExecuteSqlInterpolatedAsync($@"
-    UPDATE departments SET parent_id = {newParentId.Value} WHERE path = {oldPath.Value}::ltree");
+        try
+        {
+            // Re-parent first: this matches on the old path, so it has to run before the
+            // path rewrite below changes it.
+            await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE directory.departments SET parent_id = {newParentId.Value} WHERE path = {oldPath.Value}::ltree",
+                cancellationToken);
 
-        await _dbContext.Database.ExecuteSqlInterpolatedAsync($@"
-    UPDATE departments 
-    SET path = {newParentPath.Value}::ltree || subpath(path, nlevel({oldPath.Value}::ltree)-1),
-        depth = depth - {depth}
-    WHERE path <@ {oldPath.Value}::ltree AND id != {currentId.Value}");
+            // Rewrite the moved department and its whole subtree in one statement. The same
+            // expression covers both: for the node itself subpath() yields its own last
+            // segment, for a descendant it yields the tail below the old parent. Depth is
+            // recomputed from the new path rather than adjusted by a delta - deltas go
+            // negative as soon as a node moves up the tree.
+            await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"""
+                 UPDATE directory.departments
+                 SET path  = {newParentPath.Value}::ltree || subpath(path, nlevel({oldPath.Value}::ltree) - 1),
+                     depth = (nlevel({newParentPath.Value}::ltree || subpath(path, nlevel({oldPath.Value}::ltree) - 1)) - 1)::smallint
+                 WHERE path <@ {oldPath.Value}::ltree
+                 """,
+                cancellationToken);
 
-        return UnitResult.Success<Error>();
+            return UnitResult.Success<Error>();
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(
+                e,
+                "Failed to move department {DepartmentId} under {NewParentId}",
+                currentId.Value,
+                newParentId.Value);
+
+            return Error.Failure("department.move", "Failed to move department");
+        }
     }
 
     public async Task<Result<Guid, Error>> Add(
@@ -224,9 +208,11 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
     {
         try
         {
+            // Только регистрирует сущность в контексте. Коммитит вызывающий, одним
+            // SaveChanges вместе с записью в outbox - иначе департамент сохраняется
+            // отдельной транзакцией, и падение между двумя сохранениями оставляет
+            // департамент без события о его создании.
             await _dbContext.Departments.AddAsync(department, cancellationToken);
-
-            await _dbContext.SaveChangesAsync(cancellationToken);
 
             return department.Id.Value;
         }
@@ -251,12 +237,6 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
             var missIds = departmentIds.Except(allDepartmentIds);
 
             return Result.Success<IEnumerable<DepartmentId>, Error>(missIds);
-        }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
-        {
-            _logger.LogError(ex, "Error getting departments ids");
-
-            return Error.Failure("department.get", "Fail to get departments ids");
         }
         catch (Exception e)
         {

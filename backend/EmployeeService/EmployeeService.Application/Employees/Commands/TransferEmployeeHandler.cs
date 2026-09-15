@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+﻿using CSharpFunctionalExtensions;
 using EmployeeService.Application.Database;
 using EmployeeService.Application.Directory;
 using EmployeeService.Application.Employees.Errors;
@@ -30,9 +30,14 @@ public class TransferEmployeeHandler(
                 command.PositionId,
                 cancellationToken);
         }
-        catch (Exception ex)
+        catch (DirectoryLookupException ex) when (ex.Failure == DirectoryLookupFailure.Unauthorized)
         {
-            logger.LogWarning(ex, "DirectoryService gRPC call failed while transferring {EmployeeId}", command.EmployeeId);
+            logger.LogError(ex, "DirectoryService rejected credentials while transferring {EmployeeId}", command.EmployeeId);
+            return EmployeeErrors.DirectoryUnauthorized();
+        }
+        catch (DirectoryLookupException ex)
+        {
+            logger.LogWarning(ex, "DirectoryService unavailable while transferring {EmployeeId}", command.EmployeeId);
             return EmployeeErrors.DirectoryUnavailable();
         }
 
@@ -61,8 +66,6 @@ public class TransferEmployeeHandler(
             command.EmployeeId.ToString(),
             new EmployeeTransferredEvent(command.EmployeeId, command.DepartmentId, command.PositionId));
 
-        await repository.Save(cancellationToken);
-
-        return UnitResult.Success<Error>();
+        return await repository.Save(cancellationToken);
     }
 }

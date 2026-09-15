@@ -1,120 +1,70 @@
-﻿using DirectoryService.Application.Cache;
+﻿using Dapper;
 using DirectoryService.Application.Database;
 using DirectoryService.Contracts.Request.Department;
 using DirectoryService.Contracts.Response.Department;
-using DirectoryService.Domain.Locations.ValueObjects;
-using FluentValidation;
-using FluentValidation.Results;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Hybrid;
-using Microsoft.Extensions.Logging;
 
 namespace DirectoryService.Application.Department.Queries;
 
-public class GetDepartmentByLocationValidator : AbstractValidator<GetDepartmentByLocationRequest>
+/// <summary>
+/// Каталог департаментов, отфильтрованный по локациям. Dapper, а не EF: locationIds
+/// нужно сравнивать с LocationId в DepartmentsLocationsList, а это value object за EF
+/// value-конвертером - Contains() над такой коллекцией не транслируется в SQL и падал
+/// с 500 на каждый запрос с непустым locationIds.
+/// Фильтр необязательный, как и в зеркальном <see cref="Location.Queries.GetLocationByDepartmentHandle"/>:
+/// без locationIds возвращается весь каталог.
+/// </summary>
+public class GetDepartmentByLocationHandler(IDbConnectionFactory connectionFactory)
 {
-    public GetDepartmentByLocationValidator()
-    {
-        RuleFor(x => x.Search).MaximumLength(150)
-            .When(x => !string.IsNullOrWhiteSpace(x.Search));
-        RuleFor(x => x.LocationIds).NotNull()
-            .WithMessage("LocationIds required for filtering");
-        RuleForEach(x => x.LocationIds).NotEmpty()
-            .WithMessage("LocationId cannot be empty");
-        RuleFor(x => x.Page).NotEmpty().GreaterThan(0).When(x => x.Page.HasValue).WithMessage("Page cant be null");
-        RuleFor(x => x.PageSize).NotEmpty().GreaterThan(0)
-            .LessThanOrEqualTo(100).When(x => x.Page.HasValue)
-            .WithMessage("PageSize cant be null");
-    }
-}
-
-public class GetDepartmentByLocationHandler
-{
-    private readonly IReadDbContext _readDbContext;
-    private readonly ILogger<GetDepartmentByLocationHandler> _logger;
-    private readonly HybridCache _cache;
-    private readonly GetDepartmentByLocationValidator _validator;
-
-    public GetDepartmentByLocationHandler(IReadDbContext readDbContext, ILogger<GetDepartmentByLocationHandler> logger,
-        HybridCache cache, GetDepartmentByLocationValidator validator)
-    {
-        _readDbContext = readDbContext;
-        _logger = logger;
-        _cache = cache;
-        _validator = validator;
-    }
-
     public async Task<List<ReadDepartmentDto>?> Handle(
         GetDepartmentByLocationRequest request,
         CancellationToken cancellationToken)
     {
-        // Валидация входных данных
-        ValidationResult validateResult = await _validator.ValidateAsync(request, cancellationToken);
-        if (!validateResult.IsValid)
+        using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
+
+        var parameters = new DynamicParameters();
+        var conditions = new List<string>();
+
+        if (request.LocationIds is { Length: > 0 })
         {
-            _logger.LogError("Failed to validate departmentId");
-            return [];
+            conditions.Add("""
+                           EXISTS (SELECT 1 FROM directory.department_locations dl
+                                   WHERE dl.department_id = d.id AND dl.location_id = ANY(@locationIds::uuid[]))
+                           """);
+            parameters.Add("locationIds", request.LocationIds);
         }
 
-        // Получение из кэша
-        var departments = await _cache.GetOrCreateAsync(
-            key: GetKey.DepartmentKey.ByLocation(request.LocationIds, request.Search),
-            factory: async _ => await GetDepartmentByLocationFromDb(request, cancellationToken),
-            options: new() { LocalCacheExpiration = TimeSpan.FromMinutes(5), Expiration = TimeSpan.FromMinutes(30), },
-            cancellationToken: cancellationToken);
-
-        if (departments == null)
+        if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            _logger.LogError("failed to get department");
-            return [];
+            conditions.Add("d.name ILIKE '%' || @search || '%'");
+            parameters.Add("search", request.Search.Trim());
         }
 
-        return departments;
-    }
-
-    private async Task<List<ReadDepartmentDto>?> GetDepartmentByLocationFromDb(
-        GetDepartmentByLocationRequest request,
-        CancellationToken cancellationToken)
-    {
-        var department = _readDbContext.DepartmentsRead;
-
-        if (request.LocationIds != null)
+        if (request.IsActive.HasValue)
         {
-            var locationIds = request.LocationIds.Select(LocationId.FromValue).ToList();
-            department = department.Where(d =>
-                d.DepartmentsLocationsList.Any(dl => locationIds.Contains(dl.LocationId)));
+            conditions.Add("d.is_active = @isActive");
+            parameters.Add("isActive", request.IsActive.Value);
         }
 
-        if (!string.IsNullOrWhiteSpace(request.Search) && request.Search != null)
-        {
-            department = department.Where(d => d.Name.Value.Contains(request.Search));
-        }
+        var page = request.Page is > 0 ? request.Page.Value : 1;
+        var pageSize = request.PageSize is > 0 ? request.PageSize.Value : 20;
+        parameters.Add("limit", pageSize);
+        parameters.Add("offset", (page - 1) * pageSize);
 
-        int page = request.Page ?? 1;
-        int pageSize = request.PageSize ?? 10;
+        var whereClause = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : string.Empty;
 
-        int skipCount = (page - 1) * pageSize;
+        var departments = await connection.QueryAsync<ReadDepartmentDto>(
+            new CommandDefinition(
+                $"""
+                 SELECT d.id, d.parent_id, d.name, d.identifier, d.path, d.depth,
+                        d.is_active, d.created_at, d.updated_at
+                 FROM directory.departments d
+                 {whereClause}
+                 ORDER BY d.is_active DESC, d.name, d.id
+                 LIMIT @limit OFFSET @offset
+                 """,
+                parameters,
+                cancellationToken: cancellationToken));
 
-        var departmentDto = await department
-            .OrderBy(d => d.Name.Value)
-            .Skip(skipCount)
-            .Take(pageSize)
-            .Select(d => new ReadDepartmentDto
-            {
-                Id = d.Id.Value,
-                ParentId = d.ParentId!.Value,
-                Name = d.Name.Value,
-                Identifier = d.Identifier.Value,
-                Path = d.Path.Value,
-                Depth = d.Depth,
-                IsActive = d.IsActive,
-                CreatedAt = d.CreatedAt,
-                UpdatedAt = d.UpdatedAt,
-            })
-            .ToListAsync(cancellationToken);
-
-        _logger.LogInformation("Found {Count} departments", departmentDto.Count);
-
-        return departmentDto;
+        return departments.ToList();
     }
 }

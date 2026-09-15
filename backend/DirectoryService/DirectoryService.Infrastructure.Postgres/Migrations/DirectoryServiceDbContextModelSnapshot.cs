@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using Pgvector;
 
 #nullable disable
 
@@ -124,10 +125,14 @@ namespace DirectoryService.Infrastructure.Postgres.Migrations
 
                     b.HasIndex("ParentId");
 
-                    b.HasIndex("Path")
-                        .HasDatabaseName("idx_departments_path");
+                    b.HasIndex(new[] { "Path" }, "idx_departments_path");
 
-                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Path"), "gist");
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "Path" }, "idx_departments_path"), "gist");
+
+                    b.HasIndex(new[] { "Path" }, "ux_departments_path")
+                        .IsUnique();
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "Path" }, "ux_departments_path"), "btree");
 
                     b.ToTable("departments", "directory");
                 });
@@ -212,6 +217,28 @@ namespace DirectoryService.Infrastructure.Postgres.Migrations
                         .HasName("pk_position");
 
                     b.ToTable("positions", "directory");
+                });
+
+            modelBuilder.Entity("DirectoryService.Infrastructure.Postgres.Embeddings.DepartmentEmbedding", b =>
+                {
+                    b.Property<Guid>("DepartmentId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("department_id");
+
+                    b.Property<Vector>("Embedding")
+                        .IsRequired()
+                        .HasColumnType("vector(768)")
+                        .HasColumnName("embedding");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("DepartmentId")
+                        .HasName("pk_department_embedding");
+
+                    b.ToTable("department_embeddings", "directory");
                 });
 
             modelBuilder.Entity("Shared.Outbox.OutboxMessage", b =>

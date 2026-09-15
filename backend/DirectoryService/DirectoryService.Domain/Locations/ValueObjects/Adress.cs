@@ -18,24 +18,42 @@ public record Address
 
     public static Result<Address, Error> Create(string street, string city, string country)
     {
-        var errors = new List<ErrorMessages>();
+        var errors = new List<ErrorMessage>();
 
-        if(string.IsNullOrWhiteSpace(street))
-            errors.Add(new ErrorMessages(null!, "Street is required"));
-        else if(street.Length < LenghtConstants.LENGTH3)
-            errors.Add(new ErrorMessages("length.is.invalid", "Location street cannot be less than 3 characters"));
+        // Верхние границы обязаны совпадать с HasMaxLength в LocationConfigurations:
+        // без них слишком длинный адрес проходит валидацию и падает уже на вставке,
+        // превращая ошибку ввода в 500.
+        if (string.IsNullOrWhiteSpace(street))
+        {
+            errors.Add(new ErrorMessage("value.is.required", "Street is required", nameof(Street)));
+        }
+        else if (street.Length is < LengthConstants.MinTextLength or > LengthConstants.MaxStreetLength)
+        {
+            errors.Add(GeneralErrors.LengthIsInvalid(
+                nameof(Street), LengthConstants.MinTextLength, LengthConstants.MaxStreetLength).Messages[0]);
+        }
 
-        if(string.IsNullOrWhiteSpace(city))
-            errors.Add(new ErrorMessages(null!, "City is required"));
-        else if(city.Length < LenghtConstants.LENGTH3)
-            errors.Add(new ErrorMessages("length.is.invalid", "Location city cannot be less than 3 characters"));
+        if (string.IsNullOrWhiteSpace(city))
+        {
+            errors.Add(new ErrorMessage("value.is.required", "City is required", nameof(City)));
+        }
+        else if (city.Length is < LengthConstants.MinTextLength or > LengthConstants.MaxCityLength)
+        {
+            errors.Add(GeneralErrors.LengthIsInvalid(
+                nameof(City), LengthConstants.MinTextLength, LengthConstants.MaxCityLength).Messages[0]);
+        }
 
-        if(string.IsNullOrWhiteSpace(country))
-            errors.Add(new ErrorMessages(null!, "Country is required"));
-        else if(country.Length < LenghtConstants.LENGTH3)
-            errors.Add(new ErrorMessages("length.is.invalid", "Location country cannot be less than 3 characters"));
+        if (string.IsNullOrWhiteSpace(country))
+        {
+            errors.Add(new ErrorMessage("value.is.required", "Country is required", nameof(Country)));
+        }
+        else if (country.Length is < LengthConstants.MinTextLength or > LengthConstants.MaxCountryLength)
+        {
+            errors.Add(GeneralErrors.LengthIsInvalid(
+                nameof(Country), LengthConstants.MinTextLength, LengthConstants.MaxCountryLength).Messages[0]);
+        }
 
-        if(errors.Any())
+        if (errors.Any())
             return Result.Failure<Address, Error>(Error.Validation(errors));
 
         Address adress = new(street, city, country);
