@@ -12,7 +12,6 @@
       <PackageReference Include="OpenIddict.Validation.AspNetCore" />
       <PackageReference Include="OpenIddict.Validation.ServerIntegration" />
       <PackageReference Include="Serilog.AspNetCore" />
-      <PackageReference Include="Serilog.Sinks.Seq" />
     </ItemGroup>
 
     <ItemGroup>

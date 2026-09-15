@@ -1,0 +1,63 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+  # Health probes fire every 10 seconds - without this filter they flood Tempo and
+  # Prometheus with noise and bury the traces/metrics that actually matter.
+  filter/health:
+    error_mode: ignore
+    traces:
+      span:
+        - 'attributes["url.path"] == "/health/live"'
+        - 'attributes["url.path"] == "/health/ready"'
+        - 'attributes["http.route"] == "/health/live"'
+        - 'attributes["http.route"] == "/health/ready"'
+    metrics:
+      metric:
+        - 'HasAttrOnDatapoint("http.route", "/health/live")'
+        - 'HasAttrOnDatapoint("http.route", "/health/ready")'
+        - 'HasAttrOnDatapoint("url.path", "/health/live")'
+        - 'HasAttrOnDatapoint("url.path", "/health/ready")'
+
+exporters:
+  otlp_grpc/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  otlp_http/loki:
+    endpoint: http://loki:3100/otlp
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion:
+      enabled: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/health, batch]
+      exporters: [otlp_grpc/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/health, batch]
+      exporters: [prometheus]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp_http/loki]
+
+  telemetry:
+    logs:
+      level: info
