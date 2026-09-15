@@ -22,18 +22,21 @@ builder.Services.AddObservability(builder.Configuration, "notification-service")
 builder.Services.Configure<HostOptions>(options =>
     options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost);
 
+var kafkaBootstrapServers = builder.Configuration["Kafka:BootstrapServers"]
+    ?? throw new InvalidOperationException("Configuration 'Kafka:BootstrapServers' is not set.");
+var kafkaSecurity = KafkaSecurityOptions.FromConfiguration(builder.Configuration);
+
 builder.Services.Configure<NotificationOptions>(options =>
 {
-    options.BootstrapServers = builder.Configuration["Kafka:BootstrapServers"]
-        ?? throw new InvalidOperationException("Configuration 'Kafka:BootstrapServers' is not set.");
-    options.Security = KafkaSecurityOptions.FromConfiguration(builder.Configuration);
+    options.BootstrapServers = kafkaBootstrapServers;
+    options.Security = kafkaSecurity;
     options.Topics = builder.Configuration.GetSection("Kafka:Topics").Get<string[]>()
         ?? throw new InvalidOperationException("Configuration 'Kafka:Topics' is not set.");
     options.GroupId = builder.Configuration["Kafka:GroupId"] ?? "notification-service";
 });
 
 builder.Services.AddHostedService<NotificationWorker>();
-builder.Services.AddHealthChecks();
+builder.Services.AddKafkaHealthCheck(kafkaBootstrapServers, kafkaSecurity);
 
 var app = builder.Build();
 

@@ -113,6 +113,11 @@ builder.Services.AddScoped<ITransactionManager, TransactionManager>();
 builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
 builder.Services.AddOutboxPublisher<DirectoryServiceDbContext>(builder.Configuration, "directory.events");
 
+builder.Services.AddKafkaHealthCheck(
+    builder.Configuration["Kafka:BootstrapServers"]
+        ?? throw new InvalidOperationException("Configuration 'Kafka:BootstrapServers' is not set."),
+    KafkaSecurityOptions.FromConfiguration(builder.Configuration));
+
 builder.Services.AddOptions<EmbeddingsOptions>()
     .Bind(builder.Configuration.GetSection(EmbeddingsOptions.SectionName));
 builder.Services.AddHttpClient<IEmbeddingClient, OllamaEmbeddingClient>((sp, client) =>
