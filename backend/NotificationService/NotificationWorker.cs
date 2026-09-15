@@ -19,7 +19,7 @@ public class NotificationWorker(IOptions<NotificationOptions> options, ILogger<N
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await KafkaTopicProvisioner.WaitForTopicsAsync(
-            _options.BootstrapServers, logger, stoppingToken, _options.Topics);
+            _options.BootstrapServers, _options.Security, logger, stoppingToken, _options.Topics);
 
         if (stoppingToken.IsCancellationRequested)
         {
@@ -37,6 +37,7 @@ public class NotificationWorker(IOptions<NotificationOptions> options, ILogger<N
             GroupId = _options.GroupId,
             AutoOffsetReset = AutoOffsetReset.Earliest,
         };
+        _options.Security.ApplyTo(config);
 
         using var consumer = new ConsumerBuilder<string, string>(config).Build();
         consumer.Subscribe(_options.Topics);
@@ -91,6 +92,8 @@ public class NotificationWorker(IOptions<NotificationOptions> options, ILogger<N
 public class NotificationOptions
 {
     public string BootstrapServers { get; set; } = null!;
+
+    public KafkaSecurityOptions Security { get; set; } = new(null, null);
 
     public string[] Topics { get; set; } = [];
 

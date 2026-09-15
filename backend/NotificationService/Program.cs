@@ -3,6 +3,7 @@ using NotificationService;
 using Serilog;
 using Shared.HealthChecks;
 using Shared.Observability;
+using Shared.Outbox;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +26,7 @@ builder.Services.Configure<NotificationOptions>(options =>
 {
     options.BootstrapServers = builder.Configuration["Kafka:BootstrapServers"]
         ?? throw new InvalidOperationException("Configuration 'Kafka:BootstrapServers' is not set.");
+    options.Security = KafkaSecurityOptions.FromConfiguration(builder.Configuration);
     options.Topics = builder.Configuration.GetSection("Kafka:Topics").Get<string[]>()
         ?? throw new InvalidOperationException("Configuration 'Kafka:Topics' is not set.");
     options.GroupId = builder.Configuration["Kafka:GroupId"] ?? "notification-service";
