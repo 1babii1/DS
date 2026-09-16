@@ -46,8 +46,8 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://*:5130
-      - Auth__WebClient__Enabled
-      - Auth__WebClient__FrontendOrigin
+      - Auth__WebClient__Enabled=true
+      - Auth__WebClient__FrontendOrigin=http://localhost:3000
       - Auth__WebClient__ClientSecret=${AUTH_OIDC_CLIENT_SECRET:?AUTH_OIDC_CLIENT_SECRET must be set}
     depends_on:
       postgres:
