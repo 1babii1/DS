@@ -48,5 +48,13 @@
     <Project Path="RewardsService/RewardsService.IntegrationTests/RewardsService.IntegrationTests.csproj" />
     <Project Path="RewardsService/RewardsService.Web/RewardsService.Web.csproj" />
   </Folder>
+  <Folder Name="/SearchService/">
+    <Project Path="SearchService/SearchService.ArchitectureTests/SearchService.ArchitectureTests.csproj" />
+    <Project Path="SearchService/SearchService.Domain/SearchService.Domain.csproj" />
+    <Project Path="SearchService/SearchService.Infrastructure.Elasticsearch/SearchService.Infrastructure.Elasticsearch.csproj" />
+    <Project Path="SearchService/SearchService.Infrastructure.Postgres/SearchService.Infrastructure.Postgres.csproj" />
+    <Project Path="SearchService/SearchService.IntegrationTests/SearchService.IntegrationTests.csproj" />
+    <Project Path="SearchService/SearchService.Web/SearchService.Web.csproj" />
+  </Folder>
   <Project Path="Shared/Shared.csproj" />
 </Solution>

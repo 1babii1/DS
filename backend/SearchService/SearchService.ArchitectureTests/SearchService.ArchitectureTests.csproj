@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>true</IsTestProject>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Using Include="Xunit" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="xunit" />
+        <PackageReference Include="xunit.runner.visualstudio">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="coverlet.collector">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="NetArchTest.Rules" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\SearchService.Domain\SearchService.Domain.csproj" />
+        <ProjectReference Include="..\SearchService.Infrastructure.Postgres\SearchService.Infrastructure.Postgres.csproj" />
+        <ProjectReference Include="..\SearchService.Infrastructure.Elasticsearch\SearchService.Infrastructure.Elasticsearch.csproj" />
+        <ProjectReference Include="..\SearchService.Web\SearchService.Web.csproj" />
+    </ItemGroup>
+
+</Project>
