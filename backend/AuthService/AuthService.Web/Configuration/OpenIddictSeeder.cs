@@ -30,6 +30,7 @@ public static class OpenIddictSeeder
         "audit-service",
         "mcp-server",
         "rewards-service",
+        "notification-service",
     ];
 
     public static async Task SeedAsync(IServiceProvider services)
