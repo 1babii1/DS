@@ -255,6 +255,80 @@ services:
       './efbundle --connection "Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=rewards,public"'
     ]
 
+  search_service:
+    container_name: search_service
+    restart: always
+    build:
+      context: ./backend
+      dockerfile: SearchService/Dockerfile
+    ports:
+      - "5135:5135"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+      - ASPNETCORE_URLS=http://*:5135
+      - ConnectionStrings__SearchServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=search,public
+      - Elasticsearch__Uri=http://elasticsearch:9200
+      - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
+      - Kafka__SaslUsername=kafka
+      - Kafka__SaslPassword=${KAFKA_PASSWORD:-changeme-kafka}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5135/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      search_service_migrations:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+
+  search_service_migrations:
+    container_name: search_service_migrations
+    restart: "no"
+    build:
+      context: ./backend
+      dockerfile: SearchService/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: [
+      "/bin/sh",
+      "-c",
+      './efbundle --connection "Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=search,public"'
+    ]
+
+  # Single-node dev setup - security disabled the same way Kafka's own SASL/PLAIN setup
+  # is dev-appropriate rather than production-hardened. Only SearchService talks to it.
+  elasticsearch:
+    container_name: elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    restart: always
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.security.http.ssl.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    # Loopback-only, same reasoning as redis/kafka: every consumer reaches this over the
+    # docker network via the "elasticsearch" hostname - published only for local debugging.
+    ports:
+      - "127.0.0.1:9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+
   mcp_server:
     container_name: mcp_server
     restart: always
@@ -398,6 +472,7 @@ services:
       - audit_service
       - rewards_service
       - notification_service
+      - search_service
 
   postgres:
     container_name: postgres
@@ -578,3 +653,4 @@ volumes:
   grafana_data:
   kafka_data:
   ollama_data:
+  elasticsearch_data:

@@ -75,8 +75,11 @@
     <PackageVersion Include="xunit" Version="2.9.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageVersion Include="coverlet.collector" Version="6.0.2" />
-    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.9.0" />
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
+    <PackageVersion Include="Testcontainers.Elasticsearch" Version="4.15.0" />
     <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
     <PackageVersion Include="Respawn" Version="7.0.0" />
+    <!-- Search (SearchService) -->
+    <PackageVersion Include="Elastic.Clients.Elasticsearch" Version="8.15.10" />
   </ItemGroup>
 </Project>
