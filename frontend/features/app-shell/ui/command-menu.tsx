@@ -23,8 +23,15 @@ export function CommandMenu() {
 	const input = useRef<HTMLInputElement>(null)
 	const router = useRouter()
 	const openMenu = useCallback(() => { setQuery(''); setActiveIndex(0); setOpen(true) }, [])
+	const handleOpenChange = useCallback((nextOpen: boolean) => {
+		if (nextOpen) {
+			setQuery('')
+			setActiveIndex(0)
+		}
+		setOpen(nextOpen)
+	}, [])
 	const filtered = commands.filter(command => `${command.label} ${command.description}`.toLowerCase().includes(query.toLowerCase()))
-	const select = useCallback((href: string) => { router.push(href); setOpen(false) }, [router])
+	const select = useCallback((href: string) => { setOpen(false); router.push(href) }, [router])
 
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -42,5 +49,5 @@ export function CommandMenu() {
 		if (event.key === 'Enter' && filtered[activeIndex]) { event.preventDefault(); select(filtered[activeIndex].href) }
 	}
 
-	return <Dialog.Root onOpenChange={setOpen} open={open}><Dialog.Trigger asChild><button aria-label='Open command menu' className='command-trigger' onClick={openMenu} type='button'><Search aria-hidden='true' size={15} /><span>Search workspace</span><kbd><Command size={11} />K</kbd></button></Dialog.Trigger><Dialog.Portal><Dialog.Overlay className='command-overlay' /><Dialog.Content aria-describedby='command-description' className='command-menu'><Dialog.Title className='sr-only'>Command navigation</Dialog.Title><Dialog.Description className='sr-only' id='command-description'>Search and open a workspace section.</Dialog.Description><div className='command-search'><Search aria-hidden='true' size={16} /><input aria-activedescendant={filtered[activeIndex] ? `command-${filtered[activeIndex].href.slice(1) || 'overview'}` : undefined} aria-autocomplete='list' aria-controls='command-results' aria-expanded={open} aria-label='Search workspace commands' onChange={event => { setQuery(event.target.value); setActiveIndex(0) }} onKeyDown={onSearchKeyDown} placeholder='Search workspace…' ref={input} role='combobox' value={query} /></div><div aria-label='Workspace commands' className='command-list' id='command-results' role='listbox'>{filtered.map((command, index) => <button aria-selected={index === activeIndex} data-selected={index === activeIndex} id={`command-${command.href.slice(1) || 'overview'}`} key={command.href} onClick={() => select(command.href)} onMouseEnter={() => setActiveIndex(index)} role='option' type='button'><span><strong>{command.label}</strong><small>{command.description}</small></span><kbd>↵</kbd></button>)}{filtered.length === 0 ? <p>No matching workspace command.</p> : null}</div></Dialog.Content></Dialog.Portal></Dialog.Root>
+	return <Dialog.Root onOpenChange={handleOpenChange} open={open}><Dialog.Trigger asChild><button aria-label='Open command menu' className='command-trigger' type='button'><Search aria-hidden='true' size={15} /><span>Search workspace</span><kbd><Command size={11} />K</kbd></button></Dialog.Trigger><Dialog.Portal><Dialog.Overlay className='command-overlay' /><Dialog.Content aria-describedby='command-description' className='command-menu'><Dialog.Title className='sr-only'>Command navigation</Dialog.Title><Dialog.Description className='sr-only' id='command-description'>Search and open a workspace section.</Dialog.Description><div className='command-search'><Search aria-hidden='true' size={16} /><input aria-activedescendant={filtered[activeIndex] ? `command-${filtered[activeIndex].href.slice(1) || 'overview'}` : undefined} aria-autocomplete='list' aria-controls='command-results' aria-expanded={open} aria-label='Search workspace commands' onChange={event => { setQuery(event.target.value); setActiveIndex(0) }} onKeyDown={onSearchKeyDown} placeholder='Search workspace…' ref={input} role='combobox' value={query} /></div><div aria-label='Workspace commands' className='command-list' id='command-results' role='listbox'>{filtered.map((command, index) => <button aria-selected={index === activeIndex} data-selected={index === activeIndex} id={`command-${command.href.slice(1) || 'overview'}`} key={command.href} onClick={() => select(command.href)} onMouseEnter={() => setActiveIndex(index)} role='option' type='button'><span><strong>{command.label}</strong><small>{command.description}</small></span><kbd>↵</kbd></button>)}{filtered.length === 0 ? <p>No matching workspace command.</p> : null}</div></Dialog.Content></Dialog.Portal></Dialog.Root>
 }
