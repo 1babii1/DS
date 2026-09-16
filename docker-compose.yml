@@ -299,18 +299,44 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://*:5133
+      - ConnectionStrings__NotificationServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=notification,public
+      - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
+      - Kafka__Topics__0=rewards.events
+      - Kafka__Topics__1=auth.events
+      - Kafka__Topics__2=employee.events
       - Kafka__SaslUsername=kafka
       - Kafka__SaslPassword=${KAFKA_PASSWORD:-changeme-kafka}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-    depends_on:
-      kafka:
-        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5133/health/ready || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 15s
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      notification_service_migrations:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_healthy
+
+  notification_service_migrations:
+    container_name: notification_service_migrations
+    restart: "no"
+    build:
+      context: ./backend
+      dockerfile: NotificationService/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: [
+      "/bin/sh",
+      "-c",
+      './efbundle --connection "Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=notification,public"'
+    ]
 
   kafka:
     container_name: kafka
@@ -371,6 +397,7 @@ services:
       - employee_service
       - audit_service
       - rewards_service
+      - notification_service
 
   postgres:
     container_name: postgres

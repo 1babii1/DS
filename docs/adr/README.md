@@ -12,6 +12,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0003](0003-choreography-saga-for-hire-employee.md) | Choreography saga for the Hire Employee → provision account flow |
 | [0004](0004-no-api-gateway-aggregation.md) | No API Gateway aggregation / BFF, for now |
 | [0005](0005-rewards-ledger-design.md) | Rewards ledger design and no cross-service employee validation in v1 |
+| [0006](0006-signalr-notification-center.md) | SignalR for the in-app notification center |
 
 Not yet written up, though each decision is already live in the codebase and explained
 in its own commit messages: gRPC for internal calls, local JWT validation via JWKS,

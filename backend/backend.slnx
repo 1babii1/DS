@@ -34,7 +34,13 @@
   </Folder>
   <Project Path="McpServer/McpServer.IntegrationTests/McpServer.IntegrationTests.csproj" />
   <Project Path="McpServer/McpServer.csproj" />
-  <Project Path="NotificationService/NotificationService.csproj" />
+  <Folder Name="/NotificationService/">
+    <Project Path="NotificationService/NotificationService.ArchitectureTests/NotificationService.ArchitectureTests.csproj" />
+    <Project Path="NotificationService/NotificationService.Domain/NotificationService.Domain.csproj" />
+    <Project Path="NotificationService/NotificationService.Infrastructure.Postgres/NotificationService.Infrastructure.Postgres.csproj" />
+    <Project Path="NotificationService/NotificationService.IntegrationTests/NotificationService.IntegrationTests.csproj" />
+    <Project Path="NotificationService/NotificationService.Web/NotificationService.Web.csproj" />
+  </Folder>
   <Folder Name="/RewardsService/">
     <Project Path="RewardsService/RewardsService.ArchitectureTests/RewardsService.ArchitectureTests.csproj" />
     <Project Path="RewardsService/RewardsService.Domain/RewardsService.Domain.csproj" />
