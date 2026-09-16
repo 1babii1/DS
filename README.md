@@ -236,16 +236,39 @@ docker/                                 # nginx, Postgres init
 frontend/                               # Next.js client (separate concern, own README)
 ```
 
+## The frontend
+
+Next.js (App Router), with authentication done the way a senior would actually want to
+defend it in review, not the fastest way to make a login button work:
+
+- **Auth.js with database-backed sessions**, not a JWT in a cookie — the browser holds only
+  an opaque, `HttpOnly` session id. OAuth access/refresh tokens live server-side in a
+  dedicated Postgres `web_auth` schema and never reach React state, TanStack Query, or
+  `localStorage`.
+- **A same-origin BFF proxy** (`app/api/backend/[...path]/route.ts`) is the *only* way the
+  browser reaches the backend — it attaches the bearer token server-side, rejects
+  cross-origin mutations, and only forwards an explicit allowlist of backend paths, not
+  everything nginx exposes.
+- Departments, Positions, Locations, People (hire/transfer), and an Activity timeline built
+  from `AuditService` are wired up with real create flows, pagination, filtering, and
+  accessible loading/empty/error states — not just read-only lists.
+
 ## Honest status
 
-Backend is functionally complete for everything `docs/adr/` covers, and every feature in
-this README was verified live against the running stack, not just unit-tested. What's
-genuinely unfinished, said plainly rather than glossed over:
+Both halves of this project were verified live against the running stack, not just
+unit-tested — but they were built and merged from two branches that diverged for several
+days, and the newest backend work hasn't caught up to the frontend yet. Said plainly rather
+than glossed over:
 
-- **The frontend has no authentication wired up at all** — no OIDC client, no `/auth/callback`
-  route, no token attached to any request. It currently renders one read-only screen
-  (departments) against a backend that, everywhere else, requires a bearer token it never
-  sends. This is the actual next milestone, not a footnote.
+- **RewardsService, NotificationService, and SearchService have no frontend yet** — not
+  because auth is missing (it isn't), but because the BFF's own allowlist
+  (`app/api/backend/[...path]/route.ts`) doesn't include `/api/rewards`, `/api/notifications`,
+  or `/api/search` yet, and nothing calls them. This is the actual next milestone: three
+  working backends with zero UI surface.
+- `NotificationService`'s live SignalR push has no frontend client at all yet (no
+  `@microsoft/signalr` dependency) — the REST feed would work through the BFF once allowlisted,
+  but the real-time push needs its own connection story (the BFF pattern above is HTTP-shaped,
+  not WebSocket-shaped, and hasn't been extended to cover it).
 - Cross-service search covers five entity kinds; it doesn't yet cover department hierarchy
   path in results, or position/location updates and deletions — both entities only support
   create today, so there's nothing to update or delete yet.
