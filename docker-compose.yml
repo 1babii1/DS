@@ -316,6 +316,13 @@ services:
       xpack.security.enabled: "false"
       xpack.security.http.ssl.enabled: "false"
       ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+      # Dev machines routinely sit above ES's default 85%/90%/95% disk watermarks long
+      # before actually running out of space (build caches, other containers' volumes) -
+      # without this, shard allocation silently refuses and the cluster goes red with no
+      # actionable log line pointing at "disk usage", not "index is broken".
+      cluster.routing.allocation.disk.watermark.low: "95%"
+      cluster.routing.allocation.disk.watermark.high: "97%"
+      cluster.routing.allocation.disk.watermark.flood_stage: "98%"
     # Loopback-only, same reasoning as redis/kafka: every consumer reaches this over the
     # docker network via the "elasticsearch" hostname - published only for local debugging.
     ports:

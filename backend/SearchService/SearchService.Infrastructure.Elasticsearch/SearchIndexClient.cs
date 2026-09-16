@@ -33,14 +33,20 @@ public class SearchIndexClient
 
         var response = await _client.Indices.CreateAsync<SearchDocument>(
             _indexName,
-            c => c.Mappings(m => m.Properties(p => p
-                .Keyword(f => f.Kind)
-                .Keyword(f => f.SourceId)
-                .SearchAsYouType(f => f.Title)
-                .Text(f => f.Subtitle)
-                .Text(f => f.SearchText)
-                .Boolean(f => f.IsActive)
-                .Date(f => f.OccurredAt))),
+            c => c
+                // Single-node dev deployment (docker-compose's elasticsearch service, and
+                // the Testcontainers instance in tests) - a replica can never be assigned
+                // to a second node that doesn't exist, which otherwise leaves the cluster
+                // permanently yellow for no actionable reason.
+                .Settings(s => s.NumberOfReplicas(0))
+                .Mappings(m => m.Properties(p => p
+                    .Keyword(f => f.Kind)
+                    .Keyword(f => f.SourceId)
+                    .SearchAsYouType(f => f.Title)
+                    .Text(f => f.Subtitle)
+                    .Text(f => f.SearchText)
+                    .Boolean(f => f.IsActive)
+                    .Date(f => f.OccurredAt))),
             cancellationToken);
 
         if (!response.IsValidResponse)
