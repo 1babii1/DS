@@ -1,27 +1,155 @@
-# DS — Directory & Employee Platform
+<div align="center">
 
-A small distributed system for managing an organization's structure — departments,
-locations, positions, and the employees assigned to them. Built as a portfolio project
-to work through a specific set of distributed-systems problems end to end, not to be a
-product: transactional outbox and idempotent consumers over Kafka, optimistic
-concurrency, gRPC between services with resilience policies, local JWT validation, and
-a semantic search layer over the same data using local embeddings.
+# dsPortfolio
+
+**A distributed org-management platform, built to work through real distributed-systems
+problems end to end — not to be a product.**
+
+[![🇬🇧 English](https://img.shields.io/badge/🇬🇧-English-blue?style=for-the-badge)](README.md)
+[![🇷🇺 Русский](https://img.shields.io/badge/🇷🇺-Русский-lightgrey?style=for-the-badge)](README.ru.md)
+
+![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
+![Kafka](https://img.shields.io/badge/Kafka-231F20?logo=apachekafka&logoColor=white)
+![Elasticsearch](https://img.shields.io/badge/Elasticsearch-005571?logo=elasticsearch&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
+![OpenIddict](https://img.shields.io/badge/OpenIddict-OIDC-orange)
+![Next.js](https://img.shields.io/badge/Next.js-000000?logo=nextdotjs&logoColor=white)
+
+</div>
+
+---
+
+## What this is
+
+An organization-management platform — departments, positions, locations, employees, an
+internal reward currency, real-time notifications, and cross-entity search — split into
+eight cooperating .NET services behind one gateway. It's a **portfolio project**: every
+piece exists because I wanted to build and defend a specific answer to a real
+distributed-systems problem, not because a product needed it. Where that shows: every
+non-trivial decision has a written ADR explaining *why*, not just *what* — see
+[`docs/adr/`](docs/adr/).
+
+If you're evaluating this as a portfolio, the fastest way in is `docs/adr/` — seven short
+records of the actual trade-offs, written the way I'd defend them in a design review, not
+backfilled to sound tidy.
+
+## Architecture
+
+```mermaid
+flowchart TB
+    Client["Browser / API client"] --> Nginx["nginx — the only way in"]
+
+    Nginx --> Directory["DirectoryService<br/>departments · positions · locations"]
+    Nginx --> Auth["AuthService<br/>OpenIddict OIDC provider"]
+    Nginx --> Employee["EmployeeService<br/>hire · transfer · terminate"]
+    Nginx --> Audit["AuditService<br/>append-only event log"]
+    Nginx --> Rewards["RewardsService<br/>internal currency ledger"]
+    Nginx --> Notification["NotificationService<br/>in-app feed + SignalR push"]
+    Nginx --> Search["SearchService<br/>cross-entity search"]
+    Nginx --> Mcp["McpServer<br/>MCP tools for AI assistants"]
+
+    Employee -. "gRPC (internal only)" .-> Directory
+
+    Directory -- publishes --> Kafka(["Kafka — event backbone"])
+    Employee -- publishes --> Kafka
+    Auth -- publishes --> Kafka
+    Rewards -- publishes --> Kafka
+
+    Kafka -- consumes --> Audit
+    Kafka -- consumes --> Notification
+    Kafka -- consumes --> Search
+    Kafka -- consumes --> Rewards
+    Kafka -- consumes --> Auth
+    Kafka -- consumes --> Employee
+
+    Search --> ES[("Elasticsearch")]
+    Directory --> PG[("Postgres<br/>schema-per-service, pgvector, ltree")]
+    Auth --> PG
+    Employee --> PG
+    Audit --> PG
+    Rewards --> PG
+    Notification --> PG
+    Search --> PG
+    Directory -- embeddings --> Ollama[("Ollama<br/>local, no external API")]
+```
+
+Every arrow into Kafka is a **transactional outbox** — the domain write and the "tell the
+bus" write commit in the same transaction, so there's no gap between "saved" and "the rest
+of the system finds out." Every arrow out of Kafka is an **idempotent, retry-then-dead-letter
+consumer** — the same pattern, copied structurally five times (Audit, Notification, Search,
+Rewards' welcome-bonus consumer, and the hire→provision saga), not five different mechanisms
+to reason about.
 
 ## Services
 
 | Service | Role | Protocols |
 |---|---|---|
-| **DirectoryService** | source of truth for org structure (departments, locations, positions), ltree hierarchy, pgvector semantic search | REST + gRPC server, Kafka producer |
-| **AuthService** | OpenIddict OIDC provider (`authorization_code` + PKCE, `client_credentials`), ASP.NET Identity | REST + OIDC |
-| **EmployeeService** | employee records, hiring, transfers, termination | REST, gRPC client → DirectoryService, Kafka producer |
-| **AuditService** | append-only record of every event published on the bus | Kafka consumer, REST (read-only) |
-| **NotificationService** | independent consumer group proving the event bus is a real fan-out, not wiring built for one reader | Kafka consumer |
+| **DirectoryService** | source of truth for org structure — departments (`ltree` hierarchy), positions, locations — plus pgvector semantic department search | REST + gRPC server, Kafka producer |
+| **AuthService** | OpenIddict OIDC provider (`authorization_code` + PKCE, `client_credentials`), ASP.NET Identity, account provisioning | REST + OIDC, Kafka producer + consumer |
+| **EmployeeService** | employee records — hire, transfer, terminate — participant in the hire→provision-account saga | REST, gRPC client → DirectoryService, Kafka producer + consumer |
+| **AuditService** | append-only record of every event on the bus, with a dead-letter table for what couldn't be processed | Kafka consumer, REST (read-only) |
+| **RewardsService** | an internal currency ledger — manual grants and an automatic welcome bonus on hire | REST, Kafka producer + consumer |
+| **NotificationService** | a real in-app notification center — persisted feed, unread counts, and a live SignalR push, not a log line | REST + SignalR, Kafka consumer |
+| **SearchService** | cross-entity search (employees, departments, positions, locations, audit history) over an Elasticsearch index materialized from the same event stream | REST, Kafka consumer |
 | **McpServer** | read-only [MCP](https://modelcontextprotocol.io) tools (semantic search, org tree, employee lookup) for AI assistants | Streamable HTTP, JWT-authenticated |
 
-All REST traffic goes through nginx at `/`; gRPC between DirectoryService and
-EmployeeService is internal-only, never exposed to the host. See
-[`docs/adr/`](docs/adr/) for why each of these decisions was made, not just what they
-are.
+All REST traffic goes through nginx at `/`; gRPC between EmployeeService and
+DirectoryService is internal-only, never exposed to the host.
+
+## Decisions worth reading about
+
+Picked because each one has a real trade-off behind it, not because it was the only option:
+
+- **[Materialize, don't fan out](docs/adr/0007-elasticsearch-cross-service-search.md).**
+  Cross-service search could have queried five services live on every keystroke. Instead
+  `SearchService` consumes the same Kafka events every other consumer does and builds its
+  own Elasticsearch index — the search box never waits on five services being up at once,
+  and it can't leak a result from a service whose data it was never allowed to see either
+  (it only knows what it was told).
+- **[Choreography over orchestration](docs/adr/0003-choreography-saga-for-hire-employee.md)**
+  for hiring an employee → provisioning their login account. No new orchestrator process or
+  state store — two more Kafka consumers, in the same shape every other consumer in this
+  codebase already uses. A failed provisioning attempt is visible on the employee record
+  (`ProvisioningFailed`, with a reason), not a silently stuck row.
+- **[No API gateway aggregation — until there was evidence for one](docs/adr/0004-no-api-gateway-aggregation.md).**
+  Built nginx as a plain reverse proxy on purpose, and said so in writing: *"a decision to
+  revisit given evidence, not a permanent stance."* Five services and two rebuilt ones
+  later, the evidence showed up (cross-service search), and that ADR is exactly what got
+  revisited — not a new plan invented from scratch.
+- **[SignalR over polling](docs/adr/0006-signalr-notification-center.md)** for real-time
+  notifications, with a deliberate twist: the JWT rides in on the WebSocket URL's query
+  string (`?access_token=`), because a browser's WebSocket API can't set an `Authorization`
+  header on the upgrade handshake — a documented ASP.NET Core pattern, not a workaround, and
+  the ADR says so explicitly rather than leaving it looking like one.
+- **[Elasticsearch alongside pgvector — on purpose, not redundantly](docs/adr/0007-elasticsearch-cross-service-search.md).**
+  This project already had a semantic search tool for AI assistants (embeddings, cosine
+  similarity, meant for a natural-language query). Elasticsearch's `search_as_you_type`
+  answers a different question — "what matches these keystrokes, ranked exact → prefix →
+  substring" — for a human typing into a search box. Neither replaces the other; the ADR
+  explains why they coexist instead of picking one.
+
+## What each service does with concurrency and failure
+
+Deliberately designed for, not discovered as bugs after the fact:
+
+- **Transactional outbox** in every producer — no dual-write gap between "saved" and "the
+  rest of the system finds out."
+- **Idempotent consumers**, five separate copies of the same shape: dedupe by the message's
+  own id (a unique Postgres index, or — for `SearchService` — Elasticsearch's own
+  upsert-by-deterministic-id semantics, documented as the one deliberate exception to the
+  pattern).
+- **Retry, then dead-letter, then stall**: three attempts, then a `dead_letters` row instead
+  of a silently dropped message. If even *that* write fails, the consumer stalls on the
+  exact offset and keeps retrying rather than skipping a record it never saved.
+- **Optimistic concurrency** on `Employee` via Postgres's own `xmin` — two concurrent
+  transfers of the same employee produce one success and one `409`, never a silent lost
+  update.
+- **gRPC resilience**: EmployeeService's calls to DirectoryService carry retry, a circuit
+  breaker, and a timeout — a DirectoryService blip doesn't fail every hire outright, and a
+  real outage surfaces as `503`, not an opaque `500`.
+- **Rate limiting** on `/auth/login`, `/auth/register`, semantic search, and every write
+  endpoint — partitioned per client IP, not a shared global bucket.
 
 ## Running it
 
@@ -29,62 +157,44 @@ are.
 docker compose up -d
 ```
 
-Brings up Postgres (with `ltree` and `pgvector`), Kafka (KRaft, no Zookeeper), Redis,
-Ollama (pulls `nomic-embed-text` on first start), Seq, nginx, and all six services.
-Migrations run in dedicated, gated containers before the service that needs them starts
-— not inline at every boot, which would fight itself under `restart: always` if a
-migration ever failed partway. Health checks (`/health/live`, `/health/ready`) gate
-`docker compose`'s own view of readiness for every web service.
+Brings up Postgres (`ltree` + `pgvector`), Kafka (KRaft, no Zookeeper), Redis, Elasticsearch,
+Ollama (pulls `nomic-embed-text` on first start), Mailpit, an OTel collector, nginx, and all
+eight services. Migrations run in dedicated, gated containers before the service that needs
+them starts — not inline at every boot, which would fight itself under `restart: always` if
+a migration ever failed partway. Health checks gate `docker compose`'s own view of readiness
+for every service.
 
 ```bash
-curl http://localhost/api/departments/roots        # 401 without a token — everything behind nginx requires one
+curl http://localhost/api/departments/roots   # 401 without a token — everything behind nginx requires one
 ```
 
-`.env.example` documents the one thing worth overriding for a non-default local setup
-(`POSTGRES_PASSWORD`); copy it to `.env` if you need to change it.
+`.env.example` documents what's worth overriding locally; copy it to `.env` if you need to.
+An optional observability stack (Tempo/Loki/Prometheus/Grafana) is behind a compose profile:
+
+```bash
+docker compose --profile obs up -d
+```
 
 | Exposed on localhost | What |
 |---|---|
-| `:80` | nginx — every REST/OIDC endpoint and `/mcp` |
-| `:5434` | Postgres (`platform` database, schema-per-service) |
-| `:9092` | Kafka |
+| `:80` | nginx — every REST/OIDC endpoint, `/hub/notifications`, and `/mcp` |
+| `:5434` | Postgres (`platform` database, one schema per service) |
+| `:9200` | Elasticsearch (loopback-only, dev-only security posture) |
+| `:9092` | Kafka (loopback-only, for local CLI/GUI inspection) |
 | `:11434` | Ollama |
-| `:8081`, `:5341` | Seq UI / ingestion |
+| `:8025` | Mailpit — catches every email AuthService sends locally |
 
-Internal-only (never published to the host): DirectoryService's gRPC port, Redis, and
-every service's own HTTP port — nginx is the only way in.
+Internal-only (never published to the host): DirectoryService's gRPC port, Redis, and every
+service's own HTTP port — nginx is the only way in.
 
 ## Tech stack
 
 .NET 10 / ASP.NET Core, EF Core 10 + Npgsql, Dapper for read-heavy catalogue queries,
 [CSharpFunctionalExtensions](https://github.com/vkhorikov/CSharpFunctionalExtensions)
 (`Result<T, Error>` end to end, no exceptions for expected failure), FluentValidation,
-Serilog → Seq, OpenIddict, Confluent.Kafka, HybridCache over Redis, Testcontainers +
-Respawn for integration tests, k6 for load tests.
-
-## What each service does with concurrency and failure
-
-Not an exhaustive list — the point is these were deliberately designed for, not
-discovered as bugs after the fact:
-
-- **Transactional outbox** in every producer: the domain write and the outbox row
-  commit in one transaction, a background publisher drains it to Kafka. No dual-write
-  gap between "saved to the database" and "the rest of the system finds out."
-- **Idempotent consumers**: AuditService dedupes by the outbox message's own id via a
-  unique index, so at-least-once Kafka delivery can't double-record an event.
-- **Retry, then dead-letter, then stall**: a message AuditService can't process gets
-  three attempts, then goes to a `dead_letters` table (readable at
-  `GET /api/audit/dead-letters`) rather than being silently dropped. If even that write
-  fails — the database itself being down — the consumer stalls on that exact offset and
-  retries every few seconds instead of skipping past a record it never saved.
-- **Optimistic concurrency** on Employee via Postgres's own `xmin`: two concurrent
-  transfers of the same employee produce one success and one `409 Conflict`, never a
-  silent lost update.
-- **gRPC resilience**: EmployeeService's calls to DirectoryService carry retry,
-  a circuit breaker, and a timeout — a DirectoryService blip doesn't fail every hire
-  outright, and a real outage surfaces as `503`, not an opaque `500`.
-- **Rate limiting** on `/auth/login`, `/auth/register`, and semantic search — partitioned
-  per client IP, not a shared global bucket.
+Serilog → OpenTelemetry, OpenIddict, Confluent.Kafka, the official `Elastic.Clients.Elasticsearch`
+client, SignalR, HybridCache over Redis, Testcontainers + Respawn for integration tests, k6
+for load tests. Frontend: Next.js (App Router) + React + TanStack Query + shadcn/ui.
 
 ## Testing
 
@@ -92,17 +202,16 @@ discovered as bugs after the fact:
 dotnet test backend/backend.slnx
 ```
 
-39 tests across five integration test projects (DirectoryService, EmployeeService,
-AuditService, AuthService, McpServer), each spinning up its own Postgres via
-Testcontainers rather than sharing state or mocking the database. What they cover is
-deliberately not "everything" — see each project's own tests for what's in scope and
-why; a few things (a live database going down mid-request, for instance) are exercised
-by hand against the real stack instead of automated, and that's noted where it applies
-rather than left implicit.
+107 tests across architecture-boundary suites (NetArchTest — domain layers can't depend on
+infrastructure) and integration suites, each spinning up its own Postgres — and, for
+`SearchService`, its own Elasticsearch — via Testcontainers rather than sharing state or
+mocking the database. What's covered is deliberately not "everything"; a few things (a live
+database going down mid-request, for instance) are exercised by hand against the real stack
+instead of automated, and that's noted where it applies rather than left implicit.
 
 CI (`.github/workflows/ci.yml`) builds and runs the full suite on every push and pull
-request, plus a separate job that builds every service's Docker image without pushing
-it, to catch a broken Dockerfile before `docker compose up` does.
+request, plus a separate job that builds every service's Docker image without pushing it, to
+catch a broken Dockerfile before `docker compose up` does.
 
 ```bash
 cd load-tests/k6
@@ -114,21 +223,34 @@ docker run --rm --network host -v "$(pwd)":/scripts -w /scripts grafana/k6 run m
 ```
 backend/
   {Service}/
-    {Service}.Domain             # entities, value objects, invariants — no framework dependencies
-    {Service}.Application        # handlers, validation, Result<T, Error>
-    {Service}.Infrastructure.*   # EF Core, Dapper, gRPC clients, Kafka
-    {Service}.Web                # controllers, Program.cs, DI wiring
-    {Service}.IntegrationTests   # Testcontainers + WebApplicationFactory
-  Shared/                        # Envelope, Error, outbox, health checks, CORS — nothing service-specific
-docs/adr/                        # architecture decisions, written from why, not backfilled generically
-load-tests/k6/                   # load test scenarios
-docker/                          # nginx, Postgres init
-frontend/                        # Next.js client (separate concern, own README)
+    {Service}.Domain                    # entities, value objects, invariants — no framework dependencies
+    {Service}.Application                 # handlers, validation, Result<T, Error>          (some services)
+    {Service}.Infrastructure.{Postgres,*}  # EF Core, Dapper, gRPC clients, Elasticsearch, Kafka
+    {Service}.Web                       # controllers, Program.cs, DI wiring
+    {Service}.ArchitectureTests         # layer-boundary rules (NetArchTest)
+    {Service}.IntegrationTests          # Testcontainers + WebApplicationFactory
+  Shared/                               # Envelope, Error, outbox, health checks, CORS — nothing service-specific
+docs/adr/                               # architecture decisions, written from why, not backfilled generically
+load-tests/k6/                          # load test scenarios
+docker/                                 # nginx, Postgres init
+frontend/                               # Next.js client (separate concern, own README)
 ```
 
-## Status
+## Honest status
 
-Backend is functionally complete for its current scope and load-tested. `docs/adr/`
-covers the two decisions written up so far (schema-per-service, transactional outbox);
-the rest of the architecture's reasoning currently lives in commit messages rather than
-in a document — worth finishing, not yet done.
+Backend is functionally complete for everything `docs/adr/` covers, and every feature in
+this README was verified live against the running stack, not just unit-tested. What's
+genuinely unfinished, said plainly rather than glossed over:
+
+- **The frontend has no authentication wired up at all** — no OIDC client, no `/auth/callback`
+  route, no token attached to any request. It currently renders one read-only screen
+  (departments) against a backend that, everywhere else, requires a bearer token it never
+  sends. This is the actual next milestone, not a footnote.
+- Cross-service search covers five entity kinds; it doesn't yet cover department hierarchy
+  path in results, or position/location updates and deletions — both entities only support
+  create today, so there's nothing to update or delete yet.
+- The observability stack (Tempo/Loki/Prometheus/Grafana) is wired and working but optional
+  by design (`--profile obs`) — traces and metrics exist, dashboards are minimal.
+
+I'd rather a portfolio README say "here's what's actually missing and why" than read like
+marketing copy for a project nobody's going to production with.
