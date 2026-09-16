@@ -1,5 +1,6 @@
 ﻿using CSharpFunctionalExtensions;
 using DirectoryService.Application.Database;
+using DirectoryService.Application.IntegrationEvents;
 using DirectoryService.Application.Validation;
 using DirectoryService.Contracts.Request.Location;
 using DirectoryService.Domain.DepartmentLocations;
@@ -16,13 +17,18 @@ public class CreateLocationHandle
 {
     private readonly ILocationsRepository _locationsRepository;
     private readonly CreateLocationValidation _validator;
+    private readonly IOutboxWriter _outboxWriter;
     private readonly ILogger<CreateLocationHandle> _logger;
 
-    public CreateLocationHandle(ILocationsRepository locationsRepository, CreateLocationValidation validator,
+    public CreateLocationHandle(
+        ILocationsRepository locationsRepository,
+        CreateLocationValidation validator,
+        IOutboxWriter outboxWriter,
         ILogger<CreateLocationHandle> logger)
     {
         _locationsRepository = locationsRepository;
         _validator = validator;
+        _outboxWriter = outboxWriter;
         _logger = logger;
     }
 
@@ -51,6 +57,20 @@ public class CreateLocationHandle
 
         Locations locations = new Locations(locationId, locationName, locationTimezone, locationAddress,
             new List<DepartmentLocation>());
+
+        // Enqueue before Add(): IOutboxWriter only stages the message on the same scoped
+        // DbContext, and Add() is what actually calls SaveChangesAsync - so this lands
+        // both writes in that one commit without changing the repository's contract.
+        _outboxWriter.Enqueue(
+            LocationEventTypes.Created,
+            locationId.Value.ToString(),
+            new LocationCreatedEvent(
+                locationId.Value,
+                locationName.Value,
+                locationAddress.Street,
+                locationAddress.City,
+                locationAddress.Country,
+                locationTimezone.Value));
 
         var result = await _locationsRepository.Add(locations, cancellationToken);
         if (result.IsFailure)
