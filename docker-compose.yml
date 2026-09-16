@@ -48,7 +48,7 @@ services:
       - ASPNETCORE_URLS=http://*:5130
       - Auth__WebClient__Enabled
       - Auth__WebClient__FrontendOrigin
-      - Auth__WebClient__ClientSecret
+      - Auth__WebClient__ClientSecret=${AUTH_OIDC_CLIENT_SECRET:?AUTH_OIDC_CLIENT_SECRET must be set}
     depends_on:
       postgres:
         condition: service_healthy
