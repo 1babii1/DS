@@ -76,9 +76,9 @@ services:
       - Email__FromAddress=${EMAIL_FROM_ADDRESS:-no-reply@portfolio.local}
       - Kafka__SaslUsername=kafka
       - Kafka__SaslPassword=${KAFKA_PASSWORD:-changeme-kafka}
-      - Auth__WebClient__Enabled=${AUTH_WEB_CLIENT_ENABLED:-false}
+      - Auth__WebClient__Enabled=true
       - Auth__WebClient__FrontendOrigin=${AUTH_WEB_CLIENT_FRONTEND_ORIGIN:-http://localhost:3000}
-      - Auth__WebClient__ClientSecret=${AUTH_WEB_CLIENT_SECRET:-}
+      - Auth__WebClient__ClientSecret=${AUTH_OIDC_CLIENT_SECRET:?AUTH_OIDC_CLIENT_SECRET must be set}
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5130/health/ready || exit 1"]
       interval: 10s

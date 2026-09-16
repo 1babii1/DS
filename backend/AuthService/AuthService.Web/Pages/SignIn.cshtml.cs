@@ -28,31 +28,17 @@ public class SignInModel(SignInManager<Account> signInManager) : PageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        if (!IsAuthorizationReturnUrl())
-        {
-            return BadRequest();
-        }
-
-        if (!ModelState.IsValid)
-        {
-            return Page();
-        }
+        if (!IsAuthorizationReturnUrl()) return BadRequest();
+        if (!ModelState.IsValid) return Page();
 
         var result = await signInManager.PasswordSignInAsync(Email, Password, isPersistent: false, lockoutOnFailure: true);
         Password = string.Empty;
         ModelState.Remove(nameof(Password));
-
-        if (result.Succeeded)
-        {
-            return LocalRedirect(ReturnUrl);
-        }
-
+        if (result.Succeeded) return LocalRedirect(ReturnUrl);
         ModelState.AddModelError(string.Empty, "We couldn't sign you in. Check your details or try again later.");
         return Page();
     }
 
-    // Only ever redirects back into the OIDC authorization flow that sent the
-    // browser here in the first place - not an open redirect to an arbitrary path.
     private bool IsAuthorizationReturnUrl() => Url.IsLocalUrl(ReturnUrl)
         && ReturnUrl.Split('?')[0].Equals("/connect/authorize", StringComparison.Ordinal);
 }

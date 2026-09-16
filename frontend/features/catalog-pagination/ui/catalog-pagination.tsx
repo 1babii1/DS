@@ -1,0 +1,4 @@
+'use client'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+export function CatalogPagination({hasNext,page,total}:{hasNext:boolean;page:number;total:number}){const r=useRouter();const path=usePathname();const p=useSearchParams();const go=(n:number)=>{const q=new URLSearchParams(p);q.set('page',String(n));r.replace(`${path}?${q.toString()}`)};return <nav aria-label='Catalogue pages' className='catalog-pagination'><span>{total} results</span><button disabled={page<=1} onClick={()=>go(page-1)} type='button'><ChevronLeft aria-hidden='true' size={16}/>Previous</button><span>Page {page}</span><button disabled={!hasNext} onClick={()=>go(page+1)} type='button'>Next<ChevronRight aria-hidden='true' size={16}/></button></nav>}

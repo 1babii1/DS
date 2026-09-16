@@ -1,7 +1,10 @@
 @page "/auth/sign-in"
 @model AuthService.Web.Pages.SignInModel
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
-@{ Layout = null; }
+@{
+    Layout = null;
+    var passwordInput = new AuthService.Web.Pages.Shared.PasswordInputModel("current-password", "password-error", "Password", "Password", "Password");
+}
 <!doctype html>
 <html lang="en">
 <head>
@@ -21,6 +24,12 @@
         input { background: #1c2520; color: #f0f4f1; border: 1px solid #53685b; margin-bottom: .5rem; }
         input:focus-visible, button:focus-visible { outline: 3px solid #a8d7b8; outline-offset: 3px; }
         button { border: 0; background: #a8d7b8; color: #131a17; font-weight: 600; cursor: pointer; margin-top: .75rem; }
+        .password-field { position: relative; margin-bottom: .5rem; }
+        .password-field input { display: block; margin-bottom: 0; padding-right: 3.5rem; }
+        .password-toggle { position: absolute; top: 0; right: 0; width: 3.25rem; height: 100%; margin: 0; padding: 0; border: 0; background: transparent; color: #a8d7b8; }
+        .password-toggle__icon { position: relative; display: block; width: 1.15rem; height: .72rem; margin: auto; border: 2px solid currentColor; border-radius: 50%; }
+        .password-toggle__icon::after { content: ""; position: absolute; top: 50%; left: 50%; width: .28rem; height: .28rem; transform: translate(-50%, -50%); border-radius: 50%; background: currentColor; }
+        .password-toggle[data-visible="true"] .password-toggle__icon::before { content: ""; position: absolute; top: 50%; left: 50%; width: 1.4rem; height: 2px; transform: translate(-50%, -50%) rotate(-45deg); background: #a8d7b8; }
         .validation-summary-errors, .field-validation-error { color: #ffb5b5; }
         .validation-summary-valid { display: none; }
     </style>
@@ -36,11 +45,24 @@
         <label asp-for="Email">Work email</label>
         <input asp-for="Email" autocomplete="username" required aria-describedby="email-error" />
         <span asp-validation-for="Email" id="email-error"></span>
-        <label asp-for="Password">Password</label>
-        <input asp-for="Password" autocomplete="current-password" required aria-describedby="password-error" />
+        <partial name="Shared/_PasswordInput" model="passwordInput" />
         <span asp-validation-for="Password" id="password-error"></span>
         <button type="submit">Sign in</button>
+        <p class="auth-switch">New here? <a href="/auth/sign-up?ReturnUrl=@Uri.EscapeDataString(Model.ReturnUrl ?? "/")">Create a viewer account</a></p>
     </form>
 </main>
+<script>
+    document.querySelectorAll("[data-password-toggle]").forEach((passwordToggle) => {
+        const passwordInput = document.getElementById(passwordToggle.dataset.target);
+
+        passwordToggle.addEventListener("click", () => {
+            const visible = passwordInput.type === "text";
+            passwordInput.type = visible ? "password" : "text";
+            passwordToggle.dataset.visible = String(!visible);
+            passwordToggle.setAttribute("aria-pressed", String(!visible));
+            passwordToggle.setAttribute("aria-label", visible ? "Show password" : "Hide password");
+        });
+    });
+</script>
 </body>
 </html>
