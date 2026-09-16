@@ -253,7 +253,7 @@ public class EmployeeEventsConsumer(
             outboxWriter.Enqueue(
                 AuthEventTypes.AccountProvisioningFailed,
                 hired.EmployeeId.ToString(),
-                new AccountProvisioningFailedEvent(hired.EmployeeId, reason));
+                new AccountProvisioningFailedEvent(hired.EmployeeId, reason, hired.HiredByAccountId));
             dbContext.SaveChanges();
             logger.LogWarning(
                 "Account provisioning failed for employee {EmployeeId}: {Reason}", hired.EmployeeId, reason);

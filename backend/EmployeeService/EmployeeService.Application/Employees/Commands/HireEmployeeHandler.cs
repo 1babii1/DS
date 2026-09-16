@@ -67,7 +67,8 @@ public class HireEmployeeHandler(
             command.DepartmentId,
             validation.DepartmentName,
             command.PositionId,
-            validation.PositionName);
+            validation.PositionName,
+            command.HiredByAccountId);
 
         if (employeeResult.IsFailure)
         {
@@ -80,7 +81,13 @@ public class HireEmployeeHandler(
         outboxWriter.Enqueue(
             EmployeeEventTypes.Hired,
             employee.Id.ToString(),
-            new EmployeeHiredEvent(employee.Id, employee.FullName, employee.Email, employee.DepartmentId, employee.PositionId));
+            new EmployeeHiredEvent(
+                employee.Id,
+                employee.FullName,
+                employee.Email,
+                employee.DepartmentId,
+                employee.PositionId,
+                employee.HiredByAccountId));
 
         var saveResult = await repository.Save(cancellationToken);
         if (saveResult.IsFailure)

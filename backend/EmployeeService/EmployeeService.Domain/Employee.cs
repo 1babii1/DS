@@ -28,6 +28,12 @@ public class Employee
     // duplicate email), surfaced to whoever needs to retry the hire.
     public string? ProvisioningFailureReason { get; private set; }
 
+    // Null for employees hired before actor tracking existed - genuinely
+    // unknown, not an oversight, so nullable rather than backfilled. Lets
+    // AccountProvisioningFailed notify whoever did the hiring; a null here
+    // just means that notification is skipped, not an error.
+    public Guid? HiredByAccountId { get; private set; }
+
     public DateTime HiredAt { get; private set; }
 
     public DateTime CreatedAt { get; private set; }
@@ -44,7 +50,8 @@ public class Employee
         Guid departmentId,
         string departmentName,
         Guid positionId,
-        string positionName)
+        string positionName,
+        Guid? hiredByAccountId = null)
     {
         if (string.IsNullOrWhiteSpace(fullName))
         {
@@ -68,6 +75,7 @@ public class Employee
             PositionId = positionId,
             PositionName = positionName,
             Status = EmployeeStatus.PendingProvisioning,
+            HiredByAccountId = hiredByAccountId,
             HiredAt = now,
             CreatedAt = now,
             UpdatedAt = now,

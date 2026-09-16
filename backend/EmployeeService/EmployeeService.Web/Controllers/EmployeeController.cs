@@ -1,4 +1,5 @@
-﻿using EmployeeService.Application.Employees.Commands;
+﻿using System.Security.Claims;
+using EmployeeService.Application.Employees.Commands;
 using EmployeeService.Application.Employees.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,8 +20,16 @@ public class EmployeeController : ControllerBase
     public async Task<EndpointResult<Guid>> Hire(
         [FromServices] HireEmployeeHandler handler,
         HireEmployeeCommand command,
-        CancellationToken cancellationToken) =>
-        await handler.Handle(command, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        // Always the caller's own identity, never whatever the request body
+        // happened to carry - HiredByAccountId only exists to answer "who did
+        // this" later (e.g. notifying them if account provisioning fails), not
+        // as client-supplied data.
+        var hiredBy = Guid.Parse(User.FindFirstValue("sub")!);
+        command = command with { HiredByAccountId = hiredBy };
+        return await handler.Handle(command, cancellationToken);
+    }
 
     [HttpPut("{employeeId:guid}/transfer")]
     [Authorize(Policy = "CanEdit")]
