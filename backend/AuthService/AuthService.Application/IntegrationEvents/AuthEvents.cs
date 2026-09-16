@@ -8,4 +8,4 @@ public static class AuthEventTypes
 
 public record AccountProvisionedEvent(Guid EmployeeId, Guid AccountId);
 
-public record AccountProvisioningFailedEvent(Guid EmployeeId, string Reason);
+public record AccountProvisioningFailedEvent(Guid EmployeeId, string Reason, Guid? HiredByAccountId = null);

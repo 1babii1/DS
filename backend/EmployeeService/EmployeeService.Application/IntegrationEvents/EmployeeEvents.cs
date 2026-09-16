@@ -7,7 +7,13 @@ public static class EmployeeEventTypes
     public const string Terminated = "EmployeeTerminated";
 }
 
-public record EmployeeHiredEvent(Guid EmployeeId, string FullName, string Email, Guid DepartmentId, Guid PositionId);
+public record EmployeeHiredEvent(
+    Guid EmployeeId,
+    string FullName,
+    string Email,
+    Guid DepartmentId,
+    Guid PositionId,
+    Guid? HiredByAccountId = null);
 
 public record EmployeeTransferredEvent(Guid EmployeeId, Guid DepartmentId, Guid PositionId);
 
