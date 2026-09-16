@@ -1,6 +1,7 @@
 ﻿using CSharpFunctionalExtensions;
 using DirectoryService.Application.Database;
 using DirectoryService.Application.Department;
+using DirectoryService.Application.IntegrationEvents;
 using DirectoryService.Application.Position.Errors;
 using DirectoryService.Application.Validation;
 using DirectoryService.Contracts.Request.Position;
@@ -38,15 +39,18 @@ public class CreatePositionHandle
     private readonly IPositionRepository _positionRepository;
     private readonly IDepartmentRepository _departmentRepository;
     private readonly CreatePositionValidation _validator;
+    private readonly IOutboxWriter _outboxWriter;
     private readonly ILogger<CreatePositionHandle> _logger;
 
     public CreatePositionHandle(
         IPositionRepository positionRepository,
         CreatePositionValidation validator,
+        IOutboxWriter outboxWriter,
         ILogger<CreatePositionHandle> logger, IDepartmentRepository departmentRepository)
     {
         _positionRepository = positionRepository;
         _validator = validator;
+        _outboxWriter = outboxWriter;
         _logger = logger;
         _departmentRepository = departmentRepository;
     }
@@ -103,6 +107,18 @@ public class CreatePositionHandle
 
         Domain.Positions.Position position = new(positionId, positionName, departmentPositions,
             positionDescription);
+
+        // Enqueue before Add(): IOutboxWriter only stages the message on the same scoped
+        // DbContext, and Add() is what actually calls SaveChangesAsync - so this lands
+        // both writes in that one commit without changing the repository's contract.
+        _outboxWriter.Enqueue(
+            PositionEventTypes.Created,
+            positionId.Value.ToString(),
+            new PositionCreatedEvent(
+                positionId.Value,
+                positionName.Value,
+                positionDescription?.Value,
+                request.DepartmentIds.Select(id => id.Value).ToArray()));
 
         var result = await _positionRepository.Add(position, cancellationToken);
         if (result.IsFailure)
