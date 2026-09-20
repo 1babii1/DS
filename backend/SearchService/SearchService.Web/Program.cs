@@ -8,6 +8,7 @@ using Shared.HealthChecks;
 using Shared.Middlewares;
 using Shared.Observability;
 using Shared.Outbox;
+using Shared.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,18 +28,7 @@ builder.Services.AddOpenApi();
 
 builder.Services.AddFrameworkCors(builder.Configuration);
 
-builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.MapInboundClaims = false;
-        options.MetadataAddress = builder.Configuration["Auth:MetadataAddress"];
-        options.RequireHttpsMetadata = builder.Environment.IsProduction();
-        options.TokenValidationParameters.ValidIssuer = builder.Configuration["Auth:Issuer"];
-        options.TokenValidationParameters.ValidAudience = builder.Configuration["Auth:Audience"];
-        options.TokenValidationParameters.RoleClaimType = "role";
-        options.TokenValidationParameters.NameClaimType = "name";
-    });
+builder.Services.AddPlatformJwtAuthentication(builder.Configuration, builder.Environment);
 
 builder.Services.AddAuthorization();
 

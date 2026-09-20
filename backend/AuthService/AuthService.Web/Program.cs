@@ -84,6 +84,10 @@ builder.Services.AddKafkaHealthCheck(kafkaBootstrapServers, kafkaSecurity);
 var authRateLimit = builder.Configuration.GetValue("RateLimiting:Auth:PermitLimit", 5);
 var authRateLimitWindow = builder.Configuration.GetValue("RateLimiting:Auth:WindowSeconds", 60);
 
+// Must be configured for the rate limiter below to see the real client IP
+// instead of nginx's - see ForwardedHeadersExtensions for why that matters.
+builder.Services.AddProxyForwardedHeaders(builder.Configuration);
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -99,6 +103,8 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+
+app.UseProxyForwardedHeaders();
 
 app.UseRequestCorrelationId();
 app.UseExceptionMiddleware();

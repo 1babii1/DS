@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using Shared.Observability;
+using Shared.Security;
 
 Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
 
@@ -32,18 +33,7 @@ builder.Services.AddHttpClient<OllamaEmbeddingClient>((sp, client) =>
 // сотрудников, в обход правил доступа, которые эти сервисы проверяют у себя.
 // Поэтому те же токены и тот же JWKS, что и везде: без аутентификации этот
 // endpoint был самым коротким путём к персональным данным во всей системе.
-builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.MapInboundClaims = false;
-        options.MetadataAddress = builder.Configuration["Auth:MetadataAddress"];
-        options.RequireHttpsMetadata = builder.Environment.IsProduction();
-        options.TokenValidationParameters.ValidIssuer = builder.Configuration["Auth:Issuer"];
-        options.TokenValidationParameters.ValidAudience = builder.Configuration["Auth:Audience"];
-        options.TokenValidationParameters.RoleClaimType = "role";
-        options.TokenValidationParameters.NameClaimType = "name";
-    });
+builder.Services.AddPlatformJwtAuthentication(builder.Configuration, builder.Environment);
 
 builder.Services.AddAuthorization();
 
