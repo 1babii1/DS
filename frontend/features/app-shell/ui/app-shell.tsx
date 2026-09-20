@@ -17,6 +17,7 @@ import { usePathname } from 'next/navigation'
 import type { ComponentType, ReactNode } from 'react'
 
 import { NotificationBell } from '@/features/notifications/ui/notification-bell'
+import { WalletBalance } from '@/features/rewards/ui/wallet-balance'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/shared/ui/sheet'
 
 import { CommandMenu } from './command-menu'
@@ -131,7 +132,8 @@ export function AppShell({ accountControl, authenticated, children }: { accountC
 					<p className='app-topbar__context'>People operations workspace</p>
 					<div className='app-topbar__actions'>
 						<span className='environment-badge'><span aria-hidden='true' />Local environment</span>
-						<CommandMenu />
+				<CommandMenu />
+				<WalletBalance enabled={authenticated} />
 						<NotificationBell enabled={authenticated} />
 						{accountControl}
 						<ThemeToggle />
