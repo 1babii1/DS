@@ -86,6 +86,7 @@ public class EmployeeEventsConsumerTests : IClassFixture<AuthTestWebFactory>, IA
         var outboxCount = await ExecuteInDb(db => db.Set<Shared.Outbox.OutboxMessage>()
             .CountAsync(m => m.Type == "AccountProvisioningFailed" && m.AggregateId == employeeId.ToString()));
         Assert.Equal(1, outboxCount);
+
         // Nothing was provisioned, so nothing should have been emailed for this hire.
         Assert.DoesNotContain(_factory.EmailSender.Sent, s => s.ToEmail == existingEmail);
     }

@@ -31,19 +31,23 @@ public class SearchIndexClient
             return;
         }
 
+        // NumberOfReplicas(0): single-node dev deployment (docker-compose's elasticsearch
+        // service, and the Testcontainers instance in tests) - a replica can never be
+        // assigned to a second node that doesn't exist, which otherwise leaves the cluster
+        // permanently yellow for no actionable reason.
         var response = await _client.Indices.CreateAsync<SearchDocument>(
             _indexName,
             c => c
-                // Single-node dev deployment (docker-compose's elasticsearch service, and
-                // the Testcontainers instance in tests) - a replica can never be assigned
-                // to a second node that doesn't exist, which otherwise leaves the cluster
-                // permanently yellow for no actionable reason.
                 .Settings(s => s.NumberOfReplicas(0))
                 .Mappings(m => m.Properties(p => p
                     .Keyword(f => f.Kind)
                     .Keyword(f => f.SourceId)
                     .SearchAsYouType(f => f.Title)
-                    .Text(f => f.Subtitle)
+
+                    // Subtitle is the one nullable field in the document. This selector is
+                    // never invoked - the client reads it as an expression tree purely to
+                    // resolve the field's name - so the annotation is the only mismatch.
+                    .Text(f => f.Subtitle!)
                     .Text(f => f.SearchText)
                     .Boolean(f => f.IsActive)
                     .Date(f => f.OccurredAt))),
@@ -51,6 +55,16 @@ public class SearchIndexClient
 
         if (!response.IsValidResponse)
         {
+            // Two instances can both pass the exists-check above and race to create the
+            // index (e.g. a rolling deploy briefly running two replicas) - re-check rather
+            // than fail the loser, since "someone else already created it" is success, not
+            // an error, for an operation whose whole point is "ensure this exists".
+            var recheck = await _client.Indices.ExistsAsync(_indexName, cancellationToken);
+            if (recheck.Exists)
+            {
+                return;
+            }
+
             throw new InvalidOperationException($"Elasticsearch index creation failed: {response.DebugInformation}");
         }
     }
@@ -91,7 +105,8 @@ public class SearchIndexClient
     public async Task<IReadOnlyList<SearchHit>> SearchAsync(
         string query, IReadOnlyCollection<string>? kinds, int limit, CancellationToken cancellationToken)
     {
-        var response = await _client.SearchAsync<SearchDocument>(s => s
+        var response = await _client.SearchAsync<SearchDocument>(
+            s => s
             .Indices(_indexName)
             .Size(limit)
             .Query(q => q

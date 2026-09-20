@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using SearchService.Domain;
 using SearchService.Infrastructure.Elasticsearch;
 using SearchService.Web.Controllers;
@@ -20,7 +21,7 @@ public class SearchControllerTests : IClassFixture<SearchTestWebFactory>, IAsync
     {
         _resetDatabase = factory.ResetDatabaseAsync;
         _indexClient = factory.Services.GetRequiredService<SearchIndexClient>();
-        _sut = new SearchController(_indexClient);
+        _sut = new SearchController(_indexClient, NullLogger<SearchController>.Instance);
     }
 
     [Theory]

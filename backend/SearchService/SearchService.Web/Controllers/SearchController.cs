@@ -19,7 +19,7 @@ public record SearchResponse(string Query, IReadOnlyList<SearchResultDto> Result
 [ApiController]
 [Route("api/search")]
 [Authorize]
-public class SearchController(SearchIndexClient indexClient) : ControllerBase
+public class SearchController(SearchIndexClient indexClient, ILogger<SearchController> logger) : ControllerBase
 {
     private const int DefaultLimit = 8;
     private const int MaxLimit = 20;
@@ -62,8 +62,9 @@ public class SearchController(SearchIndexClient indexClient) : ControllerBase
         {
             hits = await indexClient.SearchAsync(query, kinds, size, cancellationToken);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            logger.LogError(ex, "Search query failed for {Query}", query);
             return Result.Failure<SearchResponse, Error>(
                 Error.Unavailable("search.index.unavailable", "Search is temporarily unavailable"));
         }

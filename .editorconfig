@@ -254,22 +254,27 @@ dotnet_diagnostic.SA1503.severity = none
 dotnet_diagnostic.SA1206.severity = none
 dotnet_diagnostic.SA1313.severity = none
 dotnet_diagnostic.SA1010.severity = none
-dotnet_diagnostic.SA1200.severity = none
 dotnet_diagnostic.SA1601.severity = none
 dotnet_diagnostic.SA1106.severity = none
 dotnet_diagnostic.SA1117.severity = none
 dotnet_diagnostic.SA1024.severity = none
 dotnet_diagnostic.SA1009.severity = none
 dotnet_diagnostic.SA1000.severity = none
-dotnet_diagnostic.SA1009.severity = none
 dotnet_diagnostic.SA1011.severity = none
-dotnet_diagnostic.SA1101.severity = none
 dotnet_diagnostic.SA1633.severity = none
 dotnet_diagnostic.SA1602.severity = none
-dotnet_diagnostic.SA1201.severity = none
 dotnet_diagnostic.SA1623.severity = none
 dotnet_diagnostic.SA1118.severity = none
-dotnet_diagnostic.eSA1128.severity = none
+dotnet_diagnostic.SA1128.severity = none
+
+# Member ordering, as one decision instead of three. SA1201 (element order) was already
+# off while SA1202 (access order) and SA1204 (static order) were left on, so the same
+# codebase was simultaneously told ordering does not matter and warned 26 times that it
+# does. Turned off together: this project groups members by what they do - the retry
+# seam next to the loop that drives it - rather than by accessibility.
+dotnet_diagnostic.SA1201.severity = none
+dotnet_diagnostic.SA1202.severity = none
+dotnet_diagnostic.SA1204.severity = none
 dotnet_diagnostic.SA1401.severity = none
 dotnet_diagnostic.SA1402.severity = none
 
@@ -319,3 +324,8 @@ dotnet_naming_style.private_constants_style.word_separator = _
 dotnet_naming_rule.private_constants_rule.symbols = private_constants
 dotnet_naming_rule.private_constants_rule.style = private_constants_style
 dotnet_naming_rule.private_constants_rule.severity = suggestion
+# EF Core writes these files and rewrites them on every "migrations add". AGENTS.md
+# forbids hand-editing generated code, so a style rule that can only be satisfied by
+# hand-editing them is noise that hides real warnings.
+[**/Migrations/*.cs]
+dotnet_diagnostic.SA1413.severity = none
