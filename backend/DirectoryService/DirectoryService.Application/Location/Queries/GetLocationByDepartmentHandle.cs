@@ -2,6 +2,7 @@
 using DirectoryService.Application.Database;
 using DirectoryService.Contracts.Request.Location;
 using DirectoryService.Contracts.Response.Location;
+using Shared;
 
 namespace DirectoryService.Application.Location.Queries;
 
@@ -41,8 +42,13 @@ public class GetLocationByDepartmentHandle
             parameters.Add("DepartmentId", request.DepartmentId);
         }
 
-        parameters.Add("limit", request.PageSize);
-        parameters.Add("offset", (request.Page - 1) * request.PageSize);
+        // Straight through Normalize, like every other catalogue query: PageSize reached
+        // SQL's LIMIT unvalidated, so an omitted value became "LIMIT NULL" (no limit at
+        // all in Postgres) and a large one dumped the whole join in a single response.
+        var (page, pageSize) = PagedResponse<ReadLocationDto>.Normalize(request.Page, request.PageSize);
+
+        parameters.Add("limit", pageSize);
+        parameters.Add("offset", (page - 1) * pageSize);
 
         var whereClause = conditions.Count > 0 ? "WHERE " + string.Join(" AND ", conditions) : string.Empty;
 

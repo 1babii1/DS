@@ -2,6 +2,7 @@
 using DirectoryService.Application.Database;
 using DirectoryService.Contracts.Request.Department;
 using DirectoryService.Contracts.Response.Department;
+using Shared;
 
 namespace DirectoryService.Application.Department.Queries;
 
@@ -45,8 +46,9 @@ public class GetDepartmentByLocationHandler(IDbConnectionFactory connectionFacto
             parameters.Add("isActive", request.IsActive.Value);
         }
 
-        var page = request.Page is > 0 ? request.Page.Value : 1;
-        var pageSize = request.PageSize is > 0 ? request.PageSize.Value : 20;
+        // Normalize rather than a hand-rolled default: the previous check only guarded the
+        // lower bound, leaving PageSize with no ceiling at all before it reached SQL's LIMIT.
+        var (page, pageSize) = PagedResponse<ReadDepartmentDto>.Normalize(request.Page, request.PageSize);
         parameters.Add("limit", pageSize);
         parameters.Add("offset", (page - 1) * pageSize);
 

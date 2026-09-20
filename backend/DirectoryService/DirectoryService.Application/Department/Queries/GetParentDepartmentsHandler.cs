@@ -19,8 +19,11 @@ public class GetParentDepartmentsValidator : AbstractValidator<GetParentDepartme
     {
         RuleFor(x => x.Preferch).NotEmpty().GreaterThan(0).When(x => x.Preferch.HasValue).WithMessage("Preferch cant be null");
         RuleFor(x => x.Page).NotEmpty().GreaterThan(0).When(x => x.Page.HasValue).WithMessage("Page cant be null");
+
+        // Guarded on Size, not Page: .When() applies to the whole preceding chain, so
+        // guarding this on Page meant a null Page silently dropped Size's bounds as well.
         RuleFor(x => x.Size).NotEmpty().GreaterThan(0)
-            .LessThanOrEqualTo(100).When(x => x.Page.HasValue)
+            .LessThanOrEqualTo(100).When(x => x.Size.HasValue)
             .WithMessage("PageSize cant be null");
     }
 }

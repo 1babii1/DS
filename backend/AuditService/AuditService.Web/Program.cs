@@ -4,6 +4,7 @@ using Serilog;
 using Shared.HealthChecks;
 using Shared.Middlewares;
 using Shared.Observability;
+using Shared.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,20 +22,10 @@ builder.Services.AddControllers();
 builder.Services.AddEnvelopeModelStateValidation();
 builder.Services.AddOpenApi();
 
-builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.MapInboundClaims = false;
-        options.MetadataAddress = builder.Configuration["Auth:MetadataAddress"];
-        options.RequireHttpsMetadata = builder.Environment.IsProduction();
-        options.TokenValidationParameters.ValidIssuer = builder.Configuration["Auth:Issuer"];
-        options.TokenValidationParameters.ValidAudience = builder.Configuration["Auth:Audience"];
-        options.TokenValidationParameters.RoleClaimType = "role";
-        options.TokenValidationParameters.NameClaimType = "name";
-    });
+builder.Services.AddPlatformJwtAuthentication(builder.Configuration, builder.Environment);
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("IsAdmin", policy => policy.RequireRole(RoleNames.Admin));
 
 builder.Services.AddAuditInfrastructure(builder.Configuration);
 

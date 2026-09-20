@@ -54,12 +54,28 @@ public class RewardsController(RewardsDbContext dbContext, CurrencyGrantWriter w
         return transaction.Id;
     }
 
-    // Caller's own wallet, from the JWT - never a request parameter.
+    // Caller's own wallet, from the JWT - never a request parameter. "sub" is the caller's
+    // AccountId, which is NOT the EmployeeId wallets are keyed by, so it has to be resolved
+    // through the AccountProvisioned projection first; reading the wallet by "sub" directly
+    // silently matched nothing and reported a zero balance to everyone.
     [HttpGet("wallet")]
     public async Task<ActionResult<WalletDto>> GetOwnWallet(CancellationToken cancellationToken)
     {
-        var employeeId = Guid.Parse(User.FindFirstValue("sub")!);
-        return await GetWallet(employeeId, cancellationToken);
+        var accountId = Guid.Parse(User.FindFirstValue("sub")!);
+        var employeeId = await dbContext.AccountLookups.AsNoTracking()
+            .Where(l => l.AccountId == accountId)
+            .Select(l => (Guid?)l.EmployeeId)
+            .SingleOrDefaultAsync(cancellationToken);
+
+        // No mapping means this account was never provisioned from a hire (a self-registered
+        // account, or one created before provisioning existed) - it owns no wallet, which is
+        // the same zero-balance answer as an employee who has never been granted anything.
+        if (employeeId is null)
+        {
+            return Ok(new WalletDto(accountId, 0));
+        }
+
+        return await GetWallet(employeeId.Value, cancellationToken);
     }
 
     [HttpGet("wallet/{employeeId:guid}")]

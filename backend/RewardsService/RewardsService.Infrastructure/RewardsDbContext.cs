@@ -1,14 +1,17 @@
 using Microsoft.EntityFrameworkCore;
 using RewardsService.Domain;
+using Shared.Kafka;
 using Shared.Outbox;
 
 namespace RewardsService.Infrastructure;
 
-public class RewardsDbContext(DbContextOptions<RewardsDbContext> options) : DbContext(options)
+public class RewardsDbContext(DbContextOptions<RewardsDbContext> options) : DbContext(options), IHasDeadLetters
 {
     public DbSet<Wallet> Wallets => Set<Wallet>();
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
+
+    public DbSet<AccountLookup> AccountLookups => Set<AccountLookup>();
 
     public DbSet<DeadLetterEntry> DeadLetters => Set<DeadLetterEntry>();
 
@@ -37,6 +40,14 @@ public class RewardsDbContext(DbContextOptions<RewardsDbContext> options) : DbCo
 
             entity.HasIndex(e => e.EmployeeId);
             entity.HasIndex(e => e.CreatedAt);
+        });
+
+        builder.Entity<AccountLookup>(entity =>
+        {
+            entity.ToTable("account_lookups");
+            entity.HasKey(e => e.EmployeeId);
+
+            entity.HasIndex(e => e.AccountId).IsUnique();
         });
 
         builder.Entity<DeadLetterEntry>(entity =>
