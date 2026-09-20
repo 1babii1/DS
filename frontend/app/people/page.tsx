@@ -34,8 +34,10 @@ export default function PeoplePage() {
 	const page = Number(params.get('page') ?? '1')
 	const departmentId = params.get('department') ?? ''
 	const positionId = params.get('position') ?? ''
+	const employeeId = params.get('employeeId') ?? ''
 	const [form, setForm] = useState<{ employee?: Employee } | null>(null)
 	const people = useQuery({ queryKey: ['employees', departmentId, page], queryFn: () => employeesApi.list(departmentId || undefined, page) })
+	const selectedEmployee = useQuery({ queryKey: ['employees', employeeId], queryFn: () => employeesApi.get(employeeId), enabled: Boolean(employeeId) })
 	const positions = useQuery({ queryKey: ['positions', 'active'], queryFn: () => directoryCatalogApi.positions({ isActive: true, size: 200 }) })
 	const departments = useMemo(() => Array.from(new Map((positions.data?.items ?? []).flatMap(position => position.departments).map(department => [department.id, department])).values()).sort((a, b) => a.name.localeCompare(b.name)), [positions.data])
 	const visiblePeople = useMemo(() => people.data?.items.filter(person => !positionId || person.positionId === positionId) ?? [], [people.data, positionId])
@@ -48,12 +50,19 @@ export default function PeoplePage() {
 		router.replace(`${pathname}${next.size ? `?${next}` : ''}`)
 	}
 	const clearFilters = () => router.replace(pathname)
+	const clearSelectedEmployee = () => {
+		const next = new URLSearchParams(params.toString())
+		next.delete('employeeId')
+		router.replace(`${pathname}${next.size ? `?${next}` : ''}`)
+	}
 	const hasFilters = Boolean(departmentId || positionId)
 
 	return <div className='page'>
 		<header className='page-heading'><div><p className='eyebrow'>Employee service</p><h1>People</h1></div><div className='page-heading__actions'><p className='page-heading__description'>People records are retrieved through the authenticated service boundary.</p><button className='primary-action' onClick={() => setForm({})} type='button'><Plus aria-hidden='true' size={16} />Hire employee</button></div></header>
 		{form && positions.data ? <EmployeeForm employee={form.employee ? { id: form.employee.id, name: form.employee.fullName } : undefined} onClose={() => setForm(null)} positions={positions.data.items} /> : null}
 		{form && positions.isPending ? <section className='empty-state'><h2>Loading organization options</h2><p>Retrieving active positions and their department links.</p></section> : null}
+		{selectedEmployee.data ? <section aria-label='Selected person' className='selected-person'><div className='selected-person__heading'><div><p className='eyebrow'>Workspace search result</p><h2>Selected person</h2></div><button className='filter-reset' onClick={clearSelectedEmployee} type='button'><X aria-hidden='true' size={14} />Clear selection</button></div><PersonCard employee={selectedEmployee.data} onTransfer={employee => setForm({ employee })} /></section> : null}
+		{selectedEmployee.error ? <section className='empty-state' role='alert'><h2>This person is no longer available</h2><p>The search index may be catching up with a recent change. Return to the directory and try again.</p><button className='retry-button' onClick={clearSelectedEmployee} type='button'>Back to directory</button></section> : null}
 		{people.data ? <section aria-label='People directory filters' className='directory-filters'><div className='directory-filters__heading'><SlidersHorizontal aria-hidden='true' size={16} /><span>Directory filters</span></div><label><span>Department</span><select onChange={event => updateFilter('department', event.target.value)} value={departmentId}><option value=''>All departments</option>{departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}</select></label><label><span>Position</span><select onChange={event => updateFilter('position', event.target.value)} value={positionId}><option value=''>All positions</option>{(positions.data?.items ?? []).map(position => <option key={position.id} value={position.id}>{position.name}</option>)}</select></label>{hasFilters ? <button className='filter-reset' onClick={clearFilters} type='button'><X aria-hidden='true' size={14} />Clear filters</button> : null}</section> : null}
 		{people.isPending ? <CatalogueSkeleton kind='people' /> : null}
 		{accessStatus === 401 || accessStatus === 403 ? <AccessState resource='people' status={accessStatus} /> : null}

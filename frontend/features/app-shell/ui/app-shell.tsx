@@ -16,6 +16,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ComponentType, ReactNode } from 'react'
 
+import { NotificationBell } from '@/features/notifications/ui/notification-bell'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/shared/ui/sheet'
 
 import { CommandMenu } from './command-menu'
@@ -116,7 +117,7 @@ function MobileNavigation() {
 	)
 }
 
-export function AppShell({ accountControl, children }: { accountControl: ReactNode; children: ReactNode }) {
+export function AppShell({ accountControl, authenticated, children }: { accountControl: ReactNode; authenticated: boolean; children: ReactNode }) {
 	const pathname = usePathname()
 	if (pathname.startsWith('/login')) return <>{children}</>
 
@@ -131,6 +132,7 @@ export function AppShell({ accountControl, children }: { accountControl: ReactNo
 					<div className='app-topbar__actions'>
 						<span className='environment-badge'><span aria-hidden='true' />Local environment</span>
 						<CommandMenu />
+						<NotificationBell enabled={authenticated} />
 						{accountControl}
 						<ThemeToggle />
 					</div>
