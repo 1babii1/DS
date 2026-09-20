@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Shared;
+using Shared.Security;
 
 namespace AuditService.Web.Controllers;
 
@@ -10,7 +11,13 @@ namespace AuditService.Web.Controllers;
 /// <param name="SourceService">Сервис, опубликовавший событие.</param>
 /// <param name="EventType">Тип события.</param>
 /// <param name="AggregateId">Идентификатор сущности, к которой относится событие.</param>
-/// <param name="Payload">Тело события в том виде, в каком его отправил producer.</param>
+/// <param name="Payload">
+/// Тело события в том виде, в каком его отправил producer — только для админов, иначе null.
+/// Payload содержит сырые поля события (для EmployeeHired это ФИО и email сотрудника), а
+/// сам журнал доступен любому аутентифицированному пользователю, включая
+/// самозарегистрировавшегося. SearchService по этой же причине намеренно не индексирует
+/// payload — здесь он раньше отдавался напрямую.
+/// </param>
 /// <param name="OccurredAt">Момент, зафиксированный при записи события.</param>
 /// <param name="ReceivedAt">Момент, когда событие обработал консьюмер.</param>
 public record AuditEntryDto(
@@ -18,7 +25,7 @@ public record AuditEntryDto(
     string SourceService,
     string EventType,
     string AggregateId,
-    string Payload,
+    string? Payload,
     DateTime OccurredAt,
     DateTime ReceivedAt);
 
@@ -62,6 +69,8 @@ public class AuditController(AuditDbContext dbContext) : ControllerBase
         // значением, то есть к 500 на вполне безобидном запросе.
         var (currentPage, size) = PagedResponse<AuditEntryDto>.Normalize(page, pageSize);
 
+        var includePayload = User.IsInRole(RoleNames.Admin);
+
         var query = dbContext.Entries.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(aggregateId))
@@ -84,7 +93,7 @@ public class AuditController(AuditDbContext dbContext) : ControllerBase
                 e.SourceService,
                 e.EventType,
                 e.AggregateId,
-                e.Payload,
+                includePayload ? e.Payload : null,
                 e.OccurredAt,
                 e.ReceivedAt))
             .ToListAsync(cancellationToken);
@@ -99,6 +108,7 @@ public class AuditController(AuditDbContext dbContext) : ControllerBase
     /// </summary>
     /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
     [HttpGet("dead-letters")]
+    [Authorize(Policy = "IsAdmin")]
     public async Task<ActionResult<PagedResponse<DeadLetterDto>>> ListDeadLetters(
         [FromQuery] int? page,
         [FromQuery] int? pageSize,

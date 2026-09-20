@@ -20,8 +20,10 @@ public class GetChildrenLazyValidator : AbstractValidator<GetChildrenLazyCommand
     {
         RuleFor(x => x.ParentId).NotNull().NotEmpty().WithMessage("ParentId cant be null");
         RuleFor(x => x.Request.Page).NotEmpty().GreaterThan(0).When(x => x.Request.Page.HasValue).WithMessage("Page cant be null");
+
+        // Guarded on PageSize, not Page - see GetParentDepartmentsValidator for why.
         RuleFor(x => x.Request.PageSize).NotEmpty().GreaterThan(0)
-            .LessThanOrEqualTo(100).When(x => x.Request.Page.HasValue)
+            .LessThanOrEqualTo(100).When(x => x.Request.PageSize.HasValue)
             .WithMessage("PageSize cant be null");
     }
 }
