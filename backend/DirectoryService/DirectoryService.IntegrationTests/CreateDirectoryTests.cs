@@ -226,7 +226,7 @@ public class CreateDirectoryTests : IClassFixture<DirectoryTestWEbFactory>, IAsy
         LocationId locationId;
         return await ExecuteInDb(async dbContext =>
         {
-            var location = new Locations(LocationId.NewLocationId(), LocationName.Create("location").Value,
+            var location = new Location(LocationId.NewLocationId(), LocationName.Create("location").Value,
                 Timezone.Create("europe/asia").Value, Address.Create($"street{suffix}", $"city{suffix}", $"country{suffix}").Value, []);
             dbContext.Locations.Add(location);
             await dbContext.SaveChangesAsync();

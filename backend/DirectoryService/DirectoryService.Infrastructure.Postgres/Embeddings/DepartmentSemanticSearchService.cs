@@ -38,7 +38,7 @@ public sealed class DepartmentSemanticSearchService(
             .ToListAsync(cancellationToken);
 
         // Joining department_embeddings to departments in EF fails to translate here -
-        // Departments.Id goes through a value converter, and EF Core 10 can't build a
+        // Department.Id goes through a value converter, and EF Core 10 can't build a
         // join/Contains predicate against it. A second, independent, directly
         // translatable query merged in memory sidesteps that entirely.
         var activeDepartments = await db.Departments

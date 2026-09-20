@@ -171,7 +171,7 @@ public class DepartmentQueryContractTests : IClassFixture<DirectoryTestWEbFactor
     {
         var locationId = await ExecuteInDb(async dbContext =>
         {
-            var location = new Locations(
+            var location = new Location(
                 LocationId.NewLocationId(),
                 LocationName.Create($"location-{identifier}").Value,
                 Timezone.Create("europe/asia").Value,

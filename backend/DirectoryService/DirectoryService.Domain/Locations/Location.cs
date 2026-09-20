@@ -4,7 +4,7 @@ using Shared;
 
 namespace DirectoryService.Domain.Locations;
 
-public class Locations : ISoftDeletable
+public class Location : ISoftDeletable
 {
     public LocationId Id { get; private set; } = null!;
 
@@ -25,9 +25,9 @@ public class Locations : ISoftDeletable
     public IReadOnlyList<DepartmentLocation> DepartmentLocationsList { get; private set; } = null!;
 
     // EF Core
-    public Locations() { }
+    public Location() { }
 
-    public Locations(LocationId id, LocationName name, Timezone timezone, Address address,
+    public Location(LocationId id, LocationName name, Timezone timezone, Address address,
         IReadOnlyList<DepartmentLocation> departmentLocationsList)
     {
         Id = id;
@@ -40,14 +40,14 @@ public class Locations : ISoftDeletable
         DepartmentLocationsList = departmentLocationsList.ToList();
     }
 
-    // public static Result<Locations> Create(
+    // public static Result<Location> Create(
     //     LocationId id,
     //     LocationName name,
     //     Timezone timezone,
     //     Address address,
     //     IReadOnlyList<DepartmentLocation> departmentLocationsList)
     // {
-    //     Locations locations = new(id, name, timezone, address, departmentLocationsList);
+    //     Location locations = new(id, name, timezone, address, departmentLocationsList);
     //
     //     return Result.Success(locations);
     // }

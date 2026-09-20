@@ -115,7 +115,7 @@ public class ClearDbOfDeletedEntitiesTests : IClassFixture<DirectoryTestWEbFacto
     {
         return await ExecuteInDb(async dbContext =>
         {
-            var location = new Locations(
+            var location = new Location(
                 LocationId.NewLocationId(),
                 LocationName.Create("purge-test-location").Value,
                 Timezone.Create("europe/asia").Value,

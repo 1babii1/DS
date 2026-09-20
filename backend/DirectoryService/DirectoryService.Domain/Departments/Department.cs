@@ -7,7 +7,7 @@ using Shared;
 
 namespace DirectoryService.Domain.Departments;
 
-public sealed class Departments : ISoftDeletable
+public sealed class Department : ISoftDeletable
 {
     public DepartmentId Id { get; private set; } = null!;
 
@@ -29,16 +29,16 @@ public sealed class Departments : ISoftDeletable
 
     public DateTime? DeletedAt { get; set; }
 
-    public IReadOnlyList<Departments> DepartmentsChildrenList { get; private set; } = null!;
+    public IReadOnlyList<Department> DepartmentsChildrenList { get; private set; } = null!;
 
     public IReadOnlyList<DepartmentPosition> DepartmentsPositionsList { get; private set; } = null!;
 
     public IReadOnlyList<DepartmentLocation> DepartmentsLocationsList { get; private set; } = null!;
 
     // EF Core
-    public Departments() { }
+    public Department() { }
 
-    private Departments(DepartmentId id, DepartmentName name, DepartmentIdentifier identifier, DepartmentPath path,
+    private Department(DepartmentId id, DepartmentName name, DepartmentIdentifier identifier, DepartmentPath path,
         short depth, DepartmentId? parentId)
     {
         Id = id;
@@ -52,7 +52,7 @@ public sealed class Departments : ISoftDeletable
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public static Result<Departments, Error> CreateParent(DepartmentName name, DepartmentIdentifier identifier,
+    public static Result<Department, Error> CreateParent(DepartmentName name, DepartmentIdentifier identifier,
         IEnumerable<LocationId> locationIds, DepartmentId? departmentId = null)
     {
         IEnumerable<LocationId> departmentLocationsList = locationIds.ToList();
@@ -70,16 +70,16 @@ public sealed class Departments : ISoftDeletable
 
         DepartmentPath departmentPath = departmentPathResult.Value;
 
-        Departments departments = new(departmentId ?? DepartmentId.NewDepartmentId(), name, identifier, departmentPath,
+        Department departments = new(departmentId ?? DepartmentId.NewDepartmentId(), name, identifier, departmentPath,
             0, null);
 
-        return Result.Success<Departments, Error>(departments);
+        return Result.Success<Department, Error>(departments);
     }
 
-    public static Result<Departments, Error> CreateChild(
+    public static Result<Department, Error> CreateChild(
         DepartmentName name,
         DepartmentIdentifier identifier,
-        Departments department,
+        Department department,
         IEnumerable<LocationId> locationIds,
         DepartmentId? departmentId = null)
     {
@@ -100,10 +100,10 @@ public sealed class Departments : ISoftDeletable
 
         DepartmentId parentId = DepartmentId.FromValue(department.Id.Value);
 
-        Departments departments = new(departmentId ?? DepartmentId.NewDepartmentId(), name, identifier, pathChild,
+        Department departments = new(departmentId ?? DepartmentId.NewDepartmentId(), name, identifier, pathChild,
             (short)(department.Depth + 1), parentId);
 
-        return Result.Success<Departments, Error>(departments);
+        return Result.Success<Department, Error>(departments);
     }
 
     public void SetName(DepartmentName name) => Name = name;

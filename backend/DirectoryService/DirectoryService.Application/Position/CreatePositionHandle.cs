@@ -79,7 +79,7 @@ public class CreatePositionHandle
         if (departmentIdsNotFound.Value.Any())
         {
             _logger.LogWarning(
-                "Departments not found: {MissingDepartmentIds}",
+                "Department not found: {MissingDepartmentIds}",
                 departmentIdsNotFound.Value.Select(id => id.Value));
             return PositionErrors.DepartmentIdsNotFound();
         }

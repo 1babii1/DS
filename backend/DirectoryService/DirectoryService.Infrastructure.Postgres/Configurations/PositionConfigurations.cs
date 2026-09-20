@@ -33,6 +33,12 @@ public class PositionConfigurations : IEntityTypeConfiguration<Position>
         builder.Property(p => p.IsActive)
             .HasColumnName("is_active");
 
+        // Mirrors LocationConfigurations' index: GetPositionsHandler sorts the catalogue
+        // by is_active DESC, name, id on every page, same reasoning as locations.
+        builder.HasIndex(p => new { p.IsActive, p.Name, p.Id })
+            .IsDescending(true, false, false)
+            .HasDatabaseName("ix_positions_is_active_name_id");
+
         builder.Property(p => p.CreatedAt)
             .HasColumnName("created_at");
 

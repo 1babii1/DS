@@ -17,8 +17,7 @@ public class DirectoryTestWEbFactory : WebApplicationFactory<Program>, IAsyncLif
 {
     // Same image as docker-compose: the model uses ltree for hierarchy paths and
     // vector for department embeddings, neither of which exists on a plain postgres image.
-    private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder()
-        .WithImage("pgvector/pgvector:pg18")
+    private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder("pgvector/pgvector:pg18")
         .WithDatabase("directory_service_db")
         .WithPassword("postgres")
         .WithUsername("postgres")

@@ -10,5 +10,5 @@ public static class DepartmentErrors
         Error.Validation(code ?? "department.validation", message ?? "Department is invalid", invalidField);
 
     public static Error LocationsIdsNotFound() =>
-        Error.NotFound("department.locations_ids_not_found", "Locations ids not found");
+        Error.NotFound("department.locations_ids_not_found", "Location ids not found");
 }

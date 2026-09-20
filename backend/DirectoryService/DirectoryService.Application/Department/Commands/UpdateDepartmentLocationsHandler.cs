@@ -87,7 +87,7 @@ public class UpdateDepartmentLocationsHandler
         {
             var missed = string.Join(", ", locations.Value.Select(id => id.Value));
             _logger.LogError("Missing locations: {Missed}", missed);
-            return Error.Validation("locations", $"Locations not found: {missed}");
+            return Error.Validation("locations", $"Location not found: {missed}");
         }
 
         var departmentlocation =

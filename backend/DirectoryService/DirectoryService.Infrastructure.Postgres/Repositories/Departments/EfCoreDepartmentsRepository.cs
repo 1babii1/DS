@@ -24,7 +24,7 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
         _logger = logger;
     }
 
-    public async Task<Result<IReadOnlyList<Domain.Departments.Departments>, Error>> GetById(
+    public async Task<Result<IReadOnlyList<Domain.Departments.Department>, Error>> GetById(
         IReadOnlyList<DepartmentId> departmentIds,
         CancellationToken cancellationToken)
     {
@@ -36,11 +36,11 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
 
             if (departments.Count == 0)
             {
-                _logger.LogError("Departments not found");
-                return Error.NotFound("departments.get", "Departments not found");
+                _logger.LogError("Department not found");
+                return Error.NotFound("departments.get", "Department not found");
             }
 
-            return Result.Success<IReadOnlyList<Domain.Departments.Departments>, Error>(departments);
+            return Result.Success<IReadOnlyList<Domain.Departments.Department>, Error>(departments);
         }
         catch (NpgsqlException ex)
         {
@@ -56,7 +56,7 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
         }
     }
 
-    public async Task<Result<Domain.Departments.Departments, Error>> GetById(
+    public async Task<Result<Domain.Departments.Department, Error>> GetById(
         DepartmentId departmentId,
         CancellationToken cancellationToken)
     {
@@ -68,11 +68,11 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
 
             if (departments is null)
             {
-                _logger.LogError("Departments not found");
-                return Error.NotFound("departments.get", "Departments not found");
+                _logger.LogError("Department not found");
+                return Error.NotFound("departments.get", "Department not found");
             }
 
-            return Result.Success<Domain.Departments.Departments, Error>(departments);
+            return Result.Success<Domain.Departments.Department, Error>(departments);
         }
         catch (NpgsqlException ex)
         {
@@ -88,7 +88,7 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
         }
     }
 
-    public async Task<Result<Domain.Departments.Departments, Error>> GetByIdIncludeLocations(
+    public async Task<Result<Domain.Departments.Department, Error>> GetByIdIncludeLocations(
         DepartmentId departmentId,
         CancellationToken cancellationToken)
     {
@@ -99,11 +99,11 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
                 .FirstOrDefaultAsync(d => d.Id == departmentId, cancellationToken: cancellationToken);
             if (department is null)
             {
-                _logger.LogError("Departments not found");
-                return Error.NotFound("department.get", "Departments not found");
+                _logger.LogError("Department not found");
+                return Error.NotFound("department.get", "Department not found");
             }
 
-            return Result.Success<Domain.Departments.Departments, Error>(department);
+            return Result.Success<Domain.Departments.Department, Error>(department);
         }
         catch (NpgsqlException ex)
         {
@@ -118,7 +118,7 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
         }
     }
 
-    public async Task<Result<Domain.Departments.Departments, Error>> GetByIdWithLock(
+    public async Task<Result<Domain.Departments.Department, Error>> GetByIdWithLock(
         DepartmentId departmentId,
         CancellationToken cancellationToken)
     {
@@ -129,11 +129,11 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
                 .FirstOrDefaultAsync(d => d.Id == departmentId, cancellationToken);
             if (department is null)
             {
-                _logger.LogError("Departments not found");
-                return Error.NotFound("department.get", "Departments not found");
+                _logger.LogError("Department not found");
+                return Error.NotFound("department.get", "Department not found");
             }
 
-            return Result.Success<Domain.Departments.Departments, Error>(department);
+            return Result.Success<Domain.Departments.Department, Error>(department);
         }
         catch (NpgsqlException ex)
         {
@@ -203,7 +203,7 @@ public class EfCoreDepartmentsRepository : IDepartmentRepository
     }
 
     public async Task<Result<Guid, Error>> Add(
-        Domain.Departments.Departments department,
+        Domain.Departments.Department department,
         CancellationToken cancellationToken)
     {
         try

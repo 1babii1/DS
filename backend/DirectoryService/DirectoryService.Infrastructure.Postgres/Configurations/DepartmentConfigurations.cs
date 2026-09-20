@@ -6,9 +6,9 @@ using Shared;
 
 namespace DirectoryService.Infrastructure.Postgres.Configurations;
 
-public class DepartmentConfigurations : IEntityTypeConfiguration<Departments>
+public class DepartmentConfigurations : IEntityTypeConfiguration<Department>
 {
-    public void Configure(EntityTypeBuilder<Departments> builder)
+    public void Configure(EntityTypeBuilder<Department> builder)
     {
         builder.ToTable("departments");
 
@@ -69,6 +69,19 @@ public class DepartmentConfigurations : IEntityTypeConfiguration<Departments>
             .Property(d => d.IsActive)
             .HasColumnName("is_active");
 
+        // Mirrors LocationConfigurations/PositionConfigurations: GetDepartmentByLocationHandler
+        // sorts by is_active DESC, name, id on every page.
+        builder.HasIndex(d => new { d.IsActive, d.Name, d.Id })
+            .IsDescending(true, false, false)
+            .HasDatabaseName("ix_departments_is_active_name_id");
+
+        // GetParentDepartmentsHandler (roots) and GetChildrenLazyHandler (children) both run
+        // "WHERE parent_id = X ORDER BY created_at" - the recursive query behind every
+        // department-tree page load. EF's automatic FK index on parent_id alone still leaves
+        // the ORDER BY to an in-memory sort; a composite index removes that sort entirely.
+        builder.HasIndex(d => new { d.ParentId, d.CreatedAt })
+            .HasDatabaseName("ix_departments_parent_id_created_at");
+
         builder
             .Property(d => d.CreatedAt)
             .HasColumnName("created_at");
@@ -83,7 +96,7 @@ public class DepartmentConfigurations : IEntityTypeConfiguration<Departments>
             .IsRequired(false);
 
         builder
-            .HasOne<Departments>()
+            .HasOne<Department>()
             .WithMany(d => d.DepartmentsChildrenList)
             .HasForeignKey(d => d.ParentId);
 

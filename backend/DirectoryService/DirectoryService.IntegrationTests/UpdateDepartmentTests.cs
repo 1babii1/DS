@@ -99,7 +99,7 @@ public class UpdateDepartmentTests : IClassFixture<DirectoryTestWEbFactory>, IAs
         LocationId locationId;
         return await ExecuteInDb(async dbContext =>
         {
-            var location = new Locations(LocationId.NewLocationId(), LocationName.Create($"location{suffix}").Value,
+            var location = new Location(LocationId.NewLocationId(), LocationName.Create($"location{suffix}").Value,
                 Timezone.Create("europe/asia").Value,
                 Address.Create($"street{suffix}", $"city{suffix}", $"country{suffix}").Value, []);
             dbContext.Locations.Add(location);
