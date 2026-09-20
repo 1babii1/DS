@@ -28,18 +28,7 @@ builder.Services.AddOpenApi();
 
 builder.Services.AddFrameworkCors(builder.Configuration);
 
-builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.MapInboundClaims = false;
-        options.MetadataAddress = builder.Configuration["Auth:MetadataAddress"];
-        options.RequireHttpsMetadata = builder.Environment.IsProduction();
-        options.TokenValidationParameters.ValidIssuer = builder.Configuration["Auth:Issuer"];
-        options.TokenValidationParameters.ValidAudience = builder.Configuration["Auth:Audience"];
-        options.TokenValidationParameters.RoleClaimType = "role";
-        options.TokenValidationParameters.NameClaimType = "name";
-    });
+builder.Services.AddPlatformJwtAuthentication(builder.Configuration, builder.Environment);
 
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy("CanEdit", policy => policy.RequireRole(RoleNames.Admin, RoleNames.Editor));
@@ -53,6 +42,10 @@ builder.Services.AddDatabaseHealthCheck<RewardsDbContext>();
 // unauthenticated callers, not a compromised or buggy admin/editor token.
 var writeRateLimit = builder.Configuration.GetValue("RateLimiting:Write:PermitLimit", 30);
 var writeRateLimitWindow = builder.Configuration.GetValue("RateLimiting:Write:WindowSeconds", 60);
+
+// Must be configured for the rate limiter below to see the real client IP
+// instead of nginx's - see ForwardedHeadersExtensions for why that matters.
+builder.Services.AddProxyForwardedHeaders(builder.Configuration);
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -69,6 +62,8 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+
+app.UseProxyForwardedHeaders();
 
 app.UseRequestCorrelationId();
 app.UseExceptionMiddleware();

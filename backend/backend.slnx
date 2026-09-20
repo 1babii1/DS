@@ -57,4 +57,5 @@
     <Project Path="SearchService/SearchService.Web/SearchService.Web.csproj" />
   </Folder>
   <Project Path="Shared/Shared.csproj" />
+  <Project Path="Shared.UnitTests/Shared.UnitTests.csproj" />
 </Solution>
