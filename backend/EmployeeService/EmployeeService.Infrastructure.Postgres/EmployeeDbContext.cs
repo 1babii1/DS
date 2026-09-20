@@ -1,11 +1,12 @@
 ﻿using EmployeeService.Application.Database;
 using EmployeeService.Domain;
 using Microsoft.EntityFrameworkCore;
+using Shared.Kafka;
 using Shared.Outbox;
 
 namespace EmployeeService.Infrastructure.Postgres;
 
-public class EmployeeDbContext(DbContextOptions<EmployeeDbContext> options) : DbContext(options), IReadDbContext
+public class EmployeeDbContext(DbContextOptions<EmployeeDbContext> options) : DbContext(options), IReadDbContext, IHasDeadLetters
 {
     public DbSet<Employee> Employees => Set<Employee>();
 

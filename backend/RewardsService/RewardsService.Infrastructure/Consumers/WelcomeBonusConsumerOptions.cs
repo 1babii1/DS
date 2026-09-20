@@ -1,16 +1,10 @@
-using Shared.Outbox;
+using Shared.Kafka;
 
 namespace RewardsService.Infrastructure.Consumers;
 
-public class WelcomeBonusConsumerOptions
+public class WelcomeBonusConsumerOptions : KafkaConsumerOptions
 {
-    public string BootstrapServers { get; set; } = null!;
-
-    public KafkaSecurityOptions Security { get; set; } = new(null, null);
-
-    public string[] Topics { get; set; } = [];
-
-    public string GroupId { get; set; } = "rewards-service";
+    public WelcomeBonusConsumerOptions() => GroupId = "rewards-service";
 
     public decimal WelcomeBonusAmount { get; set; } = 100;
 }

@@ -1,9 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using NotificationService.Domain;
+using Shared.Kafka;
 
 namespace NotificationService.Infrastructure.Postgres;
 
-public class NotificationDbContext(DbContextOptions<NotificationDbContext> options) : DbContext(options)
+public class NotificationDbContext(DbContextOptions<NotificationDbContext> options) : DbContext(options), IHasDeadLetters
 {
     public DbSet<Notification> Notifications => Set<Notification>();
 

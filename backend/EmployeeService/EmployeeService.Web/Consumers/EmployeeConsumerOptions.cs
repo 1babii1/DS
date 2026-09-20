@@ -1,14 +1,8 @@
-using Shared.Outbox;
+using Shared.Kafka;
 
 namespace EmployeeService.Web.Consumers;
 
-public class EmployeeConsumerOptions
+public class EmployeeConsumerOptions : KafkaConsumerOptions
 {
-    public string BootstrapServers { get; set; } = null!;
-
-    public KafkaSecurityOptions Security { get; set; } = new(null, null);
-
-    public string[] Topics { get; set; } = [];
-
-    public string GroupId { get; set; } = "employee-service";
+    public EmployeeConsumerOptions() => GroupId = "employee-service";
 }
