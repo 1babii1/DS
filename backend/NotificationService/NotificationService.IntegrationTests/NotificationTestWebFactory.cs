@@ -16,8 +16,7 @@ namespace NotificationService.IntegrationTests;
 
 public class NotificationTestWebFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder()
-        .WithImage("postgres:16")
+    private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder("postgres:16")
         .WithDatabase("notification_service_db")
         .WithPassword("postgres")
         .WithUsername("postgres")

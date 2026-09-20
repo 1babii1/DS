@@ -51,7 +51,12 @@ public class SmtpEmailSender(IOptions<EmailOptions> options, ILogger<SmtpEmailSe
         {
             await client.ConnectAsync(_options.SmtpHost, _options.SmtpPort, secureSocketOptions, cancellationToken);
 
-            if (!string.IsNullOrWhiteSpace(_options.SmtpUsername))
+            // Both halves, not just the username: a username with no password was being
+            // passed to AuthenticateAsync as null, which fails at the SMTP server rather
+            // than where the configuration is actually wrong. Mailpit needs no auth at
+            // all, so "neither is set" stays a normal, unauthenticated connection.
+            if (!string.IsNullOrWhiteSpace(_options.SmtpUsername) &&
+                !string.IsNullOrWhiteSpace(_options.SmtpPassword))
             {
                 await client.AuthenticateAsync(_options.SmtpUsername, _options.SmtpPassword, cancellationToken);
             }

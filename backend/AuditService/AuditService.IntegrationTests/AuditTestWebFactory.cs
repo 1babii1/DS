@@ -15,8 +15,7 @@ namespace AuditService.IntegrationTests;
 
 public class AuditTestWebFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder()
-        .WithImage("postgres:16")
+    private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder("postgres:16")
         .WithDatabase("audit_service_db")
         .WithPassword("postgres")
         .WithUsername("postgres")

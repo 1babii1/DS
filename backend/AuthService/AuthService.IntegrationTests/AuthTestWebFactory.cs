@@ -1,6 +1,6 @@
 ﻿using System.Data.Common;
-using AuthService.IntegrationTests.Infrastructure;
 using AuthService.Infrastructure.Postgres;
+using AuthService.IntegrationTests.Infrastructure;
 using AuthService.Web.Configuration;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Npgsql;
 using Respawn;
 using Testcontainers.PostgreSql;
@@ -25,8 +26,7 @@ namespace AuthService.IntegrationTests;
 /// </summary>
 public class AuthTestWebFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder()
-        .WithImage("postgres:16")
+    private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder("postgres:16")
         .WithDatabase("auth_service_db")
         .WithPassword("postgres")
         .WithUsername("postgres")
@@ -86,6 +86,14 @@ public class AuthTestWebFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
         builder.ConfigureTestServices(services =>
         {
+            // EmployeeEventsConsumer and the outbox publisher are both IHostedService.
+            // These tests construct the consumer themselves and call
+            // HandleWithRetryAndDeadLetter directly, so the host's own copies add nothing -
+            // they just spend the whole run retrying against a Kafka broker that does not
+            // exist here, which is what made this the one suite that failed under load.
+            // Every other service's factory already removes them.
+            services.RemoveAll<IHostedService>();
+
             services.RemoveAll<DbContextOptions<AuthDbContext>>();
             services.RemoveAll<AuthDbContext>();
             services.AddDbContext<AuthDbContext>(options => options.UseNpgsql(_dbContainer.GetConnectionString()));

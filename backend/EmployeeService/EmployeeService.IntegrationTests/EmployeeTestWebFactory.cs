@@ -18,8 +18,7 @@ public class EmployeeTestWebFactory : WebApplicationFactory<Program>, IAsyncLife
 {
     // Plain postgres is enough here: unlike DirectoryService, this model needs neither
     // ltree nor vector.
-    private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder()
-        .WithImage("postgres:16")
+    private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder("postgres:16")
         .WithDatabase("employee_service_db")
         .WithPassword("postgres")
         .WithUsername("postgres")
