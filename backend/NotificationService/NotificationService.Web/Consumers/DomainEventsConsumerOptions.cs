@@ -1,14 +1,8 @@
-using Shared.Outbox;
+using Shared.Kafka;
 
 namespace NotificationService.Web.Consumers;
 
-public class DomainEventsConsumerOptions
+public class DomainEventsConsumerOptions : KafkaConsumerOptions
 {
-    public string BootstrapServers { get; set; } = null!;
-
-    public KafkaSecurityOptions Security { get; set; } = new(null, null);
-
-    public string[] Topics { get; set; } = [];
-
-    public string GroupId { get; set; } = "notification-service";
+    public DomainEventsConsumerOptions() => GroupId = "notification-service";
 }

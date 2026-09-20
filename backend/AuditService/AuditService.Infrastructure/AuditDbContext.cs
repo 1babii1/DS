@@ -1,9 +1,10 @@
 ﻿using AuditService.Domain;
 using Microsoft.EntityFrameworkCore;
+using Shared.Kafka;
 
 namespace AuditService.Infrastructure;
 
-public class AuditDbContext(DbContextOptions<AuditDbContext> options) : DbContext(options)
+public class AuditDbContext(DbContextOptions<AuditDbContext> options) : DbContext(options), IHasDeadLetters
 {
     public DbSet<AuditEntry> Entries => Set<AuditEntry>();
 

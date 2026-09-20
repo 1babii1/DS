@@ -1,9 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using SearchService.Domain;
+using Shared.Kafka;
 
 namespace SearchService.Infrastructure.Postgres;
 
-public class SearchDbContext(DbContextOptions<SearchDbContext> options) : DbContext(options)
+public class SearchDbContext(DbContextOptions<SearchDbContext> options) : DbContext(options), IHasDeadLetters
 {
     public DbSet<DeadLetterEntry> DeadLetters => Set<DeadLetterEntry>();
 

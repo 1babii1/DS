@@ -1,11 +1,15 @@
-namespace SearchService.Domain;
+namespace Shared.Kafka;
 
-// Same shape and same reason as every other DeadLetterEntry copy in this codebase
-// (AuditService, EmployeeService, RewardsService, NotificationService) - a message that
-// exhausts every processing attempt is parked here instead of silently skipped past by the
-// consumer's own offset commit. This is the one piece of SearchService's own state that
-// still lives in Postgres rather than Elasticsearch - a consumer's record of its own
-// failures is operational bookkeeping, not part of the search index itself.
+/// <summary>
+/// A message that exhausted every processing attempt, parked instead of being silently
+/// skipped past by the consumer's own offset commit.
+/// <para>
+/// Lives in Shared for the same reason <see cref="Shared.Outbox.OutboxMessage"/> does: the
+/// shape is mechanism, not domain, and six services had byte-identical copies of it. The
+/// row still belongs to each service - every DbContext maps this into its own schema, so
+/// schema-per-service is untouched; only the class is shared.
+/// </para>
+/// </summary>
 public class DeadLetterEntry
 {
     public Guid Id { get; private set; }

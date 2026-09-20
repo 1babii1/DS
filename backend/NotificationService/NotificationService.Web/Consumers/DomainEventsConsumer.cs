@@ -1,216 +1,41 @@
-using System.Text;
 using System.Text.Json;
 using Confluent.Kafka;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NotificationService.Domain;
 using NotificationService.Infrastructure.Postgres;
-using Shared.Outbox;
+using Shared.Kafka;
 
 namespace NotificationService.Web.Consumers;
 
-// One consumer group across every producer's topic this service cares about - structural
-// copy of AuditConsumer/EmployeeService's AuthEventsConsumer/RewardsService's
-// WelcomeBonusConsumer (retry, dead-letter, idempotent ProcessMessage,
-// HandleWithRetryAndDeadLetter as the internal seam for direct-call tests). Lives in
-// .Web rather than .Infrastructure.Postgres because it needs IHubContext<NotificationsHub>
-// - the same reason EmployeeService's AuthEventsConsumer lives in EmployeeService.Web,
-// not its Infrastructure.Postgres project.
+// One consumer group across every producer topic this service cares about. Lives in .Web
+// rather than .Infrastructure.Postgres because it needs IHubContext<NotificationsHub>.
+// Consume loop, retries and dead-lettering come from KafkaRetryConsumer.
 public class DomainEventsConsumer(
     IServiceScopeFactory scopeFactory,
     IHubContext<NotificationsHub> hub,
     IOptions<DomainEventsConsumerOptions> options,
-    ILogger<DomainEventsConsumer> logger) : BackgroundService
+    ILogger<DomainEventsConsumer> logger)
+    : KafkaRetryConsumer<NotificationDbContext>(scopeFactory, options.Value, logger)
 {
-    private const int MaxAttempts = 3;
-    private static readonly TimeSpan[] RetryDelays = [TimeSpan.FromMilliseconds(200), TimeSpan.FromSeconds(1)];
+    protected override string MessageKind => "notification";
 
-    private readonly DomainEventsConsumerOptions _options = options.Value;
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        await KafkaTopicProvisioner.WaitForTopicsAsync(
-            _options.BootstrapServers, _options.Security, logger, stoppingToken, _options.Topics);
-
-        if (stoppingToken.IsCancellationRequested)
-        {
-            return;
-        }
-
-        await Task.Run(() => Run(stoppingToken), stoppingToken);
-    }
-
-    private void Run(CancellationToken stoppingToken)
-    {
-        var config = new ConsumerConfig
-        {
-            BootstrapServers = _options.BootstrapServers,
-            GroupId = _options.GroupId,
-            AutoOffsetReset = AutoOffsetReset.Earliest,
-            EnableAutoCommit = false,
-        };
-        _options.Security.ApplyTo(config);
-
-        using var consumer = new ConsumerBuilder<string, string>(config).Build();
-        consumer.Subscribe(_options.Topics);
-
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            ConsumeResult<string, string>? result;
-            try
-            {
-                result = consumer.Consume(stoppingToken);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-            catch (ConsumeException ex)
-            {
-                logger.LogError(ex, "Kafka consume error");
-                Thread.Sleep(TimeSpan.FromSeconds(1));
-                continue;
-            }
-
-            if (result?.Message is null)
-            {
-                continue;
-            }
-
-            if (HandleWithRetryAndDeadLetter(result, stoppingToken))
-            {
-                consumer.Commit(result);
-            }
-            else
-            {
-                consumer.Seek(result.TopicPartitionOffset);
-
-                try
-                {
-                    Task.Delay(TimeSpan.FromSeconds(5), stoppingToken).GetAwaiter().GetResult();
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
-                }
-            }
-        }
-
-        consumer.Close();
-    }
-
-    internal bool HandleWithRetryAndDeadLetter(ConsumeResult<string, string> result, CancellationToken stoppingToken)
-    {
-        Exception? lastError = null;
-
-        for (var attempt = 1; attempt <= MaxAttempts; attempt++)
-        {
-            try
-            {
-                ProcessMessage(result);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                lastError = ex;
-                logger.LogWarning(
-                    ex,
-                    "Failed to process notification message on {Topic} (attempt {Attempt}/{MaxAttempts})",
-                    result.Topic,
-                    attempt,
-                    MaxAttempts);
-
-                if (attempt < MaxAttempts)
-                {
-                    try
-                    {
-                        Task.Delay(RetryDelays[attempt - 1], stoppingToken).GetAwaiter().GetResult();
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        return TryDeadLetter(result, lastError!);
-    }
-
-    private bool TryDeadLetter(ConsumeResult<string, string> result, Exception error)
-    {
-        var messageId = GetHeader(result.Message.Headers, "message-id");
-        if (messageId is null || !Guid.TryParse(messageId, out var messageGuid))
-        {
-            return true;
-        }
-
-        try
-        {
-            using var scope = scopeFactory.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<NotificationDbContext>();
-
-            if (dbContext.DeadLetters.Any(d => d.MessageId == messageGuid))
-            {
-                return true;
-            }
-
-            dbContext.DeadLetters.Add(DeadLetterEntry.Create(
-                messageGuid,
-                result.Topic,
-                result.Message.Key,
-                result.Message.Value,
-                error.ToString(),
-                MaxAttempts));
-
-            dbContext.SaveChanges();
-
-            logger.LogError(
-                error,
-                "Notification message {MessageId} on {Topic} exhausted retries and was moved to dead_letters",
-                messageGuid,
-                result.Topic);
-
-            return true;
-        }
-        catch (DbUpdateException) when (DeadLetterAlreadyRecorded(messageGuid))
-        {
-            return true;
-        }
-        catch (Exception ex)
-        {
-            logger.LogCritical(
-                ex,
-                "Failed to write dead letter for notification message {MessageId} on {Topic} - the database is likely down",
-                messageGuid,
-                result.Topic);
-            return false;
-        }
-    }
-
-    private bool DeadLetterAlreadyRecorded(Guid messageGuid)
-    {
-        using var scope = scopeFactory.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<NotificationDbContext>();
-        return dbContext.DeadLetters.Any(d => d.MessageId == messageGuid);
-    }
-
-    private void ProcessMessage(ConsumeResult<string, string> result)
+    protected override Task ProcessMessageAsync(
+        ConsumeResult<string, string> result, CancellationToken cancellationToken)
     {
         var messageId = GetHeader(result.Message.Headers, "message-id");
         var messageType = GetHeader(result.Message.Headers, "message-type");
 
         if (messageId is null || !Guid.TryParse(messageId, out var messageGuid))
         {
-            logger.LogWarning("Skipping message without a valid message-id header on topic {Topic}", result.Topic);
-            return;
+            Logger.LogWarning("Skipping message without a valid message-id header on topic {Topic}", result.Topic);
+            return Task.CompletedTask;
         }
 
-        using var scope = scopeFactory.CreateScope();
+        using var scope = ScopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<NotificationDbContext>();
 
         // Idempotency: a redelivered message must not create a second notification. Every
@@ -218,7 +43,7 @@ public class DomainEventsConsumer(
         // redelivery (the AccountLookup upsert).
         if (dbContext.Notifications.Any(n => n.SourceMessageId == messageGuid))
         {
-            return;
+            return Task.CompletedTask;
         }
 
         Notification? notification = messageType switch
@@ -232,7 +57,7 @@ public class DomainEventsConsumer(
 
         if (notification is null)
         {
-            return;
+            return Task.CompletedTask;
         }
 
         dbContext.Notifications.Add(notification);
@@ -244,10 +69,12 @@ public class DomainEventsConsumer(
         catch (DbUpdateException) when (dbContext.Notifications.Any(n => n.SourceMessageId == messageGuid))
         {
             // Lost a race with another consumer instance - fine, already recorded.
-            return;
+            return Task.CompletedTask;
         }
 
         PushAsync(notification).GetAwaiter().GetResult();
+
+        return Task.CompletedTask;
     }
 
     private static Notification? HandleCurrencyGranted(NotificationDbContext dbContext, Guid messageId, string payload)
@@ -343,14 +170,4 @@ public class DomainEventsConsumer(
                 notification.DeepLink,
                 notification.CreatedAt,
             });
-
-    private static string? GetHeader(Headers headers, string key)
-    {
-        if (!headers.TryGetLastBytes(key, out var bytes))
-        {
-            return null;
-        }
-
-        return Encoding.UTF8.GetString(bytes);
-    }
 }

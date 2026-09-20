@@ -2,12 +2,13 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Shared.Kafka;
 using Shared.Outbox;
 
 namespace AuthService.Infrastructure.Postgres;
 
 public class AuthDbContext(DbContextOptions<AuthDbContext> options)
-    : IdentityDbContext<Account, Role, Guid>(options)
+    : IdentityDbContext<Account, Role, Guid>(options), IHasDeadLetters
 {
     public DbSet<DeadLetterEntry> DeadLetters => Set<DeadLetterEntry>();
 
