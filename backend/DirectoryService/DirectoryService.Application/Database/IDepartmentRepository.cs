@@ -10,19 +10,19 @@ namespace DirectoryService.Application.Database;
 
 public interface IDepartmentRepository
 {
-    Task<Result<Departments, Error>> GetByIdIncludeLocations(
+    Task<Result<Domain.Departments.Department, Error>> GetByIdIncludeLocations(
         DepartmentId departmentIdId,
         CancellationToken cancellationToken);
 
-    Task<Result<IReadOnlyList<Departments>, Error>> GetById(
+    Task<Result<IReadOnlyList<Domain.Departments.Department>, Error>> GetById(
         IReadOnlyList<DepartmentId> departmentIds,
         CancellationToken cancellationToken);
 
-    Task<Result<Domain.Departments.Departments, Error>> GetById(
+    Task<Result<Domain.Departments.Department, Error>> GetById(
         DepartmentId departmentId,
         CancellationToken cancellationToken);
 
-    Task<Result<Domain.Departments.Departments, Error>> GetByIdWithLock(
+    Task<Result<Domain.Departments.Department, Error>> GetByIdWithLock(
         DepartmentId departmentIdId,
         CancellationToken cancellationToken);
 
@@ -42,7 +42,8 @@ public interface IDepartmentRepository
         DepartmentPath oldPath,
         CancellationToken cancellationToken = default);
 
-    Task<Result<Guid, Error>> Add(Departments department, CancellationToken cancellationToken = default);
+    Task<Result<Guid, Error>> Add(
+        Domain.Departments.Department department, CancellationToken cancellationToken = default);
 
     Task<Result<IEnumerable<DepartmentId>, Error>> GetDepartmentsIds(
         IEnumerable<DepartmentId> departmentIds,

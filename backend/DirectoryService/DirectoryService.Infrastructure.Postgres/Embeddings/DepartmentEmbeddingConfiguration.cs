@@ -17,7 +17,7 @@ public class DepartmentEmbeddingConfiguration : IEntityTypeConfiguration<Departm
 
         builder.Property(e => e.UpdatedAt).HasColumnName("updated_at");
 
-        // No EF-modeled relationship to Departments: its Id is a converted value object,
+        // No EF-modeled relationship to Department: its Id is a converted value object,
         // which EF can't match against a plain Guid FK. The FK constraint is added via
         // raw SQL in the migration instead.
     }

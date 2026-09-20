@@ -48,7 +48,7 @@ public sealed class DepartmentEmbeddingWorker(
         var embeddingClient = scope.ServiceProvider.GetRequiredService<IEmbeddingClient>();
 
         // Two independent queries filtered in memory: EF Core can't translate a correlated
-        // subquery predicate over Departments.Id once it goes through the DepartmentId value
+        // subquery predicate over Department.Id once it goes through the DepartmentId value
         // converter, so a single Where(!DepartmentEmbeddings.Any(...)) query fails to translate.
         var embeddedIds = (await db.DepartmentEmbeddings
             .Select(e => e.DepartmentId)

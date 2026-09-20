@@ -12,7 +12,7 @@ namespace DirectoryService.ArchitectureTests;
 public class LayerBoundaryTests
 {
     private static readonly Assembly DomainAssembly =
-        typeof(DirectoryService.Domain.Departments.Departments).Assembly;
+        typeof(DirectoryService.Domain.Departments.Department).Assembly;
 
     private static readonly Assembly ApplicationAssembly =
         typeof(DirectoryService.Application.Department.Commands.CreateDepartmentHandler).Assembly;

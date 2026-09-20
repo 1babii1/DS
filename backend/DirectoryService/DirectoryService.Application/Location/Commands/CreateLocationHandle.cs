@@ -55,8 +55,10 @@ public class CreateLocationHandle
             locationRequest.Address.Country).Value;
         Timezone locationTimezone = Timezone.Create(locationRequest.Timezone).Value;
 
-        Locations locations = new Locations(locationId, locationName, locationTimezone, locationAddress,
-            new List<DepartmentLocation>());
+        // Qualified: this file's own namespace segment is also called Location, the same
+        // collision Domain.Positions.Position is qualified for elsewhere.
+        Domain.Locations.Location location = new(
+            locationId, locationName, locationTimezone, locationAddress, new List<DepartmentLocation>());
 
         // Enqueue before Add(): IOutboxWriter only stages the message on the same scoped
         // DbContext, and Add() is what actually calls SaveChangesAsync - so this lands
@@ -72,7 +74,7 @@ public class CreateLocationHandle
                 locationAddress.Country,
                 locationTimezone.Value));
 
-        var result = await _locationsRepository.Add(locations, cancellationToken);
+        var result = await _locationsRepository.Add(location, cancellationToken);
         if (result.IsFailure)
         {
             _logger.LogError("Failed to persist location {LocationId}", locationId.Value);

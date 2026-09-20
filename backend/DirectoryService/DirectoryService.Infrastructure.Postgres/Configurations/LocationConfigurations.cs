@@ -7,9 +7,9 @@ using Shared;
 
 namespace DirectoryService.Infrastructure.Postgres.Configurations;
 
-public class LocationConfigurations : IEntityTypeConfiguration<Locations>
+public class LocationConfigurations : IEntityTypeConfiguration<Location>
 {
-    public void Configure(EntityTypeBuilder<Locations> builder)
+    public void Configure(EntityTypeBuilder<Location> builder)
     {
         builder.ToTable("locations");
 
@@ -28,6 +28,15 @@ public class LocationConfigurations : IEntityTypeConfiguration<Locations>
         builder.HasIndex(l => l.Name)
             .IsUnique()
             .HasDatabaseName("ux_locations_name");
+
+        // GetLocationsHandler's catalogue query sorts by is_active DESC, name, id on
+        // every page. Without this, Postgres has no choice but a full table scan plus an
+        // in-memory sort per request - unnoticeable at a handful of rows, but it degrades
+        // linearly with table size, and nothing about this endpoint's contract caps how
+        // large that table gets. Declared up front rather than reactively.
+        builder.HasIndex(l => new { l.IsActive, l.Name, l.Id })
+            .IsDescending(true, false, false)
+            .HasDatabaseName("ix_locations_is_active_name_id");
 
         builder.Property(l => l.Timezone)
             .HasConversion(l => l.Value, value => Timezone.FromPersisted(value))

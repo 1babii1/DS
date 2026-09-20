@@ -87,7 +87,7 @@ public class CreateDepartmentHandler
         }
 
         // Проверка на существование Подразделения(если передан)
-        Departments? departmentFromDB = null;
+        Domain.Departments.Department? departmentFromDB = null;
         if (request.ParentDepartmentId != null)
         {
             var getResult =
@@ -103,7 +103,7 @@ public class CreateDepartmentHandler
 
         if (locationIdsNotFound.Value.Any())
         {
-            _logger.LogWarning("Locations not found: {MissingLocationIds}", locationIdsNotFound.Value.Select(id => id.Value));
+            _logger.LogWarning("Location not found: {MissingLocationIds}", locationIdsNotFound.Value.Select(id => id.Value));
             return DepartmentErrors.LocationsIdsNotFound();
         }
 
@@ -112,9 +112,9 @@ public class CreateDepartmentHandler
         DepartmentIdentifier departmentIdentifier = DepartmentIdentifier.Create(request.Identifier.Value).Value;
 
         var department = departmentFromDB is null
-            ? Departments.CreateParent(departmentName, departmentIdentifier, request.LocationsIds,
+            ? Domain.Departments.Department.CreateParent(departmentName, departmentIdentifier, request.LocationsIds,
                 request.DepartmentId)
-            : Departments.CreateChild(departmentName, departmentIdentifier, departmentFromDB,
+            : Domain.Departments.Department.CreateChild(departmentName, departmentIdentifier, departmentFromDB,
                 request.LocationsIds, request.DepartmentId);
         if (department.IsFailure)
         {
@@ -194,7 +194,7 @@ public class CreateDepartmentHandler
         }
         catch (Exception e)
         {
-            _logger.LogError($"Failed to create department: {e}", e);
+            _logger.LogError(e, "Failed to create department");
             throw;
         }
     }

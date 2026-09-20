@@ -50,11 +50,11 @@ public class DirectoryServiceDbContext : DbContext, IReadDbContext
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DirectoryServiceDbContext).Assembly);
     }
 
-    public DbSet<Locations> Locations => Set<Locations>();
+    public DbSet<Location> Locations => Set<Location>();
 
     public DbSet<Position> Positions => Set<Position>();
 
-    public DbSet<Departments> Departments => Set<Departments>();
+    public DbSet<Department> Departments => Set<Department>();
 
     public DbSet<DepartmentLocation> DepartmentLocations => Set<DepartmentLocation>();
 
@@ -62,9 +62,9 @@ public class DirectoryServiceDbContext : DbContext, IReadDbContext
 
     public DbSet<DepartmentEmbedding> DepartmentEmbeddings => Set<DepartmentEmbedding>();
 
-    public IQueryable<Departments> DepartmentsRead => Set<Departments>().AsNoTracking();
+    public IQueryable<Department> DepartmentsRead => Set<Department>().AsNoTracking();
 
-    public IQueryable<Locations> LocationsRead => Set<Locations>().AsNoTracking();
+    public IQueryable<Location> LocationsRead => Set<Location>().AsNoTracking();
 
     public IQueryable<Position> PositionsRead => Set<Position>().AsNoTracking();
 

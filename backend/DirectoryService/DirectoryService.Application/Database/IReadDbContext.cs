@@ -7,9 +7,9 @@ namespace DirectoryService.Application.Database;
 
 public interface IReadDbContext
 {
-    IQueryable<Departments> DepartmentsRead { get; }
+    IQueryable<Domain.Departments.Department> DepartmentsRead { get; }
 
-    IQueryable<Locations> LocationsRead { get; }
+    IQueryable<Domain.Locations.Location> LocationsRead { get; }
 
     IQueryable<Domain.Positions.Position> PositionsRead { get; }
 
