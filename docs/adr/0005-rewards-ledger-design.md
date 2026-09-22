@@ -20,7 +20,11 @@ that inserts the `Transaction`. This is the same reasoning as denormalizing
 atomically, so nothing ever needs to reconcile them, and reading a wallet never requires
 summing the whole ledger. `Source` (`ManualGrant` / `WelcomeBonus`) makes the two grant
 paths distinguishable after the fact and is what the welcome bonus's idempotency check
-(`Transactions.Any(t => t.EmployeeId == id && t.Source == WelcomeBonus)`) keys on.
+(`Transactions.Any(t => t.EmployeeId == id && t.Source == WelcomeBonus)`) keys on -
+backed by a partial unique index on `(EmployeeId) WHERE Source = 'WelcomeBonus'`, added
+after the check-alone version was shown to grant the bonus repeatedly (16 of 16 attempts)
+under genuinely concurrent/redelivered processing of the same `EmployeeHired` event; the
+check without the constraint only ever protected sequential redelivery, not a real race.
 
 **One writer, two callers.** `CurrencyGrantWriter` holds the wallet-lookup-or-create +
 transaction-insert + outbox-enqueue sequence exactly once. `RewardsController.Grant`

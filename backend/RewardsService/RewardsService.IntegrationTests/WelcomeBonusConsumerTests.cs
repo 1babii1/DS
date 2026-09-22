@@ -66,6 +66,53 @@ public class WelcomeBonusConsumerTests : IClassFixture<RewardsTestWebFactory>, I
     }
 
     [Fact]
+    public async Task Concurrently_processed_EmployeeHired_events_grant_the_bonus_exactly_once()
+    {
+        // Sequential redelivery (the test above) only proves the second call sees the first's
+        // ALREADY-COMMITTED row - it can never observe two callers racing the same
+        // `Transactions.Any(...)` check before either has committed. HandleWithRetryAndDeadLetter
+        // is synchronous, so genuine concurrency needs real OS threads, not just Task.WhenAll.
+        var employeeId = Guid.NewGuid();
+        var result = BuildResult(Guid.NewGuid(), employeeId);
+        const int concurrency = 16;
+
+        // A wallet that already exists (any employee who has received even one prior grant) has
+        // no primary-key conflict left to accidentally save this race - unlike a brand-new
+        // employee, where Wallet's own PK (EmployeeId) happens to reject every racer but one.
+        await ExecuteInDb(async db =>
+        {
+            db.Wallets.Add(Wallet.Create(employeeId));
+            await db.SaveChangesAsync();
+            return true;
+        });
+
+        // A Barrier forces every thread to reach the race window (the "no existing bonus?" check
+        // inside GrantWelcomeBonus) at the same moment, instead of trusting Task.Run's scheduling
+        // to happen to overlap them - real OS threads, held at the gate until all are ready.
+        using var barrier = new Barrier(concurrency);
+        var threads = Enumerable.Range(0, concurrency).Select(_ => new Thread(() =>
+        {
+            barrier.SignalAndWait();
+            _sut.HandleWithRetryAndDeadLetter(result, CancellationToken.None);
+        })).ToList();
+        foreach (var thread in threads)
+        {
+            thread.Start();
+        }
+
+        foreach (var thread in threads)
+        {
+            thread.Join();
+        }
+
+        var count = await ExecuteInDb(db => db.Transactions.CountAsync(t => t.EmployeeId == employeeId));
+        Assert.Equal(1, count);
+
+        var wallet = await ExecuteInDb(db => db.Wallets.SingleAsync(w => w.EmployeeId == employeeId));
+        Assert.Equal(100, wallet.Balance);
+    }
+
+    [Fact]
     public async Task Message_of_a_different_type_on_employee_events_is_ignored()
     {
         var employeeId = Guid.NewGuid();

@@ -38,7 +38,17 @@ public class RewardsDbContext(DbContextOptions<RewardsDbContext> options) : DbCo
             entity.Property(e => e.Reason).HasMaxLength(500).IsRequired();
             entity.Property(e => e.Source).HasConversion<string>().HasMaxLength(50);
 
-            entity.HasIndex(e => e.EmployeeId);
+            // Partial unique index: the welcome bonus is granted at most once per employee, but
+            // ManualGrant legitimately has many rows per employee, so the constraint must not
+            // apply to those. This is what actually makes WelcomeBonusConsumer's "already
+            // granted?" check race-safe under concurrent/redelivered processing - confirmed by
+            // reproducing a 16x duplicate grant without it (same reasoning as Account.EmployeeId
+            // in AuthDbContext).
+            entity.HasIndex(e => e.EmployeeId, "IX_transactions_EmployeeId_WelcomeBonus")
+                .IsUnique()
+                .HasFilter("\"Source\" = 'WelcomeBonus'");
+
+            entity.HasIndex(e => e.EmployeeId, "IX_transactions_EmployeeId");
             entity.HasIndex(e => e.CreatedAt);
         });
 
