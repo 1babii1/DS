@@ -43,8 +43,8 @@ export function NotificationBell({ enabled }: { enabled: boolean }) {
 
 	if (!enabled || status === 401 || status === 403) return null
 
-	const openNotification = (notification: Notification) => {
-		if (!notification.isRead) markRead.mutate(notification.id)
+	const openNotification = async (notification: Notification) => {
+		if (!notification.isRead) await markRead.mutateAsync(notification.id)
 		if (notification.deepLink && isInternalDeepLink(notification.deepLink)) router.push(notification.deepLink)
 	}
 
@@ -62,7 +62,7 @@ export function NotificationBell({ enabled }: { enabled: boolean }) {
 			{notifications.error && status !== 401 && status !== 403 ? <div className='notification-sheet__state' role='alert'>Notifications are temporarily unavailable. <button onClick={() => notifications.refetch()} type='button'>Try again</button></div> : null}
 			{markRead.error || markAllRead.error ? <p className='notification-sheet__error' role='alert'>The notification state could not be updated. Try again.</p> : null}
 			{notifications.data && notificationItems.length === 0 ? <div className='notification-sheet__state'>You&apos;re all caught up.</div> : null}
-			{notificationItems.length ? <><ol className='notification-list'>{notificationItems.map(notification => <li className={notification.isRead ? '' : 'notification-list__item--unread'} key={notification.id}><button onClick={() => openNotification(notification)} type='button'><span><strong>{notification.title}</strong><small>{notification.body}</small></span><time dateTime={notification.createdAt}>{relativeTime(notification.createdAt)}</time></button></li>)}</ol>{notifications.hasNextPage ? <button className='notification-sheet__more' disabled={notifications.isFetchingNextPage} onClick={() => notifications.fetchNextPage()} type='button'>{notifications.isFetchingNextPage ? 'Loading more…' : 'Load more'}</button> : null}</> : null}
+			{notificationItems.length ? <><ol aria-busy={notifications.isFetchingNextPage} className='notification-list'>{notificationItems.map(notification => <li className={notification.isRead ? '' : 'notification-list__item--unread'} key={notification.id}><button disabled={markRead.isPending} onClick={() => void openNotification(notification)} type='button'><span><strong>{notification.title}</strong><small>{notification.body}</small></span><time dateTime={notification.createdAt}>{relativeTime(notification.createdAt)}</time></button></li>)}</ol>{notifications.hasNextPage ? <button className='notification-sheet__more' disabled={notifications.isFetchingNextPage} onClick={() => notifications.fetchNextPage()} type='button'>{notifications.isFetchingNextPage ? 'Loading more…' : 'Load more'}</button> : null}</> : null}
 		</SheetContent>
 	</Sheet>
 }
