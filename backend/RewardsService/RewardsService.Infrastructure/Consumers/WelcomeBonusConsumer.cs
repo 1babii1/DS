@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RewardsService.Domain;
+using Shared.Database;
 using Shared.Kafka;
 
 namespace RewardsService.Infrastructure.Consumers;
@@ -59,8 +60,12 @@ public class WelcomeBonusConsumer(
         var dbContext = scope.ServiceProvider.GetRequiredService<RewardsDbContext>();
         var writer = new CurrencyGrantWriter(dbContext);
 
-        // Idempotency: an EmployeeHired event redelivered after this already ran must
-        // not grant a second welcome bonus.
+        // Idempotency: an EmployeeHired event redelivered after this already ran must not grant a
+        // second welcome bonus. On its own this check is check-then-act (confirmed by reproducing
+        // a 16x duplicate grant with only this check and no database constraint) - what actually
+        // makes it race-safe is RewardsDbContext's partial unique index on
+        // (EmployeeId WHERE Source = 'WelcomeBonus'), which turns the losing racer's SaveChanges
+        // into a unique-violation exception instead of a second, silently accepted row.
         if (dbContext.Transactions.Any(t => t.EmployeeId == hired.EmployeeId && t.Source == TransactionSource.WelcomeBonus))
         {
             return;
@@ -72,10 +77,16 @@ public class WelcomeBonusConsumer(
         {
             dbContext.SaveChanges();
         }
-        catch (DbUpdateException) when (dbContext.Transactions.Any(
-            t => t.EmployeeId == hired.EmployeeId && t.Source == TransactionSource.WelcomeBonus))
+        catch (DbUpdateException ex) when (ex.IsUniqueViolation())
         {
-            // Lost a race with another consumer instance - fine, already granted.
+            // Lost the race - another concurrent/redelivered attempt already committed its own
+            // welcome-bonus transaction. The unique index is what makes this race-safe regardless
+            // (an uncaught exception here would still resolve correctly: KafkaRetryConsumer retries,
+            // and the Any() check above would see the committed row on the next attempt) - this
+            // catch only avoids the 200ms retry delay and a misleading "failed to process" warning
+            // for what is actually the expected, benign outcome of two deliveries racing. Narrowed
+            // to the specific constraint so an unrelated failure (a genuine connectivity problem,
+            // say) surfaces and retries instead of being swallowed as if it were this.
         }
     }
 
@@ -101,9 +112,10 @@ public class WelcomeBonusConsumer(
         {
             dbContext.SaveChanges();
         }
-        catch (DbUpdateException) when (dbContext.AccountLookups.Any(l => l.EmployeeId == @event.EmployeeId))
+        catch (DbUpdateException ex) when (ex.IsUniqueViolation())
         {
-            // Lost a race with another consumer instance - fine, already recorded.
+            // Lost a race with another consumer instance - AccountLookup's own primary key
+            // (EmployeeId) already made this race-safe; narrowed for the same reason as above.
         }
     }
 }
