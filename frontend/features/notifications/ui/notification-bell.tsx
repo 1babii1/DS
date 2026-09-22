@@ -1,6 +1,6 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, CheckCheck, LoaderCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -28,7 +28,7 @@ export function NotificationBell({ enabled }: { enabled: boolean }) {
 	const [open, setOpen] = useState(false)
 	const router = useRouter()
 	const queryClient = useQueryClient()
-	const notifications = useQuery({ queryKey: ['notifications'], queryFn: notificationsApi.list, enabled: enabled && open })
+	const notifications = useInfiniteQuery({ queryKey: ['notifications'], queryFn: ({ pageParam }) => notificationsApi.list(pageParam), initialPageParam: 1, getNextPageParam: page => page.hasNext ? page.page + 1 : undefined, enabled: enabled && open })
 	const unreadCount = useQuery({ queryKey: ['notifications', 'unread-count'], queryFn: notificationsApi.unreadCount, enabled, refetchInterval: 30_000 })
 	const refresh = () => Promise.all([
 		queryClient.invalidateQueries({ queryKey: ['notifications'] }),
@@ -38,6 +38,7 @@ export function NotificationBell({ enabled }: { enabled: boolean }) {
 	const markAllRead = useMutation({ mutationFn: notificationsApi.markAllRead, onSuccess: refresh })
 	const count = unreadCount.data?.count ?? 0
 	const status = getHttpStatus(notifications.error ?? unreadCount.error)
+	const notificationItems = notifications.data?.pages.flatMap(page => page.items) ?? []
 
 	if (!enabled || status === 401 || status === 403) return null
 
@@ -58,8 +59,8 @@ export function NotificationBell({ enabled }: { enabled: boolean }) {
 			{notifications.isPending ? <div className='notification-sheet__state'><LoaderCircle aria-hidden='true' className='animate-spin' size={18} />Loading notifications…</div> : null}
 			{notifications.error && status !== 401 && status !== 403 ? <div className='notification-sheet__state' role='alert'>Notifications are temporarily unavailable. <button onClick={() => notifications.refetch()} type='button'>Try again</button></div> : null}
 			{markRead.error || markAllRead.error ? <p className='notification-sheet__error' role='alert'>The notification state could not be updated. Try again.</p> : null}
-			{notifications.data?.items.length === 0 ? <div className='notification-sheet__state'>You&apos;re all caught up.</div> : null}
-			{notifications.data?.items.length ? <ol className='notification-list'>{notifications.data.items.map(notification => <li className={notification.isRead ? '' : 'notification-list__item--unread'} key={notification.id}><button onClick={() => openNotification(notification)} type='button'><span><strong>{notification.title}</strong><small>{notification.body}</small></span><time dateTime={notification.createdAt}>{relativeTime(notification.createdAt)}</time></button></li>)}</ol> : null}
+			{notifications.data && notificationItems.length === 0 ? <div className='notification-sheet__state'>You&apos;re all caught up.</div> : null}
+			{notificationItems.length ? <><ol className='notification-list'>{notificationItems.map(notification => <li className={notification.isRead ? '' : 'notification-list__item--unread'} key={notification.id}><button onClick={() => openNotification(notification)} type='button'><span><strong>{notification.title}</strong><small>{notification.body}</small></span><time dateTime={notification.createdAt}>{relativeTime(notification.createdAt)}</time></button></li>)}</ol>{notifications.hasNextPage ? <button className='notification-sheet__more' disabled={notifications.isFetchingNextPage} onClick={() => notifications.fetchNextPage()} type='button'>{notifications.isFetchingNextPage ? 'Loading more…' : 'Load more'}</button> : null}</> : null}
 		</SheetContent>
 	</Sheet>
 }
