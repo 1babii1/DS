@@ -17,6 +17,7 @@ type CommandItem = {
 	href: string
 	id: string
 	icon: ComponentType<{ size?: number; strokeWidth?: number }>
+	kind?: SearchKind
 	label: string
 }
 
@@ -37,6 +38,14 @@ const resultIcons: Record<SearchKind, CommandItem['icon']> = {
 	audit: Activity
 }
 
+const searchKindLabels: Record<SearchKind, string> = {
+	employee: 'People',
+	department: 'Departments',
+	position: 'Positions',
+	location: 'Locations',
+	audit: 'Activity'
+}
+
 function searchResultHref(result: SearchResult): string {
 	switch (result.kind) {
 		case 'department': return `/departments/${result.id}`
@@ -53,7 +62,8 @@ function toSearchItem(result: SearchResult): CommandItem {
 		href: searchResultHref(result),
 		label: result.title,
 		description: result.subtitle ?? `${result.kind[0].toUpperCase()}${result.kind.slice(1)} result`,
-		icon: resultIcons[result.kind]
+		icon: resultIcons[result.kind],
+		kind: result.kind
 	}
 }
 
@@ -73,7 +83,15 @@ export function CommandMenu() {
 		staleTime: 30 * 1000
 	})
 	const navigationMatches = useMemo(() => navigationCommands.filter(command => `${command.label} ${command.description}`.toLowerCase().includes(normalizedQuery.toLowerCase())), [normalizedQuery])
-	const resultMatches = hasSearchTerm && debouncedQuery === normalizedQuery ? (search.data?.results ?? []).map(toSearchItem) : []
+	const resultMatches = useMemo(() => hasSearchTerm && debouncedQuery === normalizedQuery ? (search.data?.results ?? []).map(toSearchItem) : [], [debouncedQuery, hasSearchTerm, normalizedQuery, search.data?.results])
+	const groupedResults = useMemo(() => {
+		return resultMatches.reduce<Partial<Record<SearchKind, CommandItem[]>>>((groups, item) => {
+			const kind = item.kind
+			if (!kind) return groups
+			;(groups[kind] ??= []).push(item)
+			return groups
+		}, {})
+	}, [resultMatches])
 	const options = [...navigationMatches, ...resultMatches]
 	const activeOptionIndex = Math.min(activeIndex, Math.max(options.length - 1, 0))
 	const openMenu = useCallback(() => { setQuery(''); setActiveIndex(0); setOpen(true) }, [])
@@ -119,7 +137,7 @@ export function CommandMenu() {
 				<div className='command-search'><Search aria-hidden='true' size={16} /><input aria-activedescendant={options[activeOptionIndex]?.id} aria-autocomplete='list' aria-controls='command-results' aria-expanded={open} aria-label='Search people, organization records, locations, positions, and audit activity' onChange={event => { setQuery(event.target.value); setActiveIndex(0) }} onKeyDown={onSearchKeyDown} placeholder='Search people, teams, places, and activity…' ref={input} role='combobox' value={query} /></div>
 				<div aria-label='Workspace search results' className='command-list' id='command-results' role='listbox'>
 					{navigationMatches.length ? <section aria-label='Navigate' className='command-section'><p className='command-section__label'>Navigate</p>{navigationMatches.map(command => <CommandOption active={options[activeOptionIndex]?.id === command.id} command={command} key={command.id} onMouseEnter={() => setActiveIndex(options.findIndex(option => option.id === command.id))} onSelect={select} />)}</section> : null}
-					{resultMatches.length ? <section aria-label='Search results' className='command-section'><p className='command-section__label'>Search results</p>{resultMatches.map(command => <CommandOption active={options[activeOptionIndex]?.id === command.id} command={command} key={command.id} onMouseEnter={() => setActiveIndex(options.findIndex(option => option.id === command.id))} onSelect={select} />)}</section> : null}
+					{(Object.entries(groupedResults) as Array<[SearchKind, CommandItem[]]>).map(([kind, commands]) => <section aria-label={searchKindLabels[kind]} className='command-section' key={kind}><p className='command-section__label'>{searchKindLabels[kind]}</p>{commands.map(command => <CommandOption active={options[activeOptionIndex]?.id === command.id} command={command} key={command.id} onMouseEnter={() => setActiveIndex(options.findIndex(option => option.id === command.id))} onSelect={select} />)}</section>)}
 					{showSearching ? <p className='command-status'>Searching workspace…</p> : null}
 					{status === 401 ? <p className='command-status'>Sign in to search workspace records.</p> : null}
 					{status === 403 ? <p className='command-status'>Your role cannot search workspace records.</p> : null}
