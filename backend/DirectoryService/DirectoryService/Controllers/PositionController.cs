@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Shared;
 using Shared.EndpointResults;
+using Shared.Security;
 
 namespace DirectoryService.Controllers;
 
@@ -16,7 +17,7 @@ namespace DirectoryService.Controllers;
 public class PositionController : ControllerBase
 {
     [HttpPost]
-    [Authorize(Policy = "CanEdit")]
+    [RequireCanEdit]
     [EnableRateLimiting("write")]
     public async Task<EndpointResult<Guid>> Create(
         [FromServices] CreatePositionHandle handler,
