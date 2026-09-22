@@ -1,6 +1,9 @@
 ﻿using McpServer.Embeddings;
 using McpServer.HealthChecks;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Polly;
+using Polly.CircuitBreaker;
+using Polly.Retry;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using Shared.Observability;
@@ -27,7 +30,29 @@ builder.Services.AddHttpClient<OllamaEmbeddingClient>((sp, client) =>
     var options = sp.GetRequiredService<IOptions<EmbeddingsOptions>>().Value;
     client.BaseAddress = new Uri(options.OllamaBaseUrl);
     client.Timeout = TimeSpan.FromSeconds(30);
-});
+})
+
+    // Same shape as DirectoryService's own Ollama client (see its Program.cs) - a brief
+    // restart of the embedding model becomes a retried call instead of a failed tool
+    // invocation, and the breaker stops every semantic-search tool call from separately
+    // paying a 30s timeout once Ollama is confirmed down.
+    .AddResilienceHandler("ollama-embeddings", builder =>
+    {
+        builder.AddRetry(new()
+        {
+            MaxRetryAttempts = 2,
+            Delay = TimeSpan.FromMilliseconds(500),
+            BackoffType = DelayBackoffType.Exponential,
+        });
+
+        builder.AddCircuitBreaker(new()
+        {
+            FailureRatio = 0.5,
+            SamplingDuration = TimeSpan.FromSeconds(30),
+            MinimumThroughput = 5,
+            BreakDuration = TimeSpan.FromSeconds(15),
+        });
+    });
 
 // Инструменты отдают данные сразу нескольких сервисов, включая ФИО и email
 // сотрудников, в обход правил доступа, которые эти сервисы проверяют у себя.

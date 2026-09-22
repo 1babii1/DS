@@ -1,5 +1,8 @@
 ﻿using System.Threading.RateLimiting;
 using DirectoryService.Application.Database;
+using Polly;
+using Polly.CircuitBreaker;
+using Polly.Retry;
 using DirectoryService.Application.Department.Commands;
 using DirectoryService.Application.Department.Queries;
 using DirectoryService.Application.Location.Commands;
@@ -73,8 +76,7 @@ builder.Services.AddHttpLogging();
 
 builder.Services.AddPlatformJwtAuthentication(builder.Configuration, builder.Environment);
 
-builder.Services.AddAuthorizationBuilder()
-    .AddPolicy("CanEdit", policy => policy.RequireRole(RoleNames.Admin, RoleNames.Editor));
+builder.Services.AddCanEditPolicy();
 
 builder.Services.AddValidatorsFromAssemblyContaining<CreateDepartmentValidation>();
 
@@ -114,7 +116,29 @@ builder.Services.AddHttpClient<IEmbeddingClient, OllamaEmbeddingClient>((sp, cli
     var options = sp.GetRequiredService<IOptions<EmbeddingsOptions>>().Value;
     client.BaseAddress = new Uri(options.OllamaBaseUrl);
     client.Timeout = TimeSpan.FromSeconds(30);
-});
+})
+
+    // DepartmentEmbeddingWorker's own catch already treats any failure here (including a
+    // tripped breaker) as "retry on the next poll pass" - so adding retry/circuit-breaking
+    // only makes a brief Ollama restart transparent instead of skipping straight to the
+    // next poll interval, without changing what happens when it stays down.
+    .AddResilienceHandler("ollama-embeddings", builder =>
+    {
+        builder.AddRetry(new()
+        {
+            MaxRetryAttempts = 2,
+            Delay = TimeSpan.FromMilliseconds(500),
+            BackoffType = DelayBackoffType.Exponential,
+        });
+
+        builder.AddCircuitBreaker(new()
+        {
+            FailureRatio = 0.5,
+            SamplingDuration = TimeSpan.FromSeconds(30),
+            MinimumThroughput = 5,
+            BreakDuration = TimeSpan.FromSeconds(15),
+        });
+    });
 builder.Services.AddHostedService<DepartmentEmbeddingWorker>();
 builder.Services.AddScoped<IDepartmentSemanticSearch, DepartmentSemanticSearchService>();
 builder.Services.AddScoped<SearchDepartmentsSemanticHandler>();
