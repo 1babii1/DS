@@ -67,7 +67,7 @@ public class Employee
 
         return new Employee
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             FullName = fullName,
             Email = email,
             DepartmentId = departmentId,

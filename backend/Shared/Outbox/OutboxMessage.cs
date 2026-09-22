@@ -27,7 +27,11 @@ public class OutboxMessage
 
     public static OutboxMessage Create(string type, string aggregateId, string payloadJson) => new()
     {
-        Id = Guid.NewGuid(),
+        // Time-ordered, unlike a v4 Guid - keeps this high-insert-rate table's primary-key
+        // index appending at the end of the B-tree instead of scattering writes across
+        // random pages. Every other append-only entity in this codebase (Transaction,
+        // AuditEntry, DeadLetterEntry, Notification, IdempotencyRecord) was moved the same way.
+        Id = Guid.CreateVersion7(),
         Type = type,
         AggregateId = aggregateId,
         Payload = payloadJson,
