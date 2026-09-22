@@ -123,7 +123,7 @@ export function CommandMenu() {
 					{showSearching ? <p className='command-status'>Searching workspace…</p> : null}
 					{status === 401 ? <p className='command-status'>Sign in to search workspace records.</p> : null}
 					{status === 403 ? <p className='command-status'>Your role cannot search workspace records.</p> : null}
-					{search.error && !status ? <p className='command-status' role='alert'>Search is temporarily unavailable. You can still use navigation.</p> : null}
+					{search.error && status !== 401 && status !== 403 ? <p className='command-status' role='alert'>Search is temporarily unavailable. You can still use navigation.</p> : null}
 					{showNoResults ? <p className='command-status'>No workspace records match “{normalizedQuery}”.</p> : null}
 				</div>
 			</Dialog.Content>
