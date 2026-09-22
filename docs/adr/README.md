@@ -17,6 +17,10 @@ descriptions as each phase shipped, not backfilled generically.
 | [0008](0008-mcp-server-cross-schema-reporting-layer.md) | McpServer as a read-only cross-schema reporting layer |
 | [0009](0009-postgres-backup-and-restore.md) | Postgres backup and restore |
 | [0010](0010-kubernetes-migration-target-architecture.md) | Kubernetes migration target architecture (design only, not implemented) |
+| [0011](0011-kafka-cluster-and-cdc-target-architecture.md) | Kafka cluster, Debezium CDC, event contracts (design only, not implemented) |
+| [0012](0012-reliability-as-a-process.md) | SLOs, canary delivery, chaos testing (design only, not implemented) |
+| [0013](0013-cell-based-isolation-target-architecture.md) | Cell-based isolation, Temporal, Citus (design only, not implemented) |
+| [0014](0014-multi-region-target-architecture.md) | Multi-region deployment (design only, not implemented) |
 
 Not yet written up, though each decision is already live in the codebase and explained
 in its own commit messages: gRPC for internal calls, local JWT validation via JWKS,
