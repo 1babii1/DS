@@ -44,7 +44,11 @@ export function NotificationBell({ enabled }: { enabled: boolean }) {
 	if (!enabled || status === 401 || status === 403) return null
 
 	const openNotification = async (notification: Notification) => {
-		if (!notification.isRead) await markRead.mutateAsync(notification.id)
+		try {
+			if (!notification.isRead) await markRead.mutateAsync(notification.id)
+		} catch {
+			return
+		}
 		if (notification.deepLink && isInternalDeepLink(notification.deepLink)) router.push(notification.deepLink)
 	}
 
