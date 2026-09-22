@@ -17,6 +17,8 @@ public class RewardsDbContext(DbContextOptions<RewardsDbContext> options) : DbCo
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         builder.HasDefaultSchema("rewards");
@@ -84,6 +86,20 @@ public class RewardsDbContext(DbContextOptions<RewardsDbContext> options) : DbCo
             entity.Property(e => e.Payload).HasColumnType("jsonb").IsRequired();
 
             entity.HasIndex(e => e.ProcessedAt);
+        });
+
+        builder.Entity<IdempotencyRecord>(entity =>
+        {
+            entity.ToTable("idempotency_records");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Scope).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Key).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.RequestHash).HasMaxLength(64).IsRequired();
+
+            // What makes a retry idempotent: the second insert on the same (Scope, Key)
+            // fails the whole SaveChanges instead of creating a second Transaction.
+            entity.HasIndex(e => new { e.Scope, e.Key }).IsUnique();
         });
     }
 }
