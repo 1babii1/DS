@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import PostgresAdapter from "@auth/pg-adapter";
 import { authDatabase } from "@/shared/auth/database";
 import { authConfiguration } from "@/shared/auth/config";
+import { getCanEdit } from "@/shared/auth/access-token";
 
 declare module "next-auth" {
   interface Session {
@@ -10,6 +11,7 @@ declare module "next-auth" {
       name?: string | null;
       email?: string | null;
       image?: string | null;
+      canEdit: boolean;
     };
   }
 }
@@ -46,8 +48,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   ],
   callbacks: {
-    session({ session, user }) {
+    async session({ session, user }) {
       session.user.id = user.id;
+      session.user.canEdit = await getCanEdit(user.id);
       return session;
     },
   },

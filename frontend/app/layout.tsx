@@ -22,7 +22,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
 	return (
 		<html lang='en' suppressHydrationWarning>
 			<body className={`${geistSans.variable} ${geistMono.variable}`}>
-				<Providers><AppShell accountControl={<SessionControl user={session?.user} />} authenticated={Boolean(session?.user)}>{children}</AppShell></Providers>
+				<Providers canEdit={session?.user.canEdit ?? false}><AppShell accountControl={<SessionControl user={session?.user} />} authenticated={Boolean(session?.user)}>{children}</AppShell></Providers>
 			</body>
 		</html>
 	)

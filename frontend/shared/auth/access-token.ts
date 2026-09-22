@@ -9,12 +9,31 @@ type AccountRow = {
   expires_at: number | null;
 };
 
+type IdTokenRow = { id_token: string | null };
+
 const providerId = "openiddict";
 const tokenRefreshSkewSeconds = 60;
 
 export class AuthenticationRequiredError extends Error {
   constructor() {
     super("A valid sign-in is required.");
+  }
+}
+
+export async function getCanEdit(userId: string): Promise<boolean> {
+  const result = await authDatabase.query<IdTokenRow>(
+    `SELECT id_token FROM accounts WHERE "userId" = $1 AND provider = $2`,
+    [userId, providerId],
+  );
+  const idToken = result.rows[0]?.id_token;
+  if (!idToken) return false;
+
+  try {
+    const payload = JSON.parse(Buffer.from(idToken.split('.')[1], 'base64url').toString('utf8')) as { role?: string | string[] };
+    const roles = Array.isArray(payload.role) ? payload.role : payload.role ? [payload.role] : [];
+    return roles.some((role) => role === 'editor' || role === 'admin');
+  } catch {
+    return false;
   }
 }
 
