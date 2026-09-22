@@ -381,6 +381,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://*:5133
       - ConnectionStrings__NotificationServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=notification,public
+      - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:-changeme-redis}
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
       - Kafka__Topics__0=rewards.events
       - Kafka__Topics__1=auth.events

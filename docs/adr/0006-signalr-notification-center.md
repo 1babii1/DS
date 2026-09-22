@@ -33,6 +33,19 @@ standard ASP.NET Core SignalR pattern, not a workaround or a security hole: it i
 bearer token, over the same TLS-terminated connection, with the same short (<15 minute)
 lifetime as everywhere else in this platform.
 
+**Redis backplane from the start**, even though every service today runs as exactly one
+instance (no `replicas:` anywhere in `docker-compose.yml`). Without it, a hub's connection
+groups live only in that process's memory - `Clients.Group(...)` reaches nobody connected
+to a different instance. Invisible on one instance, a silent, hard-to-notice regression the
+first time this service is ever scaled out (a push would simply stop reaching roughly half
+of connected users, with no error anywhere). Wired via
+`AddSignalR().AddStackExchangeRedis(...)`, sharing the same Redis DirectoryService's
+`HybridCache` already depends on (see `docker-compose.yml`'s `redis` service), with a
+`ChannelPrefix` keeping the two services' pub/sub traffic apart on that one instance. Added
+during a foundations review that asked, of every "works today" assumption, what silently
+breaks the moment it stops holding - this was the one growth assumption in the platform
+that was true but nowhere written down.
+
 **One connection group per recipient (`sub` claim).** `NotificationsHub.OnConnectedAsync`
 adds every connection to a group named by the caller's own account id, so a push
 (`Clients.Group(recipientAccountId.ToString())`) reaches every open tab/device for that
@@ -86,3 +99,15 @@ rule for "who is a department's audience" would have been worse than not buildin
   phase - blocked on the frontend's OIDC/BFF work (issue #13) not yet carrying a bearer
   token on requests at all. This phase is backend-complete and was verified live end-to-end
   with a hand-rolled Python SignalR client instead.
+- The backplane is confirmed by build and the full integration test suite (SignalR's Redis
+  client connects lazily, same as `HybridCache`'s - the suite passes with no Redis reachable,
+  matching DirectoryService's own integration tests). It was not re-verified with the same
+  live, two-instance, hand-rolled-client setup the rest of this ADR was - that would mean
+  running two instances of this service against one Redis and confirming a push sent while
+  connected to instance A is delivered on instance B; worth doing before relying on it for
+  real, since "wired per the documented standard pattern" and "confirmed working" are not
+  the same claim.
+- `Microsoft.AspNetCore.SignalR.StackExchangeRedis` pulls in `MessagePack` 2.5.187, which had
+  several known CVEs (GHSA-hv8m-jj95-wg3x and others); pinned to the patched 2.5.301 via
+  `Directory.Packages.props`'s central transitive pinning rather than left at the vulnerable
+  floor version.

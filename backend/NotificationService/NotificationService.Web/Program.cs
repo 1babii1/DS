@@ -26,7 +26,18 @@ builder.Services.AddObservability(builder.Configuration, "notification-service")
 builder.Services.AddControllers();
 builder.Services.AddEnvelopeModelStateValidation();
 builder.Services.AddOpenApi();
-builder.Services.AddSignalR();
+
+// Redis backplane: without it, NotificationsHub's connection groups live only in this
+// process's memory, so a user connected to one instance never gets a push whose event was
+// processed on another - invisible today (single instance everywhere, see docker-compose.yml),
+// real the moment this service is ever scaled out. Shares the same Redis DirectoryService's
+// HybridCache already uses; ChannelPrefix keeps the two services' pub/sub channels distinct on
+// that one shared instance.
+var redisConnectionString = builder.Configuration.GetConnectionString("Redis")
+    ?? throw new InvalidOperationException("Connection string 'Redis' is not configured.");
+builder.Services.AddSignalR()
+    .AddStackExchangeRedis(redisConnectionString, options =>
+        options.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("notification-service"));
 
 builder.Services.AddFrameworkCors(builder.Configuration);
 
