@@ -10,6 +10,7 @@
       </PackageReference>
       <PackageReference Include="Serilog.AspNetCore" />
       <PackageReference Include="Confluent.Kafka" />
+      <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" />
     </ItemGroup>
 
     <ItemGroup>

@@ -67,6 +67,10 @@
     <!-- Caching -->
     <PackageVersion Include="Microsoft.Extensions.Caching.Hybrid" Version="10.1.0" />
     <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.1" />
+    <!-- SignalR backplane: shares Redis with DirectoryService's HybridCache (see docker-compose.yml), a different NuGet package from the cache one above despite both wrapping StackExchange.Redis. -->
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.1" />
+    <!-- Transitive pin: MessagePack 2.5.187 (pulled in by the package above) has several known CVEs (GHSA-hv8m-jj95-wg3x et al.), patched from 2.5.301. -->
+    <PackageVersion Include="MessagePack" Version="2.5.301" />
     <!-- Logging -->
     <PackageVersion Include="Serilog" Version="4.3.0" />
     <PackageVersion Include="Serilog.AspNetCore" Version="9.0.0" />
