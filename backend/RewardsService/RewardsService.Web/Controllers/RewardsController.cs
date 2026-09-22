@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using CSharpFunctionalExtensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,7 +10,9 @@ using RewardsService.Domain;
 using RewardsService.Infrastructure;
 using RewardsService.Web.Rewards;
 using Shared;
+using Shared.Database;
 using Shared.EndpointResults;
+using Shared.Security;
 
 namespace RewardsService.Web.Controllers;
 
@@ -21,19 +25,31 @@ public record WalletDto(Guid EmployeeId, decimal Balance);
 [Authorize]
 public class RewardsController(RewardsDbContext dbContext, CurrencyGrantWriter writer) : ControllerBase
 {
+    private const string IdempotencyScope = "rewards.grants";
+
     // Only manual grants go through here - not synchronously validated against
     // EmployeeService that EmployeeId actually exists (see the Rewards ledger ADR):
     // a wrong id just means a wallet nobody ever reads gets created, not a corrupted one.
+    //
+    // Idempotency-Key is required, not optional: this endpoint has no natural dedup key of
+    // its own (unlike hire, which rejects a repeat by its unique Email index), so without
+    // one a client retry after a timeout - or a double-click - is a second grant.
     [HttpPost("grants")]
-    [Authorize(Policy = "CanEdit")]
+    [RequireCanEdit]
     [EnableRateLimiting("write")]
-    public EndpointResult<Guid> Grant(GrantCurrencyRequest request)
+    public EndpointResult<Guid> Grant(
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey, GrantCurrencyRequest request)
     {
-        Result<Guid, Error> result = HandleGrant(request);
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            return Result.Failure<Guid, Error>(RewardsErrors.IdempotencyKeyRequired());
+        }
+
+        Result<Guid, Error> result = HandleGrant(idempotencyKey, request);
         return result;
     }
 
-    private Result<Guid, Error> HandleGrant(GrantCurrencyRequest request)
+    private Result<Guid, Error> HandleGrant(string idempotencyKey, GrantCurrencyRequest request)
     {
         if (request.Amount <= 0)
         {
@@ -45,13 +61,50 @@ public class RewardsController(RewardsDbContext dbContext, CurrencyGrantWriter w
             return RewardsErrors.ReasonRequired();
         }
 
+        var requestHash = HashRequest(request);
+
+        var existing = dbContext.IdempotencyRecords
+            .SingleOrDefault(r => r.Scope == IdempotencyScope && r.Key == idempotencyKey);
+        if (existing is not null)
+        {
+            return existing.RequestHash == requestHash
+                ? existing.TransactionId
+                : RewardsErrors.IdempotencyKeyReused();
+        }
+
         var grantedBy = Guid.Parse(User.FindFirstValue("sub")!);
         var transaction = writer.Grant(
             request.EmployeeId, request.Amount, request.Reason, TransactionSource.ManualGrant, grantedBy);
 
-        dbContext.SaveChanges();
+        dbContext.IdempotencyRecords.Add(
+            IdempotencyRecord.Create(IdempotencyScope, idempotencyKey, requestHash, transaction.Id));
+
+        try
+        {
+            dbContext.SaveChanges();
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueViolation())
+        {
+            // Raced another request on the same key - wallet update, transaction, outbox
+            // message and this row are all one SaveChanges call, so the loser's writes never
+            // partially committed. Re-read and return the winner's result instead of retrying
+            // the grant itself.
+            dbContext.ChangeTracker.Clear();
+            var winner = dbContext.IdempotencyRecords
+                .Single(r => r.Scope == IdempotencyScope && r.Key == idempotencyKey);
+            return winner.RequestHash == requestHash
+                ? winner.TransactionId
+                : RewardsErrors.IdempotencyKeyReused();
+        }
 
         return transaction.Id;
+    }
+
+    private static string HashRequest(GrantCurrencyRequest request)
+    {
+        var canonical = $"{request.EmployeeId:D}|{request.Amount}|{request.Reason}";
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(canonical));
+        return Convert.ToHexStringLower(hash);
     }
 
     // Caller's own wallet, from the JWT - never a request parameter. "sub" is the caller's
@@ -79,7 +132,7 @@ public class RewardsController(RewardsDbContext dbContext, CurrencyGrantWriter w
     }
 
     [HttpGet("wallet/{employeeId:guid}")]
-    [Authorize(Policy = "CanEdit")]
+    [RequireCanEdit]
     public async Task<ActionResult<WalletDto>> GetWalletFor(
         [FromRoute] Guid employeeId, CancellationToken cancellationToken) =>
         await GetWallet(employeeId, cancellationToken);
