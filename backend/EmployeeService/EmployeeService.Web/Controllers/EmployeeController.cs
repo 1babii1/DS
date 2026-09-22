@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Shared;
 using Shared.EndpointResults;
+using Shared.Security;
 
 namespace EmployeeService.Web.Controllers;
 
@@ -15,7 +16,7 @@ namespace EmployeeService.Web.Controllers;
 public class EmployeeController : ControllerBase
 {
     [HttpPost]
-    [Authorize(Policy = "CanEdit")]
+    [RequireCanEdit]
     [EnableRateLimiting("write")]
     public async Task<EndpointResult<Guid>> Hire(
         [FromServices] HireEmployeeHandler handler,
@@ -32,7 +33,7 @@ public class EmployeeController : ControllerBase
     }
 
     [HttpPut("{employeeId:guid}/transfer")]
-    [Authorize(Policy = "CanEdit")]
+    [RequireCanEdit]
     [EnableRateLimiting("write")]
     public async Task<EndpointResult> Transfer(
         [FromRoute] Guid employeeId,
@@ -45,7 +46,13 @@ public class EmployeeController : ControllerBase
     }
 
     [HttpDelete("{employeeId:guid}")]
-    [Authorize(Policy = "CanEdit")]
+    [RequireCanEdit]
+
+    // Terminating an employee is exactly the kind of "important" action GitHub-style sudo
+    // mode exists for - irreversible, high-blast-radius, worth one extra re-verification
+    // even from an already-signed-in admin. Multiple [Authorize]-family attributes combine
+    // with AND semantics, so this adds to CanEdit rather than replacing it.
+    [RequireStepUp]
     [EnableRateLimiting("write")]
     public async Task<EndpointResult> Terminate(
         [FromRoute] Guid employeeId,

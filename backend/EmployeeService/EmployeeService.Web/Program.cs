@@ -39,8 +39,8 @@ builder.Services.AddFrameworkCors(builder.Configuration);
 
 builder.Services.AddPlatformJwtAuthentication(builder.Configuration, builder.Environment);
 
-builder.Services.AddAuthorizationBuilder()
-    .AddPolicy("CanEdit", policy => policy.RequireRole(RoleNames.Admin, RoleNames.Editor));
+builder.Services.AddCanEditPolicy();
+builder.Services.AddStepUpPolicy();
 
 builder.Services.AddInfrastructurePostgres(builder.Configuration);
 builder.Services.AddDirectoryGrpcClient(builder.Configuration);

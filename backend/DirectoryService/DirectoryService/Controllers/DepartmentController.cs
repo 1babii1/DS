@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Shared.EndpointResults;
+using Shared.Security;
 
 namespace DirectoryService.Controllers;
 
@@ -16,7 +17,7 @@ namespace DirectoryService.Controllers;
 public class DepartmentController : ControllerBase
 {
     [HttpPost]
-    [Authorize(Policy = "CanEdit")]
+    [RequireCanEdit]
     [EnableRateLimiting("write")]
     public async Task<EndpointResult<Guid>> Create(
         [FromServices] CreateDepartmentHandler handler,
@@ -24,7 +25,7 @@ public class DepartmentController : ControllerBase
         await handler.Handle(request, cancellationToken);
 
     [HttpPatch("locations")]
-    [Authorize(Policy = "CanEdit")]
+    [RequireCanEdit]
     [EnableRateLimiting("write")]
     public async Task<EndpointResult<DepartmentId>> UpdateLocations(
         [FromServices] UpdateDepartmentLocationsHandler handler,
@@ -32,7 +33,7 @@ public class DepartmentController : ControllerBase
         await handler.Handle(request, cancellationToken);
 
     [HttpPut("{departmentId:guid}/parent")]
-    [Authorize(Policy = "CanEdit")]
+    [RequireCanEdit]
     [EnableRateLimiting("write")]
     public async Task<EndpointResult<DepartmentId>> UpdateParent(
         [FromRoute] Guid departmentId,
@@ -95,7 +96,7 @@ public class DepartmentController : ControllerBase
     }
 
     [HttpDelete("{departmentId:guid}")]
-    [Authorize(Policy = "CanEdit")]
+    [RequireCanEdit]
     [EnableRateLimiting("write")]
     public async Task<EndpointResult<DepartmentId>> SoftDeleteDepartments(
         [FromRoute] SoftDeleteDepartmentRequest request,

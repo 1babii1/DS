@@ -30,8 +30,7 @@ builder.Services.AddFrameworkCors(builder.Configuration);
 
 builder.Services.AddPlatformJwtAuthentication(builder.Configuration, builder.Environment);
 
-builder.Services.AddAuthorizationBuilder()
-    .AddPolicy("CanEdit", policy => policy.RequireRole(RoleNames.Admin, RoleNames.Editor));
+builder.Services.AddCanEditPolicy();
 
 builder.Services.AddRewardsInfrastructure(builder.Configuration);
 builder.Services.AddOutboxPublisher<RewardsDbContext>(builder.Configuration, "rewards.events");
