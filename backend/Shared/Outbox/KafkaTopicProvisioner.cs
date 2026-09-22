@@ -11,6 +11,13 @@ namespace Shared.Outbox;
 // before anyone subscribes or produces avoids the whole class of race.
 public static class KafkaTopicProvisioner
 {
+    // Kafka's own broker default (7 days) - not a new policy, just making the value this
+    // platform has always effectively run on explicit instead of implicit. A topic created
+    // without retention.ms inherits whatever log.retention.hours the broker happens to be
+    // configured with, which is an operational setting this codebase never actually sets or
+    // documents; pinning it here means every topic keeps this value regardless of that.
+    private const long DefaultRetentionMs = 604_800_000;
+
     public static async Task EnsureTopicsExistAsync(
         string bootstrapServers, KafkaSecurityOptions security, params string[] topics)
     {
@@ -25,6 +32,7 @@ public static class KafkaTopicProvisioner
                 Name = topic,
                 NumPartitions = 1,
                 ReplicationFactor = 1,
+                Configs = new Dictionary<string, string> { ["retention.ms"] = DefaultRetentionMs.ToString() },
             }));
         }
         catch (CreateTopicsException ex) when (ex.Results.All(r => r.Error.Code == ErrorCode.TopicAlreadyExists))
