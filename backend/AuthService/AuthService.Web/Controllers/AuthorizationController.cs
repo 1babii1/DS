@@ -1,4 +1,5 @@
 ﻿using System.Collections.Immutable;
+using System.Globalization;
 using System.Security.Claims;
 using AuthService.Domain;
 using Microsoft.AspNetCore;
@@ -9,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using OpenIddict.Validation.AspNetCore;
+using Shared.Security;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace AuthService.Web.Controllers;
@@ -100,6 +102,17 @@ public class AuthorizationController(
                 .SetClaim(Claims.Email, await userManager.GetEmailAsync(user))
                 .SetClaim(Claims.Name, await userManager.GetUserNameAsync(user))
                 .SetClaims(Claims.Role, (await userManager.GetRolesAsync(user)).ToImmutableArray());
+
+            // Re-read fresh on every token mint (not just once at login) so a step-up
+            // completed after this session started - or one that has since expired -
+            // is reflected the next time the client exchanges its refresh token. See
+            // StepUpService and Shared.Security.StepUpAuthorizationHandler.
+            if (user.ElevatedUntil is { } elevatedUntil && elevatedUntil > DateTime.UtcNow)
+            {
+                identity.SetClaim(
+                    StepUpClaims.ElevatedUntilClaim,
+                    new DateTimeOffset(elevatedUntil, TimeSpan.Zero).ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture));
+            }
 
             foreach (var claim in identity.Claims)
             {

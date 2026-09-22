@@ -25,6 +25,7 @@
         input { background: #1c2520; color: #f0f4f1; border: 1px solid #53685b; margin-bottom: .5rem; }
         input:focus-visible, button:focus-visible { outline: 3px solid #a8d7b8; outline-offset: 3px; }
         button { border: 0; background: #a8d7b8; color: #131a17; font-weight: 600; cursor: pointer; margin-top: .75rem; }
+        .button-link { display: block; box-sizing: border-box; width: 100%; border-radius: .75rem; padding: .875rem 1rem; margin-top: .75rem; text-align: center; text-decoration: none; font-weight: 600; background: transparent; border: 1px solid #53685b; color: #f0f4f1; }
         .password-field { position: relative; margin-bottom: .5rem; }
         .password-field input { display: block; margin-bottom: 0; padding-right: 3.5rem; }
         .password-toggle { position: absolute; top: 0; right: 0; width: 3.25rem; height: 100%; margin: 0; padding: 0; border: 0; background: transparent; color: #a8d7b8; }
@@ -40,21 +41,34 @@
 <body>
 <main>
     <div class="brand">DS / PEOPLE &amp; ORGANIZATION</div>
-    <h1>Create your account.</h1>
-    <p>Start with viewer access. An administrator can grant additional permissions later.</p>
-    <form method="post">
-        <input type="hidden" asp-for="ReturnUrl" />
-        <div asp-validation-summary="ModelOnly" role="alert"></div>
-        <label asp-for="Email">Work email</label>
-        <input asp-for="Email" autocomplete="email" required aria-describedby="email-error" />
-        <span asp-validation-for="Email" id="email-error"></span>
-        <partial name="Shared/_PasswordInput" model="passwordInput" />
-        <span asp-validation-for="Password" id="password-error"></span>
-        <partial name="Shared/_PasswordInput" model="confirmPasswordInput" />
-        <span asp-validation-for="ConfirmPassword" id="confirm-password-error"></span>
-        <button type="submit">Create viewer account</button>
-        <p class="auth-switch">Already have an account? <a href="/auth/sign-in?ReturnUrl=@Uri.EscapeDataString(Model.ReturnUrl ?? "/")">Sign in</a></p>
-    </form>
+    @if (Model.Registered)
+    {
+        <h1>Check your email.</h1>
+        <p>We sent a confirmation link to @Model.Email. Follow it to activate your account, then sign in.</p>
+        <p class="auth-switch"><a href="/auth/sign-in?ReturnUrl=@Uri.EscapeDataString(Model.ReturnUrl ?? "/")">Back to sign in</a></p>
+    }
+    else
+    {
+        <h1>Create your account.</h1>
+        <p>Start with viewer access. An administrator can grant additional permissions later.</p>
+        <form method="post">
+            <input type="hidden" asp-for="ReturnUrl" />
+            <div asp-validation-summary="ModelOnly" role="alert"></div>
+            <label asp-for="Email">Work email</label>
+            <input asp-for="Email" autocomplete="email" required aria-describedby="email-error" />
+            <span asp-validation-for="Email" id="email-error"></span>
+            <partial name="Shared/_PasswordInput" model="passwordInput" />
+            <span asp-validation-for="Password" id="password-error"></span>
+            <partial name="Shared/_PasswordInput" model="confirmPasswordInput" />
+            <span asp-validation-for="ConfirmPassword" id="confirm-password-error"></span>
+            <button type="submit">Create viewer account</button>
+            @if (Model.GoogleSignInEnabled)
+            {
+                <a class="button-link secondary" href="/auth/external/google/start?returnUrl=@Uri.EscapeDataString(Model.ReturnUrl)">Sign up with Google</a>
+            }
+            <p class="auth-switch">Already have an account? <a href="/auth/sign-in?ReturnUrl=@Uri.EscapeDataString(Model.ReturnUrl ?? "/")">Sign in</a></p>
+        </form>
+    }
 </main>
 <script>
     document.querySelectorAll("[data-password-toggle]").forEach((passwordToggle) => {

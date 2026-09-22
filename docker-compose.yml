@@ -66,6 +66,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - SigningKeys__SigningKeyBase64=${SIGNINGKEYS_SIGNING_KEY_BASE64:-}
       - SigningKeys__EncryptionKeyBase64=${SIGNINGKEYS_ENCRYPTION_KEY_BASE64:-}
+      - SigningKeys__AtRestKeyBase64=${SIGNINGKEYS_AT_REST_KEY_BASE64:-}
       - Auth__SeedAdmin__Email=${SEED_ADMIN_EMAIL:-admin@portfolio.local}
       - Auth__SeedAdmin__Password=${SEED_ADMIN_PASSWORD:-ChangeMe123!}
       - Email__SmtpHost=${EMAIL_SMTP_HOST:-mailpit}
@@ -79,6 +80,8 @@ services:
       - Auth__WebClient__Enabled=true
       - Auth__WebClient__FrontendOrigin=${AUTH_WEB_CLIENT_FRONTEND_ORIGIN:-http://localhost:3000}
       - Auth__WebClient__ClientSecret=${AUTH_OIDC_CLIENT_SECRET:?AUTH_OIDC_CLIENT_SECRET must be set}
+      - Auth__Google__ClientId=${AUTH_GOOGLE_CLIENT_ID:-}
+      - Auth__Google__ClientSecret=${AUTH_GOOGLE_CLIENT_SECRET:-}
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5130/health/ready || exit 1"]
       interval: 10s

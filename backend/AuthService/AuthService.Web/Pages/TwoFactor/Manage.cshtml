@@ -1,0 +1,97 @@
+@page "/auth/2fa/manage"
+@model AuthService.Web.Pages.TwoFactor.ManageModel
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    Layout = null;
+}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Two-factor authentication · DS</title>
+    <style>
+        :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #131a17; color: #f0f4f1; }
+        body { margin: 0; min-height: 100dvh; display: grid; place-items: center; }
+        main { width: min(32rem, calc(100% - 3rem)); padding-block: 3rem; }
+        .brand { font-weight: 700; letter-spacing: .15em; color: #a8d7b8; }
+        h1 { font-size: 2rem; letter-spacing: -.03em; margin-bottom: .75rem; }
+        h2 { font-size: 1.15rem; margin: 2rem 0 .5rem; }
+        p { color: #abb9b0; line-height: 1.6; }
+        form { display: grid; gap: .75rem; margin-top: 1rem; }
+        input, button { box-sizing: border-box; width: 100%; border-radius: .75rem; padding: .875rem 1rem; font: inherit; }
+        input { background: #1c2520; color: #f0f4f1; border: 1px solid #53685b; margin-bottom: .5rem; }
+        input:focus-visible, button:focus-visible { outline: 3px solid #a8d7b8; outline-offset: 3px; }
+        button { border: 0; background: #a8d7b8; color: #131a17; font-weight: 600; cursor: pointer; }
+        button.secondary { background: transparent; border: 1px solid #53685b; color: #f0f4f1; }
+        .validation-summary-errors, .field-validation-error { color: #ffb5b5; }
+        .validation-summary-valid { display: none; }
+        .status { display: inline-block; padding: .25rem .75rem; border-radius: 999px; font-size: .85rem; font-weight: 600; }
+        .status--on { background: #1f3a28; color: #a8d7b8; }
+        .status--off { background: #3a2020; color: #ffb5b5; }
+        .key { background: #1c2520; border: 1px solid #53685b; border-radius: .75rem; padding: .875rem 1rem; font-family: ui-monospace, monospace; word-break: break-all; margin: 1rem 0; }
+        .recovery-codes { background: #1c2520; border: 1px solid #53685b; border-radius: .75rem; padding: 1rem; margin: 1rem 0; display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; font-family: ui-monospace, monospace; }
+        .warning { border: 1px solid #a8873a; background: #2c2313; border-radius: .75rem; padding: 1rem; color: #e3c98a; margin: 1rem 0; }
+    </style>
+</head>
+<body>
+<main>
+    <div class="brand">DS / PEOPLE &amp; ORGANIZATION</div>
+    <h1>Two-factor authentication</h1>
+    <p>Status: <span class="status @(Model.Enabled ? "status--on" : "status--off")">@(Model.Enabled ? "Enabled" : "Disabled")</span></p>
+    <p><a href="/auth/passkeys/manage">Manage passkeys →</a> · <a href="/auth/sessions/manage">View active sessions →</a> · <a href="/auth/account/settings">Account settings →</a></p>
+
+    @if (Model.RecoveryCodes is not null)
+    {
+        <div class="warning">
+            <strong>Save these recovery codes now.</strong> Each one lets you sign in once if
+            you lose access to your authenticator app. They will not be shown again.
+        </div>
+        <div class="recovery-codes">
+            @foreach (var code in Model.RecoveryCodes)
+            {
+                <span>@code</span>
+            }
+        </div>
+    }
+
+    @if (!Model.Enabled && Model.Setup is not null)
+    {
+        <h2>Set up an authenticator app</h2>
+        <p>Scan this with an authenticator app (Google Authenticator, 1Password, Authy), or enter the key manually, then confirm with the 6-digit code it generates.</p>
+        <div class="key">@Model.Setup.SharedKey</div>
+        <p><a href="@Model.Setup.AuthenticatorUri">@Model.Setup.AuthenticatorUri</a></p>
+        <form method="post" asp-page-handler="Enable">
+            <div asp-validation-summary="ModelOnly" role="alert"></div>
+            <label asp-for="Code">Confirmation code</label>
+            <input asp-for="Code" autocomplete="one-time-code" inputmode="numeric" placeholder="123 456" required aria-describedby="code-error" />
+            <span asp-validation-for="Code" id="code-error"></span>
+            <button type="submit">Enable two-factor authentication</button>
+        </form>
+    }
+
+    @if (Model.Enabled)
+    {
+        <h2>Regenerate recovery codes</h2>
+        <p>Generating new codes invalidates every code you were given before.</p>
+        <form method="post" asp-page-handler="RegenerateCodes">
+            <div asp-validation-summary="ModelOnly" role="alert"></div>
+            <label asp-for="Password">Confirm your password</label>
+            <input asp-for="Password" autocomplete="current-password" type="password" required aria-describedby="pw-error-1" />
+            <span asp-validation-for="Password" id="pw-error-1"></span>
+            <button class="secondary" type="submit">Regenerate recovery codes</button>
+        </form>
+
+        <h2>Disable two-factor authentication</h2>
+        <p>Your account will only require a password to sign in.</p>
+        <form method="post" asp-page-handler="Disable">
+            <label asp-for="Password">Confirm your password</label>
+            <input asp-for="Password" autocomplete="current-password" type="password" required aria-describedby="pw-error-2" />
+            <span asp-validation-for="Password" id="pw-error-2"></span>
+            <button class="secondary" type="submit">Disable two-factor authentication</button>
+        </form>
+    }
+</main>
+</body>
+</html>

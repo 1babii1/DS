@@ -67,6 +67,13 @@ public class EmployeeEventsConsumer(
         {
             UserName = hired.Email,
             Email = hired.Email,
+
+            // Same reasoning as OpenIddictSeeder's seed admin: an HR-provisioned account's
+            // email came from the hiring process, not a self-asserted registration form, so
+            // it is already trustworthy. Leaving this false would have silently locked every
+            // newly hired employee out - RequireConfirmedAccount blocks PasswordSignInAsync
+            // for any account with EmailConfirmed = false, temporary password or not.
+            EmailConfirmed = true,
             EmployeeId = hired.EmployeeId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,

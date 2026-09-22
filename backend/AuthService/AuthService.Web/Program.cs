@@ -4,6 +4,11 @@ using AuthService.Application.Database;
 using AuthService.Infrastructure.Postgres;
 using AuthService.Web.Configuration;
 using AuthService.Web.Consumers;
+using Fido2NetLib;
+using Microsoft.AspNetCore.Identity;
+using Polly;
+using Polly.CircuitBreaker;
+using Polly.Retry;
 using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using Shared.Cors;
@@ -11,6 +16,7 @@ using Shared.HealthChecks;
 using Shared.Middlewares;
 using Shared.Observability;
 using Shared.Outbox;
+using Shared.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -53,6 +59,96 @@ builder.Services.AddOptions<EmailOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+builder.Services.AddScoped<AccountRecoveryService>();
+builder.Services.AddScoped<TwoFactorService>();
+builder.Services.AddScoped<SecurityAuditService>();
+builder.Services.AddScoped<StepUpService>();
+builder.Services.AddScoped<AdminAccountService>();
+builder.Services.AddAdminPolicy();
+
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<PasskeyService>();
+
+// RPID/Origins come from Auth:Issuer (the same value AddOpenIddictServer already reads for
+// SetIssuer) rather than a second config entry: WebAuthn's relying-party identity is AuthService's
+// own domain, since the passkey ceremonies run on its own Razor Pages, not the SPA's origin.
+var issuerUri = new Uri(builder.Configuration["Auth:Issuer"] ?? "http://localhost:5100");
+builder.Services.AddFido2(options =>
+{
+    options.RPID = issuerUri.Host;
+    options.RPName = "DS";
+    options.Origins = new HashSet<string> { issuerUri.GetLeftPart(UriPartial.Authority) };
+});
+builder.Services.AddStepUpPolicy();
+
+// "Sign in with Google" - disabled unless a client id/secret is actually configured, same
+// fallback reasoning as WebClientOptions.Enabled. SignInScheme is Identity's own external
+// cookie (IdentityConstants.ExternalScheme), not the application cookie: it only needs to
+// survive the round trip to Google and back, and ExternalLoginController is what turns it
+// into a real Identity.Application session (linking to an existing account or provisioning
+// a new one), the same two-step shape ASP.NET Identity's own external-login samples use.
+builder.Services.AddOptions<GoogleOptions>()
+    .Bind(builder.Configuration.GetSection(GoogleOptions.SectionName));
+var googleOptions = new GoogleOptions();
+builder.Configuration.GetSection(GoogleOptions.SectionName).Bind(googleOptions);
+if (googleOptions.Enabled)
+{
+    builder.Services.AddAuthentication()
+        .AddGoogle(options =>
+        {
+            options.ClientId = googleOptions.ClientId;
+            options.ClientSecret = googleOptions.ClientSecret;
+            options.SignInScheme = IdentityConstants.ExternalScheme;
+            options.CallbackPath = "/auth/external/google/callback";
+            GoogleClaimMapping.Apply(options);
+        });
+}
+
+builder.Services.AddScoped<ExternalLoginService>();
+builder.Services.AddScoped<AuthSessionService>();
+builder.Services.AddScoped<EmailChangeService>();
+builder.Services.AddScoped<AccountDeletionService>();
+builder.Services.AddSingleton<SigningKeyProtector>();
+builder.Services.AddScoped<SigningKeyStore>();
+
+// Private signing/encryption keys must not sit in the database as plaintext in production: a
+// database-only leak would otherwise hand over the keys that mint and decrypt every token.
+if (builder.Environment.IsProduction()
+    && string.IsNullOrWhiteSpace(builder.Configuration[SigningKeyProtector.ConfigurationKey]))
+{
+    throw new InvalidOperationException(
+        $"{SigningKeyProtector.ConfigurationKey} must be set in Production (32 random bytes, base64: openssl rand -base64 32).");
+}
+
+builder.Services.AddHttpClient<IPasswordBreachChecker, HaveIBeenPwnedPasswordChecker>(client =>
+{
+    client.BaseAddress = new Uri("https://api.pwnedpasswords.com/");
+    client.Timeout = TimeSpan.FromSeconds(3);
+    client.DefaultRequestHeaders.Add("Add-Padding", "true");
+})
+
+    // A blip against a third-party API shouldn't fall straight to "skip the check" - worth
+    // one quick retry first. The breaker exists so a real HIBP outage stops adding latency
+    // to every registration/password-reset request once it's established the API is down;
+    // HaveIBeenPwnedPasswordChecker's own catch treats a tripped breaker the same as a
+    // direct network failure and fails open either way.
+    .AddResilienceHandler("hibp", builder =>
+    {
+        builder.AddRetry(new()
+        {
+            MaxRetryAttempts = 2,
+            Delay = TimeSpan.FromMilliseconds(100),
+            BackoffType = DelayBackoffType.Constant,
+        });
+
+        builder.AddCircuitBreaker(new()
+        {
+            FailureRatio = 0.5,
+            SamplingDuration = TimeSpan.FromSeconds(30),
+            MinimumThroughput = 5,
+            BreakDuration = TimeSpan.FromSeconds(15),
+        });
+    });
 
 builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
 builder.Services.AddOutboxPublisher<AuthDbContext>(builder.Configuration, "auth.events");
@@ -124,6 +220,7 @@ app.MapControllers();
 app.MapRazorPages();
 app.MapDefaultHealthChecks();
 
+await SigningKeySeeder.SeedAsync(app.Services, app.Configuration);
 await OpenIddictSeeder.SeedAsync(app.Services);
 await WebClientSeeder.SeedAsync(app.Services);
 
