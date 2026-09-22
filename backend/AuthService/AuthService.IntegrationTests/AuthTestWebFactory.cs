@@ -39,6 +39,8 @@ public class AuthTestWebFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public FakeEmailSender EmailSender { get; } = new();
 
+    public FakePasswordBreachChecker PasswordBreachChecker { get; } = new();
+
     public async Task InitializeAsync()
     {
         await _dbContainer.StartAsync();
@@ -84,6 +86,12 @@ public class AuthTestWebFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("RateLimiting:Auth:PermitLimit", RateLimitPermits.ToString());
         builder.UseSetting("RateLimiting:Auth:WindowSeconds", "60");
 
+        // The whole suite runs with at-rest key encryption ON (a fixed, obviously-test-only master
+        // key), so every token flow exercised here also proves encrypted keys load and validate.
+        builder.UseSetting(
+            "SigningKeys:AtRestKeyBase64",
+            Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("test-only-32-byte-master-key!!!!")));
+
         builder.ConfigureTestServices(services =>
         {
             // EmployeeEventsConsumer and the outbox publisher are both IHostedService.
@@ -100,20 +108,43 @@ public class AuthTestWebFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
             services.RemoveAll<IEmailSender>();
             services.AddSingleton<IEmailSender>(EmailSender);
+
+            services.RemoveAll<IPasswordBreachChecker>();
+            services.AddSingleton<IPasswordBreachChecker>(PasswordBreachChecker);
         });
     }
 
     private async Task InitializeRespawner()
     {
-        // Roles and the OpenIddict client application are shared setup, not per-test
-        // state - excluded from the reset so every test doesn't have to re-seed them.
+        // Roles and everything OpenIddictSeeder creates once at startup (the "roles" API
+        // scope with its Resources, and the "portfolio-frontend" client application) are
+        // shared setup, not per-test state - excluded from the reset so every test doesn't
+        // have to re-seed them. This previously listed only the Identity-side tables
+        // ("roles"/"role_claims"); the OpenIddict tables kept their PascalCase EF Core
+        // defaults rather than this project's own snake_case naming, and being wiped after
+        // the first test in a class silently left every later test in that class with no
+        // seeded scope/application - found because a test needed the seeded client to
+        // still exist for a second time in the same run. OpenIddictAuthorizations/
+        // OpenIddictTokens are deliberately NOT here: those are genuinely per-test state.
         _respawner = await Respawner.CreateAsync(
             _dbConnection,
             new RespawnerOptions
             {
                 DbAdapter = DbAdapter.Postgres,
                 SchemasToInclude = ["auth"],
-                TablesToIgnore = ["roles", "role_claims", "__efmigrationshistory"],
+                TablesToIgnore =
+                [
+                    "roles", "role_claims", "__efmigrationshistory",
+                    "OpenIddictApplications", "OpenIddictScopes",
+
+                    // SigningKeySeeder seeds these once per factory lifetime, same shared-setup
+                    // reasoning as the two rows above - not per-test state. Missing this was a
+                    // real, observed bug: Respawn wiping signing_keys after the first test in a
+                    // class left every later test with an empty table, and the next cache-miss
+                    // resolution of OpenIddictServerOptions threw "At least one encryption key
+                    // must be registered" instead of finding the keys seeded at startup.
+                    "signing_keys",
+                ],
             });
     }
 }

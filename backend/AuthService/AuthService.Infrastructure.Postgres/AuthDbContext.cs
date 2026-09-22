@@ -12,6 +12,12 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options)
 {
     public DbSet<DeadLetterEntry> DeadLetters => Set<DeadLetterEntry>();
 
+    public DbSet<PasskeyCredential> PasskeyCredentials => Set<PasskeyCredential>();
+
+    public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
+
+    public DbSet<SigningKeyRecord> SigningKeys => Set<SigningKeyRecord>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         builder.HasDefaultSchema("auth");
@@ -62,6 +68,37 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options)
 
             entity.HasIndex(e => e.MessageId).IsUnique();
             entity.HasIndex(e => e.FailedAt);
+        });
+
+        builder.Entity<PasskeyCredential>(entity =>
+        {
+            entity.ToTable("passkey_credentials");
+            entity.HasKey(c => c.Id);
+
+            // Global lookup key for the usernameless login flow: the client sends only
+            // the FIDO2 credential id, and the account it belongs to is found from this
+            // alone, before any email/username is known.
+            entity.HasIndex(c => c.CredentialId).IsUnique();
+            entity.HasIndex(c => c.AccountId);
+
+            entity.Property(c => c.Name).HasMaxLength(100).IsRequired();
+        });
+
+        builder.Entity<AuthSession>(entity =>
+        {
+            entity.ToTable("auth_sessions");
+            entity.HasKey(s => s.Id);
+            entity.HasIndex(s => s.AccountId);
+            entity.Property(s => s.UserAgent).HasMaxLength(500);
+        });
+
+        builder.Entity<SigningKeyRecord>(entity =>
+        {
+            entity.ToTable("signing_keys");
+            entity.HasKey(k => k.Id);
+            entity.HasIndex(k => new { k.Purpose, k.RetiredAt });
+            entity.Property(k => k.KeyId).HasMaxLength(100).IsRequired();
+            entity.Property(k => k.PrivateKeyPem).IsRequired();
         });
 
         builder.UseOpenIddict();

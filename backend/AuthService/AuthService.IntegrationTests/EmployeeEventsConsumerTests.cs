@@ -1,9 +1,12 @@
+using System.Net;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using AuthService.Domain;
 using AuthService.Infrastructure.Postgres;
 using AuthService.IntegrationTests.Infrastructure;
 using AuthService.Web.Consumers;
+using AuthService.Web.Contracts;
 using Confluent.Kafka;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -50,6 +53,13 @@ public class EmployeeEventsConsumerTests : IClassFixture<AuthTestWebFactory>, IA
         var account = await ExecuteInDb(db => db.Users.SingleAsync(a => a.EmployeeId == employeeId));
         Assert.Equal(email, account.Email);
 
+        // Regression guard: RequireConfirmedAccount blocks PasswordSignInAsync for any
+        // account with EmailConfirmed = false. An HR-provisioned account's email is
+        // already trustworthy (it came from the hiring process, not self-registration),
+        // so it must be pre-confirmed the same way OpenIddictSeeder's seed admin is -
+        // otherwise every newly hired employee would be locked out on their first login.
+        Assert.True(account.EmailConfirmed);
+
         var userManager = _services.CreateScope().ServiceProvider.GetRequiredService<UserManager<Account>>();
         Assert.True(await userManager.IsInRoleAsync(account, RoleNames.Viewer));
 
@@ -58,6 +68,22 @@ public class EmployeeEventsConsumerTests : IClassFixture<AuthTestWebFactory>, IA
         var outboxCount = await ExecuteInDb(db => db.Set<Shared.Outbox.OutboxMessage>()
             .CountAsync(m => m.Type == "AccountProvisioned" && m.AggregateId == employeeId.ToString()));
         Assert.Equal(1, outboxCount);
+    }
+
+    [Fact]
+    public async Task A_provisioned_employee_can_sign_in_with_the_emailed_temporary_password()
+    {
+        var employeeId = Guid.NewGuid();
+        var email = $"login-after-hire-{Guid.NewGuid():N}@test.local";
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(
+            BuildHiredResult(Guid.NewGuid(), employeeId, "New Hire", email), CancellationToken.None));
+
+        var temporaryPassword = _factory.EmailSender.Sent.Single(s => s.ToEmail == email).Password;
+
+        using var client = _factory.CreateClient();
+        var response = await client.PostAsJsonAsync("/auth/login", new LoginRequest(email, temporaryPassword));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 
     [Fact]

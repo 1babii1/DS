@@ -5,7 +5,10 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Analyzers -->
+    <PackageVersion Include="Fido2" Version="4.1.0" />
+    <PackageVersion Include="Fido2.AspNet" Version="4.1.0" />
     <PackageVersion Include="MailKit" Version="4.16.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.Google" Version="10.0.12" />
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
     <PackageVersion Include="OpenIddict.Quartz" Version="7.7.0" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.18.0" />

@@ -39,6 +39,9 @@ namespace AuthService.Infrastructure.Postgres.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("ElevatedUntil")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
@@ -48,6 +51,12 @@ namespace AuthService.Infrastructure.Postgres.Migrations
 
                     b.Property<Guid?>("EmployeeId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("LastLoginAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastLoginIp")
+                        .HasColumnType("text");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");
@@ -101,46 +110,77 @@ namespace AuthService.Infrastructure.Postgres.Migrations
                     b.ToTable("users", "auth");
                 });
 
-            modelBuilder.Entity("AuthService.Domain.DeadLetterEntry", b =>
+            modelBuilder.Entity("AuthService.Domain.AuthSession", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<int>("AttemptCount")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Error")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("FailedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("MessageId")
+                    b.Property<Guid>("AccountId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("MessageKey")
-                        .IsRequired()
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IpAddress")
                         .HasColumnType("text");
 
-                    b.Property<string>("Payload")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Topic")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("FailedAt");
+                    b.HasIndex("AccountId");
 
-                    b.HasIndex("MessageId")
+                    b.ToTable("auth_sessions", "auth");
+                });
+
+            modelBuilder.Entity("AuthService.Domain.PasskeyCredential", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AaGuid")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<byte[]>("CredentialId")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<byte[]>("PublicKey")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<long>("SignatureCounter")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("CredentialId")
                         .IsUnique();
 
-                    b.ToTable("dead_letters", "auth");
+                    b.ToTable("passkey_credentials", "auth");
                 });
 
             modelBuilder.Entity("AuthService.Domain.Role", b =>
@@ -168,6 +208,37 @@ namespace AuthService.Infrastructure.Postgres.Migrations
                         .HasDatabaseName("RoleNameIndex");
 
                     b.ToTable("roles", "auth");
+                });
+
+            modelBuilder.Entity("AuthService.Domain.SigningKeyRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("KeyId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("PrivateKeyPem")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("RetiredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Purpose", "RetiredAt");
+
+                    b.ToTable("signing_keys", "auth");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -479,6 +550,48 @@ namespace AuthService.Infrastructure.Postgres.Migrations
                     b.HasIndex("ApplicationId", "Status", "Subject", "Type");
 
                     b.ToTable("OpenIddictTokens", "auth");
+                });
+
+            modelBuilder.Entity("Shared.Kafka.DeadLetterEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Error")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("FailedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MessageKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FailedAt");
+
+                    b.HasIndex("MessageId")
+                        .IsUnique();
+
+                    b.ToTable("dead_letters", "auth");
                 });
 
             modelBuilder.Entity("Shared.Outbox.OutboxMessage", b =>

@@ -1,0 +1,110 @@
+@page "/auth/account/settings"
+@model AuthService.Web.Pages.Settings.SettingsModel
+@{
+    Layout = null;
+}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Account settings · DS</title>
+    <style>
+        :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #131a17; color: #f0f4f1; }
+        body { margin: 0; min-height: 100dvh; display: grid; place-items: center; }
+        main { width: min(32rem, calc(100% - 3rem)); padding-block: 3rem; }
+        .brand { font-weight: 700; letter-spacing: .15em; color: #a8d7b8; }
+        h1 { font-size: 2rem; letter-spacing: -.03em; margin-bottom: .75rem; }
+        h2 { font-size: 1.15rem; margin: 2rem 0 .5rem; }
+        p { color: #abb9b0; line-height: 1.6; }
+        input, button { box-sizing: border-box; width: 100%; border-radius: .75rem; padding: .875rem 1rem; font: inherit; }
+        input { background: #1c2520; color: #f0f4f1; border: 1px solid #53685b; margin-bottom: .5rem; }
+        button { border: 0; background: #a8d7b8; color: #131a17; font-weight: 600; cursor: pointer; margin-top: .5rem; }
+        button:disabled { opacity: .6; cursor: default; }
+        .danger-zone { border: 1px solid #a83a3a; border-radius: .75rem; padding: 1rem; margin-top: .5rem; }
+        .danger-zone button { background: #a83a3a; color: #f0f4f1; }
+        .message { border-radius: .75rem; padding: .875rem 1rem; margin: 1rem 0; font-size: .9rem; }
+        .message--error { border: 1px solid #a83a3a; background: #2c1313; color: #ffb5b5; }
+        .message--success { border: 1px solid #4d7a5a; background: #14231a; color: #a8d7b8; }
+        .links { margin-top: 2rem; font-size: .9rem; }
+        .links a { color: #a8d7b8; }
+    </style>
+</head>
+<body>
+<main>
+    <div class="brand">DS / PEOPLE &amp; ORGANIZATION</div>
+    <h1>Account settings</h1>
+    <p>Signed in as <strong>@Model.Email</strong>.</p>
+
+    <h2>Change email</h2>
+    <p>We'll send a confirmation link to the new address - nothing changes until you follow it.</p>
+    <div id="email-message"></div>
+    <input id="new-email" type="email" placeholder="New email address" autocomplete="email" />
+    <input id="email-password" type="password" placeholder="Current password" autocomplete="current-password" />
+    <button id="change-email-button" type="button">Send confirmation link</button>
+
+    <h2>Danger zone</h2>
+    <div class="danger-zone">
+        <p>Deleting your account is permanent - your passkeys, sessions, and sign-in history for it are all removed.</p>
+        <div id="delete-message"></div>
+        <input id="delete-password" type="password" placeholder="Current password" autocomplete="current-password" />
+        <button id="delete-account-button" type="button">Delete my account</button>
+    </div>
+
+    <p class="links">
+        <a href="/auth/2fa/manage">Two-factor authentication</a> ·
+        <a href="/auth/passkeys/manage">Passkeys</a> ·
+        <a href="/auth/sessions/manage">Sessions</a>
+    </p>
+</main>
+<script>
+    function showMessage(elementId, text, success) {
+        const el = document.getElementById(elementId);
+        el.innerHTML = text
+            ? `<div class="message ${success ? "message--success" : "message--error"}" role="alert">${text}</div>`
+            : "";
+    }
+
+    document.getElementById("change-email-button").addEventListener("click", async () => {
+        const newEmail = document.getElementById("new-email").value.trim();
+        const password = document.getElementById("email-password").value;
+        showMessage("email-message", "", true);
+
+        const response = await fetch("/auth/email/request-change", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ newEmail, password }),
+        });
+
+        document.getElementById("email-password").value = "";
+        if (response.ok) {
+            showMessage("email-message", "Check the new address for a confirmation link.", true);
+            document.getElementById("new-email").value = "";
+        } else {
+            showMessage("email-message", "Could not start the email change. Check your password and try again.", false);
+        }
+    });
+
+    document.getElementById("delete-account-button").addEventListener("click", async () => {
+        const password = document.getElementById("delete-password").value;
+        if (!confirm("This permanently deletes your account. Continue?")) {
+            return;
+        }
+
+        const response = await fetch("/auth/account", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password }),
+        });
+
+        document.getElementById("delete-password").value = "";
+        if (response.ok) {
+            window.location.href = "/auth/sign-in";
+        } else {
+            showMessage("delete-message", "Could not delete your account. Check your password and try again.", false);
+        }
+    });
+</script>
+</body>
+</html>
