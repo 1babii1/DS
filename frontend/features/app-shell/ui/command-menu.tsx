@@ -19,6 +19,7 @@ type CommandItem = {
 	icon: ComponentType<{ size?: number; strokeWidth?: number }>
 	kind?: SearchKind
 	label: string
+	matchedFields?: string[]
 }
 
 const navigationCommands: CommandItem[] = [
@@ -63,7 +64,8 @@ function toSearchItem(result: SearchResult): CommandItem {
 		label: result.title,
 		description: result.subtitle ?? `${result.kind[0].toUpperCase()}${result.kind.slice(1)} result`,
 		icon: resultIcons[result.kind],
-		kind: result.kind
+		kind: result.kind,
+		matchedFields: result.matchedFields
 	}
 }
 
@@ -154,7 +156,7 @@ function CommandOption({ active, command, onMouseEnter, onSelect }: { active: bo
 
 	return <button aria-selected={active} className='command-option' data-selected={active} id={command.id} onClick={() => onSelect(command.href)} onMouseEnter={onMouseEnter} role='option' type='button'>
 		<Icon aria-hidden='true' size={16} />
-		<span><strong>{command.label}</strong><small>{command.description}</small></span>
+		<span><strong>{command.label}</strong><small>{command.description}</small>{command.matchedFields?.length ? <small className='command-option__matches'>Matched: {command.matchedFields.join(', ')}</small> : null}</span>
 		<kbd>↵</kbd>
 	</button>
 }
