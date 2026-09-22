@@ -26,9 +26,10 @@ function isInternalDeepLink(value: string | null) {
 
 export function NotificationBell({ enabled }: { enabled: boolean }) {
 	const [open, setOpen] = useState(false)
+	const [unreadOnly, setUnreadOnly] = useState(false)
 	const router = useRouter()
 	const queryClient = useQueryClient()
-	const notifications = useInfiniteQuery({ queryKey: ['notifications'], queryFn: ({ pageParam }) => notificationsApi.list(pageParam), initialPageParam: 1, getNextPageParam: page => page.hasNext ? page.page + 1 : undefined, enabled: enabled && open })
+	const notifications = useInfiniteQuery({ queryKey: ['notifications', { unreadOnly }], queryFn: ({ pageParam }) => notificationsApi.list(pageParam, unreadOnly), initialPageParam: 1, getNextPageParam: page => page.hasNext ? page.page + 1 : undefined, enabled: enabled && open })
 	const unreadCount = useQuery({ queryKey: ['notifications', 'unread-count'], queryFn: notificationsApi.unreadCount, enabled, refetchInterval: 30_000 })
 	const refresh = () => Promise.all([
 		queryClient.invalidateQueries({ queryKey: ['notifications'] }),
@@ -56,6 +57,7 @@ export function NotificationBell({ enabled }: { enabled: boolean }) {
 		</SheetTrigger>
 		<SheetContent aria-describedby='notification-description' className='notification-sheet'>
 			<div className='notification-sheet__heading'><div><p className='eyebrow'>Notification center</p><SheetTitle>Updates for you</SheetTitle><p id='notification-description'>Changes from your workspace and rewards activity.</p></div>{count ? <button className='filter-reset' disabled={markAllRead.isPending} onClick={() => markAllRead.mutate()} type='button'><CheckCheck aria-hidden='true' size={15} />Mark all read</button> : null}</div>
+			<div className='notification-sheet__filters'><button aria-pressed={unreadOnly} onClick={() => setUnreadOnly(value => !value)} type='button'>{unreadOnly ? 'Showing unread' : 'Show unread only'}</button></div>
 			{notifications.isPending ? <div className='notification-sheet__state'><LoaderCircle aria-hidden='true' className='animate-spin' size={18} />Loading notifications…</div> : null}
 			{notifications.error && status !== 401 && status !== 403 ? <div className='notification-sheet__state' role='alert'>Notifications are temporarily unavailable. <button onClick={() => notifications.refetch()} type='button'>Try again</button></div> : null}
 			{markRead.error || markAllRead.error ? <p className='notification-sheet__error' role='alert'>The notification state could not be updated. Try again.</p> : null}
