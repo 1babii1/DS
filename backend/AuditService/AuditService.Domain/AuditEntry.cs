@@ -33,7 +33,7 @@ public class AuditEntry
         string payloadJson,
         DateTime occurredAt) => new()
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             MessageId = messageId,
             SourceService = sourceService,
             EventType = eventType,

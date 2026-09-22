@@ -40,7 +40,7 @@ public class DeadLetterEntry
         string error,
         int attemptCount) => new()
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             MessageId = messageId,
             Topic = topic,
             MessageKey = messageKey,

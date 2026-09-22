@@ -37,7 +37,7 @@ public class Transaction
         TransactionSource source,
         Guid? grantedByAccountId) => new()
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             EmployeeId = employeeId,
             Amount = amount,
             Reason = reason,

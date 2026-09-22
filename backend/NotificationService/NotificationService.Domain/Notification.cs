@@ -44,7 +44,7 @@ public class Notification
         string body,
         string? deepLink = null) => new()
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             SourceMessageId = sourceMessageId,
             RecipientAccountId = recipientAccountId,
             Type = type,
