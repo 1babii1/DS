@@ -19,8 +19,8 @@ connects with `Search Path=<schema>,public` in its connection string. No domain
 service's code references another service's schema - the one deliberate exception is
 McpServer, which reads `directory.*` and `employee.*` directly through Dapper. It isn't
 a domain service with data of its own; it's a read-only reporting layer over both, and
-crossing the schema boundary is the point rather than a leak (see the MCP server ADR,
-not yet written up).
+crossing the schema boundary is the point rather than a leak (see
+[0008](0008-mcp-server-cross-schema-reporting-layer.md)).
 
 ## Consequences
 - Logical isolation (schema boundaries, no cross-schema foreign keys) without the

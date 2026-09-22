@@ -14,8 +14,9 @@ descriptions as each phase shipped, not backfilled generically.
 | [0005](0005-rewards-ledger-design.md) | Rewards ledger design and no cross-service employee validation in v1 |
 | [0006](0006-signalr-notification-center.md) | SignalR for the in-app notification center |
 | [0007](0007-elasticsearch-cross-service-search.md) | Elasticsearch-backed cross-service search |
+| [0008](0008-mcp-server-cross-schema-reporting-layer.md) | McpServer as a read-only cross-schema reporting layer |
+| [0009](0009-postgres-backup-and-restore.md) | Postgres backup and restore |
 
 Not yet written up, though each decision is already live in the codebase and explained
 in its own commit messages: gRPC for internal calls, local JWT validation via JWKS,
-OpenIddict as the OIDC provider, pgvector + local Ollama for semantic search, and
-McpServer as its own read-only service.
+OpenIddict as the OIDC provider, pgvector + local Ollama for semantic search.
