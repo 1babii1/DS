@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# Postgres dumps written by scripts/backup-postgres.sh
+/backups/
+
 # User-specific files
 *.rsuser
 *.suo
