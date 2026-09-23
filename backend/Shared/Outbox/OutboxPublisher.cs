@@ -73,6 +73,14 @@ public class OutboxPublisher<TContext>(
             return;
         }
 
+        // Isolated per message, not a single try around the whole batch: without this, one
+        // message that keeps failing (a stuck broker past message.timeout.ms, say) sits
+        // first in every future poll's OrderBy(OccurredAt) batch and permanently blocks
+        // every other pending message behind it - not just its own aggregate, every
+        // aggregate sharing this outbox table. A transient failure here still means the
+        // message is retried on the next poll cycle (ProcessedAt stays null); it just no
+        // longer holds up messages that succeeded around it.
+        var succeeded = 0;
         foreach (var message in pending)
         {
             var kafkaMessage = new Message<string, string>
@@ -86,12 +94,30 @@ public class OutboxPublisher<TContext>(
                 },
             };
 
-            await _producer!.ProduceAsync(_options.Topic, kafkaMessage, cancellationToken);
-            message.MarkProcessed();
+            try
+            {
+                await _producer!.ProduceAsync(_options.Topic, kafkaMessage, cancellationToken);
+                message.MarkProcessed();
+                succeeded++;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Failed to publish outbox message {MessageId} ({MessageType}) to {Topic} - will retry next poll",
+                    message.Id,
+                    message.Type,
+                    _options.Topic);
+            }
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Published {Count} outbox message(s) to {Topic}", pending.Count, _options.Topic);
+        if (succeeded > 0)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        logger.LogInformation(
+            "Published {Succeeded}/{Total} outbox message(s) to {Topic}", succeeded, pending.Count, _options.Topic);
     }
 
     public override void Dispose()
