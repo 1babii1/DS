@@ -11,4 +11,7 @@ public class OutboxPublisherOptions
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(2);
 
     public int BatchSize { get; set; } = 20;
+
+    // Isolated failures before a message is parked for an operator. See OutboxBatch.
+    public int MaxAttempts { get; set; } = 10;
 }

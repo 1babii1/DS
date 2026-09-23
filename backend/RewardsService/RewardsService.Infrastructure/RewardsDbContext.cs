@@ -84,6 +84,7 @@ public class RewardsDbContext(DbContextOptions<RewardsDbContext> options) : DbCo
             entity.Property(e => e.Type).HasMaxLength(100).IsRequired();
             entity.Property(e => e.AggregateId).HasMaxLength(200).IsRequired();
             entity.Property(e => e.Payload).HasColumnType("jsonb").IsRequired();
+            entity.Property(e => e.LastError).HasMaxLength(OutboxMessage.MaxErrorLength);
 
             entity.HasIndex(e => e.ProcessedAt);
         });

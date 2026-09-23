@@ -57,6 +57,7 @@ public class EmployeeDbContext(DbContextOptions<EmployeeDbContext> options) : Db
             entity.Property(m => m.Type).HasMaxLength(200).IsRequired();
             entity.Property(m => m.AggregateId).HasMaxLength(200).IsRequired();
             entity.Property(m => m.Payload).HasColumnType("jsonb").IsRequired();
+            entity.Property(m => m.LastError).HasMaxLength(OutboxMessage.MaxErrorLength);
 
             entity.HasIndex(m => m.ProcessedAt);
         });

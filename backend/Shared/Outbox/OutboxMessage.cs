@@ -21,6 +21,17 @@ public class OutboxMessage
 
     public DateTime? ProcessedAt { get; private set; }
 
+    // Publish failures that counted toward parking (see OutboxBatch for which ones count).
+    public int AttemptCount { get; private set; }
+
+    public string? LastError { get; private set; }
+
+    // Set when a message has failed too often to keep retrying silently. A parked message
+    // is skipped by the publisher and surfaced to an operator; Redrive() puts it back.
+    public DateTime? ParkedAt { get; private set; }
+
+    public const int MaxErrorLength = 2000;
+
     private OutboxMessage()
     {
     }
@@ -39,4 +50,20 @@ public class OutboxMessage
     };
 
     public void MarkProcessed() => ProcessedAt = DateTime.UtcNow;
+
+    public void RecordFailure(string error, int maxAttempts)
+    {
+        AttemptCount++;
+        LastError = error.Length > MaxErrorLength ? error[..MaxErrorLength] : error;
+        if (AttemptCount >= maxAttempts)
+        {
+            ParkedAt = DateTime.UtcNow;
+        }
+    }
+
+    public void Redrive()
+    {
+        AttemptCount = 0;
+        ParkedAt = null;
+    }
 }
