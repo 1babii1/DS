@@ -30,9 +30,43 @@ distributed-systems problem, not because a product needed it. Where that shows: 
 non-trivial decision has a written ADR explaining *why*, not just *what* — see
 [`docs/adr/`](docs/adr/).
 
-If you're evaluating this as a portfolio, the fastest way in is `docs/adr/` — seven short
+If you're evaluating this as a portfolio, the fastest way in is `docs/adr/` — 14 short
 records of the actual trade-offs, written the way I'd defend them in a design review, not
 backfilled to sound tidy.
+
+## Proof, not claims
+
+Every claim below links to a test or a measurement, not a description of intent. A 2-minute
+path through it: open one linked test, read its name and its first comment, run it. Where a
+test was also confirmed to fail without the fix, that's said next to it; where it wasn't, it
+isn't claimed.
+
+**Concurrency actually raced, not just reasoned about:**
+- [`WelcomeBonusConsumerTests`](backend/RewardsService/RewardsService.IntegrationTests/WelcomeBonusConsumerTests.cs) —
+  16 concurrent/redelivered attempts at the same hire's welcome bonus produce exactly one
+  grant, enforced by a database constraint, not a check-then-act guard. Confirmed red first:
+  without the constraint, the same test produced 16 of 16 duplicate grants.
+- [`GrantCurrencyTests.Concurrent_requests_with_the_same_idempotency_key_apply_exactly_one_grant`](backend/RewardsService/RewardsService.IntegrationTests/GrantCurrencyTests.cs) —
+  8 concurrent requests carrying one `Idempotency-Key` produce exactly one transaction. Confirmed red first:
+  with the unique-violation handling disabled, the test fails.
+- [`AccountControllerTests.Concurrent_registrations_to_the_same_email_create_exactly_one_account`](backend/AuthService/AuthService.IntegrationTests/AccountControllerTests.cs) —
+  8 concurrent registrations to the same email create exactly one account, and none of them
+  reveal whether the email already existed. Confirmed red first: without the unique-violation
+  handling, 3 of 6 runs failed.
+- [`OwnWalletTests.Own_wallet_reads_as_zero_between_the_bonus_being_granted_and_the_account_being_linked`](backend/RewardsService/RewardsService.IntegrationTests/OwnWalletTests.cs) —
+  documents, rather than hides, a real read-side race between a grant landing and the
+  account-lookup projection catching up.
+
+**Real numbers, not estimates:** [`docs/benchmarks/baseline.md`](docs/benchmarks/baseline.md) —
+a live k6 run against the full stack, including the two self-inflicted load-test bugs it
+took to get a number worth trusting (a request storm with no backoff, twice, against two
+different rate limiters) and how they were found and fixed.
+
+**A load test that broke the platform on purpose and watched it recover:**
+[`load-tests/k6/README.md`](load-tests/k6/README.md) documents three real, pre-existing
+bugs this same load test surfaced before it ever produced a clean number — a validation
+regex that rejected digits, a stale DNS cache in nginx, and a `localhost` Redis config that
+silently ate 5-6 seconds per request under Docker.
 
 ## Architecture
 
@@ -202,8 +236,9 @@ for load tests. Frontend: Next.js (App Router) + React + TanStack Query + shadcn
 dotnet test backend/backend.slnx
 ```
 
-107 tests across architecture-boundary suites (NetArchTest — domain layers can't depend on
-infrastructure) and integration suites, each spinning up its own Postgres — and, for
+250+ integration tests (measured per service: Auth 136, Directory 34, Rewards 19, Notification 17,
+Employee 17, Audit 14, Search 14) plus architecture-boundary suites (NetArchTest — domain layers
+can't depend on infrastructure) and unit tests, each spinning up its own Postgres — and, for
 `SearchService`, its own Elasticsearch — via Testcontainers rather than sharing state or
 mocking the database. What's covered is deliberately not "everything"; a few things (a live
 database going down mid-request, for instance) are exercised by hand against the real stack
@@ -217,6 +252,9 @@ catch a broken Dockerfile before `docker compose up` does.
 cd load-tests/k6
 docker run --rm --network host -v "$(pwd)":/scripts -w /scripts grafana/k6 run main.js
 ```
+
+Real numbers from the last run, plus two load-test bugs it took to get trustworthy ones, in
+[`docs/benchmarks/baseline.md`](docs/benchmarks/baseline.md).
 
 ## Project layout
 
