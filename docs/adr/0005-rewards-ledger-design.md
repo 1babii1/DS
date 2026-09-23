@@ -59,3 +59,19 @@ corrupt another employee's balance.
   planning and left out - not because they couldn't grant currency, but because "should a
   transfer or a department change ever pay out, and how much" wasn't a product decision
   anyone had actually made yet, and guessing would have been worse than not building it.
+- `GET /api/rewards/wallet` resolves the caller's own wallet through `AccountLookup`
+  (`AccountId -> EmployeeId`, built from the `AccountProvisioned` event - see ADR 0006's
+  identical `AccountLookup` in NotificationService for the same trade). Because
+  `EmployeeHired` and `AccountProvisioned` are two independent events on two different
+  topics, consumed independently, there is a real window - between the welcome bonus being
+  granted and `AccountProvisioned` being consumed - where the `Transaction`/`Wallet` rows
+  already exist but `AccountLookup` doesn't yet. A caller hitting this endpoint in that
+  window sees a balance of 0, indistinguishable from "no bonus was ever granted." It
+  self-resolves the moment `AccountProvisioned` is consumed (nothing is lost - the money
+  exists in the ledger the whole time, and `GET /api/rewards/wallet/{employeeId}`, the
+  admin-facing lookup by `EmployeeId`, reads it correctly immediately), but "self-resolves
+  eventually" and "looks like it didn't credit right now" are both true at once. Not fixed
+  with a synchronous call to AuthService - that's the exact trade this ADR already made for
+  hire validation, for the same reason. See
+  `OwnWalletTests.Own_wallet_reads_as_zero_between_the_bonus_being_granted_and_the_account_being_linked`
+  for the reproduction.
