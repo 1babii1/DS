@@ -63,7 +63,7 @@ public class OutboxPublisher<TContext>(
         var dbContext = scope.ServiceProvider.GetRequiredService<TContext>();
 
         var pending = await dbContext.Set<OutboxMessage>()
-            .Where(m => m.ProcessedAt == null)
+            .Where(m => m.ProcessedAt == null && m.ParkedAt == null)
             .OrderBy(m => m.OccurredAt)
             .Take(_options.BatchSize)
             .ToListAsync(cancellationToken);
@@ -73,51 +73,35 @@ public class OutboxPublisher<TContext>(
             return;
         }
 
-        // Isolated per message, not a single try around the whole batch: without this, one
-        // message that keeps failing (a stuck broker past message.timeout.ms, say) sits
-        // first in every future poll's OrderBy(OccurredAt) batch and permanently blocks
-        // every other pending message behind it - not just its own aggregate, every
-        // aggregate sharing this outbox table. A transient failure here still means the
-        // message is retried on the next poll cycle (ProcessedAt stays null); it just no
-        // longer holds up messages that succeeded around it.
-        var succeeded = 0;
-        foreach (var message in pending)
-        {
-            var kafkaMessage = new Message<string, string>
+        var result = await OutboxBatch.ProcessAsync(
+            pending,
+            async (message, ct) =>
             {
-                Key = message.AggregateId,
-                Value = message.Payload,
-                Headers = new Headers
+                var kafkaMessage = new Message<string, string>
                 {
-                    { "message-id", System.Text.Encoding.UTF8.GetBytes(message.Id.ToString()) },
-                    { "message-type", System.Text.Encoding.UTF8.GetBytes(message.Type) },
-                },
-            };
+                    Key = message.AggregateId,
+                    Value = message.Payload,
+                    Headers = new Headers
+                    {
+                        { "message-id", System.Text.Encoding.UTF8.GetBytes(message.Id.ToString()) },
+                        { "message-type", System.Text.Encoding.UTF8.GetBytes(message.Type) },
+                    },
+                };
 
-            try
-            {
-                await _producer!.ProduceAsync(_options.Topic, kafkaMessage, cancellationToken);
-                message.MarkProcessed();
-                succeeded++;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogWarning(
-                    ex,
-                    "Failed to publish outbox message {MessageId} ({MessageType}) to {Topic} - will retry next poll",
-                    message.Id,
-                    message.Type,
-                    _options.Topic);
-            }
-        }
+                await _producer!.ProduceAsync(_options.Topic, kafkaMessage, ct);
+            },
+            _options.MaxAttempts,
+            logger,
+            cancellationToken);
 
-        if (succeeded > 0)
+        // Failed messages carry updated attempt counts too, so save whenever anything changed.
+        if (result.Succeeded > 0 || result.Failed > 0)
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
         logger.LogInformation(
-            "Published {Succeeded}/{Total} outbox message(s) to {Topic}", succeeded, pending.Count, _options.Topic);
+            "Published {Succeeded}/{Total} outbox message(s) to {Topic}", result.Succeeded, pending.Count, _options.Topic);
     }
 
     public override void Dispose()
