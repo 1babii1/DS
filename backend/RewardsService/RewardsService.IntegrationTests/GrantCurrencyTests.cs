@@ -157,7 +157,7 @@ public class GrantCurrencyTests : IClassFixture<RewardsTestWebFactory>, IAsyncLi
         var results = await Task.WhenAll(tasks);
 
         Assert.All(results, r => Assert.Equal(StatusCodes.Status200OK, r.Status));
-        Assert.Equal(1, results.Select(r => r.TransactionId).Distinct().Count());
+        Assert.Single(results.Select(r => r.TransactionId).Distinct());
 
         var wallet = await ReadInDb(db => db.Wallets.SingleAsync(w => w.EmployeeId == employeeId));
         Assert.Equal(250, wallet.Balance);

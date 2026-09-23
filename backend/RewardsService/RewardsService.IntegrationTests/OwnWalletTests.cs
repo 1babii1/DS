@@ -3,6 +3,7 @@ using System.Text;
 using Confluent.Kafka;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -58,6 +59,40 @@ public class OwnWalletTests : IClassFixture<RewardsTestWebFactory>, IAsyncLifeti
         Assert.Equal(0, wallet.Balance);
     }
 
+    // The gap this documents: EmployeeHired and AccountProvisioned are two independent
+    // events on two different topics, consumed independently by this same consumer. The
+    // welcome bonus is granted purely from EmployeeHired - it does not wait for
+    // AccountProvisioned - so there is a real window, between the two being consumed,
+    // where the Transaction/Wallet already exist but AccountLookup does not yet. A caller
+    // hitting GET /api/rewards/wallet in that window sees 0, indistinguishable from "no
+    // bonus was ever granted", even though the money is already in their ledger. Same
+    // documented ordering caveat as ADR 0006's ("a notification that outraces
+    // AccountProvisioned is silently skipped"), just not previously written down for this
+    // endpoint. It self-resolves the moment AccountProvisioned is consumed - nothing here
+    // is data loss - but "self-resolves eventually" and "looks broken right now" are both
+    // true at once, which is exactly the ambiguity worth a named test.
+    [Fact]
+    public async Task Own_wallet_reads_as_zero_between_the_bonus_being_granted_and_the_account_being_linked()
+    {
+        var employeeId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+
+        // Only EmployeeHired consumed so far - AccountProvisioned has not arrived yet.
+        Assert.True(_consumer.HandleWithRetryAndDeadLetter(Hired(employeeId), CancellationToken.None));
+
+        var walletBeforeLinking = await ReadOwnWallet(accountId);
+        Assert.Equal(0, walletBeforeLinking.Balance);
+
+        // The bonus was, in fact, already granted - just not reachable by AccountId yet.
+        var walletByEmployeeId = await ReadInDb(db => db.Wallets.SingleAsync(w => w.EmployeeId == employeeId));
+        Assert.Equal(100, walletByEmployeeId.Balance);
+
+        // Once AccountProvisioned catches up, the same endpoint reflects the real balance.
+        Assert.True(_consumer.HandleWithRetryAndDeadLetter(Provisioned(employeeId, accountId), CancellationToken.None));
+        var walletAfterLinking = await ReadOwnWallet(accountId);
+        Assert.Equal(100, walletAfterLinking.Balance);
+    }
+
     public Task InitializeAsync() => Task.CompletedTask;
 
     public Task DisposeAsync() => _resetDatabase();
@@ -79,6 +114,12 @@ public class OwnWalletTests : IClassFixture<RewardsTestWebFactory>, IAsyncLifeti
 
         var response = await controller.GetOwnWallet(CancellationToken.None);
         return Assert.IsType<WalletDto>(Assert.IsType<OkObjectResult>(response.Result).Value);
+    }
+
+    private async Task<T> ReadInDb<T>(Func<RewardsDbContext, Task<T>> read)
+    {
+        await using var scope = _services.CreateAsyncScope();
+        return await read(scope.ServiceProvider.GetRequiredService<RewardsDbContext>());
     }
 
     private static ConsumeResult<string, string> Hired(Guid employeeId) =>
