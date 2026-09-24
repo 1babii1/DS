@@ -1,7 +1,8 @@
 # 8. McpServer as a read-only cross-schema reporting layer
 
 ## Status
-Accepted
+Superseded by [0015](0015-mcp-tools-read-through-the-service-apis.md) - McpServer no longer
+reads other services' schemas. Kept as the record of why it did, and of what changed its mind.
 
 ## Context
 AI assistants need to answer questions about the org structure - semantic search over

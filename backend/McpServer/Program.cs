@@ -1,70 +1,38 @@
-﻿using McpServer.Embeddings;
-using McpServer.HealthChecks;
+﻿using McpServer.Api;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Polly;
-using Polly.CircuitBreaker;
-using Polly.Retry;
-using Microsoft.Extensions.Options;
-using Npgsql;
 using Shared.Observability;
 using Shared.Security;
-
-Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddObservability(builder.Configuration, "mcp-server");
 
-builder.Services.AddOptions<EmbeddingsOptions>()
-    .Bind(builder.Configuration.GetSection(EmbeddingsOptions.SectionName));
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddTransient<BearerForwardingHandler>();
 
-builder.Services.AddSingleton(_ =>
-{
-    var dataSourceBuilder = new NpgsqlDataSourceBuilder(builder.Configuration.GetConnectionString("PlatformDb"));
-    dataSourceBuilder.UseVector();
-    return dataSourceBuilder.Build();
-});
+// Every tool talks to a service's own API as the caller (BearerForwardingHandler). McpServer has no
+// database connection and no credential of its own: what a tool can read is exactly what the
+// person using it could read directly.
+builder.Services.AddHttpClient<DirectoryApiClient>(client =>
+        client.BaseAddress = new Uri(builder.Configuration["Services:Directory:BaseUrl"]
+            ?? throw new InvalidOperationException("Configuration 'Services:Directory:BaseUrl' is not set.")))
+    .AddHttpMessageHandler<BearerForwardingHandler>()
+    .AddResilienceHandler("directory-api", ServiceApiResilience.Configure);
 
-builder.Services.AddHttpClient<OllamaEmbeddingClient>((sp, client) =>
-{
-    var options = sp.GetRequiredService<IOptions<EmbeddingsOptions>>().Value;
-    client.BaseAddress = new Uri(options.OllamaBaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(30);
-})
+builder.Services.AddHttpClient<EmployeeApiClient>(client =>
+        client.BaseAddress = new Uri(builder.Configuration["Services:Employee:BaseUrl"]
+            ?? throw new InvalidOperationException("Configuration 'Services:Employee:BaseUrl' is not set.")))
+    .AddHttpMessageHandler<BearerForwardingHandler>()
+    .AddResilienceHandler("employee-api", ServiceApiResilience.Configure);
 
-    // Same shape as DirectoryService's own Ollama client (see its Program.cs) - a brief
-    // restart of the embedding model becomes a retried call instead of a failed tool
-    // invocation, and the breaker stops every semantic-search tool call from separately
-    // paying a 30s timeout once Ollama is confirmed down.
-    .AddResilienceHandler("ollama-embeddings", builder =>
-    {
-        builder.AddRetry(new()
-        {
-            MaxRetryAttempts = 2,
-            Delay = TimeSpan.FromMilliseconds(500),
-            BackoffType = DelayBackoffType.Exponential,
-        });
-
-        builder.AddCircuitBreaker(new()
-        {
-            FailureRatio = 0.5,
-            SamplingDuration = TimeSpan.FromSeconds(30),
-            MinimumThroughput = 5,
-            BreakDuration = TimeSpan.FromSeconds(15),
-        });
-    });
-
-// Инструменты отдают данные сразу нескольких сервисов, включая ФИО и email
-// сотрудников, в обход правил доступа, которые эти сервисы проверяют у себя.
-// Поэтому те же токены и тот же JWKS, что и везде: без аутентификации этот
-// endpoint был самым коротким путём к персональным данным во всей системе.
+// Inbound: the same tokens and the same JWKS as every other service. The token that authenticates a
+// request here is also what BearerForwardingHandler passes on, so this is the one place the caller's
+// identity is established for everything a tool then reads.
 builder.Services.AddPlatformJwtAuthentication(builder.Configuration, builder.Environment);
 
 builder.Services.AddAuthorization();
 
-builder.Services
-    .AddHealthChecks()
-    .AddCheck<NpgsqlDataSourceHealthCheck>("database", tags: ["ready"]);
+builder.Services.AddHealthChecks();
 
 builder.Services
     .AddMcpServer()
@@ -78,8 +46,8 @@ app.UseAuthorization();
 
 app.MapMcp("/mcp").RequireAuthorization();
 
-// Как и в остальных сервисах: liveness ничего не проверяет (перезапуск не
-// чинит недоступную базу), readiness проверяет то, что помечено тегом "ready".
+// As elsewhere: liveness checks nothing (a restart does not fix an unreachable dependency);
+// readiness runs whatever is tagged "ready" - currently nothing, as McpServer owns no database.
 app.MapHealthChecks("/health/live", new() { Predicate = _ => false }).AllowAnonymous();
 app.MapHealthChecks("/health/ready", new() { Predicate = c => c.Tags.Contains("ready") }).AllowAnonymous();
 

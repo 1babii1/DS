@@ -126,7 +126,7 @@ to reason about.
 | **RewardsService** | an internal currency ledger — manual grants and an automatic welcome bonus on hire | REST, Kafka producer + consumer |
 | **NotificationService** | a real in-app notification center — persisted feed, unread counts, and a live SignalR push, not a log line | REST + SignalR, Kafka consumer |
 | **SearchService** | cross-entity search (employees, departments, positions, locations, audit history) over an Elasticsearch index materialized from the same event stream | REST, Kafka consumer |
-| **McpServer** | read-only [MCP](https://modelcontextprotocol.io) tools (semantic search, org tree, employee lookup) for AI assistants | Streamable HTTP, JWT-authenticated |
+| **McpServer** | read-only [MCP](https://modelcontextprotocol.io) tools (semantic search, org tree, employee lookup) for AI assistants; every tool calls the owning service's API with the caller's own token, no database access ([ADR 0015](docs/adr/0015-mcp-tools-read-through-the-service-apis.md)) | Streamable HTTP, JWT-authenticated |
 
 All REST traffic goes through nginx at `/`; gRPC between EmployeeService and
 DirectoryService is internal-only, never exposed to the host.

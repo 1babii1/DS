@@ -14,13 +14,14 @@ descriptions as each phase shipped, not backfilled generically.
 | [0005](0005-rewards-ledger-design.md) | Rewards ledger design and no cross-service employee validation in v1 |
 | [0006](0006-signalr-notification-center.md) | SignalR for the in-app notification center |
 | [0007](0007-elasticsearch-cross-service-search.md) | Elasticsearch-backed cross-service search |
-| [0008](0008-mcp-server-cross-schema-reporting-layer.md) | McpServer as a read-only cross-schema reporting layer |
+| [0008](0008-mcp-server-cross-schema-reporting-layer.md) | McpServer as a read-only cross-schema reporting layer (superseded by 0015) |
 | [0009](0009-postgres-backup-and-restore.md) | Postgres backup and restore |
 | [0010](0010-kubernetes-migration-target-architecture.md) | Kubernetes migration target architecture (design only, not implemented) |
 | [0011](0011-kafka-cluster-and-cdc-target-architecture.md) | Kafka cluster, Debezium CDC, event contracts (design only, not implemented) |
 | [0012](0012-reliability-as-a-process.md) | SLOs, canary delivery, chaos testing (design only, not implemented) |
 | [0013](0013-cell-based-isolation-target-architecture.md) | Cell-based isolation, Temporal, Citus (design only, not implemented) |
 | [0014](0014-multi-region-target-architecture.md) | Multi-region deployment (design only, not implemented) |
+| [0015](0015-mcp-tools-read-through-the-service-apis.md) | MCP tools read through the service APIs, as the caller |
 
 Not yet written up, though each decision is already live in the codebase and explained
 in its own commit messages: gRPC for internal calls, local JWT validation via JWKS,

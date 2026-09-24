@@ -352,7 +352,8 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - ASPNETCORE_URLS=http://*:5133
-      - ConnectionStrings__PlatformDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres}
+      - Services__Directory__BaseUrl=http://directory_service:5129/
+      - Services__Employee__BaseUrl=http://employee_service:5131/
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5133/health/ready || exit 1"]
@@ -361,16 +362,12 @@ services:
       retries: 5
       start_period: 30s
     depends_on:
-      postgres:
-        condition: service_healthy
       auth_service:
         condition: service_started
       directory_service:
         condition: service_started
       employee_service:
         condition: service_started
-      ollama_pull:
-        condition: service_completed_successfully
 
   notification_service:
     container_name: notification_service
