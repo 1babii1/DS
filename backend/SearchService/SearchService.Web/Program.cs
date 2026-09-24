@@ -54,6 +54,7 @@ builder.Services.AddKafkaHealthCheck(
     KafkaSecurityOptions.FromConfiguration(builder.Configuration));
 
 builder.Services.AddOpsPolicy();
+builder.Services.AddOpsMetrics<SearchDbContext>("search-service");
 
 var app = builder.Build();
 

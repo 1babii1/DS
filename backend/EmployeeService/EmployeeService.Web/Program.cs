@@ -98,6 +98,7 @@ builder.Services.AddRateLimiter(options =>
 });
 
 builder.Services.AddOpsPolicy();
+builder.Services.AddOpsMetrics<EmployeeDbContext>("employee-service");
 
 var app = builder.Build();
 

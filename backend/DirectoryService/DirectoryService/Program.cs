@@ -241,6 +241,7 @@ builder.Services.AddRateLimiter(options =>
 });
 
 builder.Services.AddOpsPolicy();
+builder.Services.AddOpsMetrics<DirectoryServiceDbContext>("directory-service");
 builder.Services.AddStepUpPolicy();
 
 var app = builder.Build();

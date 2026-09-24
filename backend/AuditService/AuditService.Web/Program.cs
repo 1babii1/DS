@@ -33,6 +33,7 @@ builder.Services.AddAuditInfrastructure(builder.Configuration);
 builder.Services.AddDatabaseHealthCheck<AuditDbContext>();
 
 builder.Services.AddOpsPolicy();
+builder.Services.AddOpsMetrics<AuditDbContext>("audit-service");
 
 var app = builder.Build();
 
