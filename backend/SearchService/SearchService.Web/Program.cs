@@ -1,3 +1,4 @@
+using Shared.Ops;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using SearchService.Infrastructure.Elasticsearch;
 using SearchService.Infrastructure.Postgres;
@@ -52,6 +53,8 @@ builder.Services.AddKafkaHealthCheck(
         ?? throw new InvalidOperationException("Configuration 'Kafka:BootstrapServers' is not set."),
     KafkaSecurityOptions.FromConfiguration(builder.Configuration));
 
+builder.Services.AddOpsPolicy();
+
 var app = builder.Build();
 
 app.UseRequestCorrelationId();
@@ -68,6 +71,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapDeadLetterOps<SearchDbContext>("/api/search/ops");
 app.MapDefaultHealthChecks();
 
 app.Run();

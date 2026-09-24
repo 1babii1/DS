@@ -1,4 +1,5 @@
-﻿using System.Threading.RateLimiting;
+﻿using Shared.Ops;
+using System.Threading.RateLimiting;
 using AuthService.Application;
 using AuthService.Application.Database;
 using AuthService.Infrastructure.Postgres;
@@ -198,6 +199,8 @@ builder.Services.AddRateLimiter(options =>
         }));
 });
 
+builder.Services.AddOpsPolicy();
+
 var app = builder.Build();
 
 app.UseProxyForwardedHeaders();
@@ -217,6 +220,8 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapControllers();
+app.MapOutboxOps<AuthDbContext>("/auth/ops");
+app.MapDeadLetterOps<AuthDbContext>("/auth/ops");
 app.MapRazorPages();
 app.MapDefaultHealthChecks();
 

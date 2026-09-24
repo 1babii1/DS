@@ -1,4 +1,5 @@
-﻿using System.Threading.RateLimiting;
+﻿using Shared.Ops;
+using System.Threading.RateLimiting;
 using EmployeeService.Application.Database;
 using EmployeeService.Application.Employees.Commands;
 using EmployeeService.Application.Employees.Queries;
@@ -96,6 +97,8 @@ builder.Services.AddRateLimiter(options =>
         }));
 });
 
+builder.Services.AddOpsPolicy();
+
 var app = builder.Build();
 
 app.UseProxyForwardedHeaders();
@@ -115,6 +118,8 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapControllers();
+app.MapOutboxOps<EmployeeDbContext>("/api/employees/ops");
+app.MapDeadLetterOps<EmployeeDbContext>("/api/employees/ops");
 app.MapDefaultHealthChecks();
 
 app.Run();
