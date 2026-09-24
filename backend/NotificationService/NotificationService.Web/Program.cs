@@ -91,6 +91,7 @@ builder.Services.AddKafkaHealthCheck(
     KafkaSecurityOptions.FromConfiguration(builder.Configuration));
 
 builder.Services.AddOpsPolicy();
+builder.Services.AddOpsMetrics<NotificationDbContext>("notification-service");
 
 var app = builder.Build();
 

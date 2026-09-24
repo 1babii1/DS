@@ -62,6 +62,7 @@ builder.Services.AddRateLimiter(options =>
 });
 
 builder.Services.AddOpsPolicy();
+builder.Services.AddOpsMetrics<RewardsDbContext>("rewards-service");
 builder.Services.AddStepUpPolicy();
 
 var app = builder.Build();

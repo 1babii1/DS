@@ -200,6 +200,7 @@ builder.Services.AddRateLimiter(options =>
 });
 
 builder.Services.AddOpsPolicy();
+builder.Services.AddOpsMetrics<AuthDbContext>("auth-service");
 
 var app = builder.Build();
 
