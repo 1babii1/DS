@@ -57,6 +57,7 @@
     <Project Path="SearchService/SearchService.Web/SearchService.Web.csproj" />
   </Folder>
   <Project Path="Shared/Shared.csproj" />
+  <Project Path="ChaosTests/ChaosTests.csproj" />
   <Project Path="EventContracts.Tests/EventContracts.Tests.csproj" />
   <Project Path="Shared.UnitTests/Shared.UnitTests.csproj" />
 </Solution>
