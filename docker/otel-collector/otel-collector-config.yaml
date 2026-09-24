@@ -24,12 +24,17 @@ processors:
         - 'attributes["url.path"] == "/health/ready"'
         - 'attributes["http.route"] == "/health/live"'
         - 'attributes["http.route"] == "/health/ready"'
+    # Filtered per datapoint, not per metric. `metric:` with HasAttrOnDatapoint drops the WHOLE
+    # metric if any single datapoint carries the attribute - and every http.server.request.duration
+    # histogram includes the health-probe datapoints, so the entire request latency/error metric
+    # was silently discarded and no SLO could be built on it. Dropping only the probe datapoints
+    # keeps the noise out and the real traffic in.
     metrics:
-      metric:
-        - 'HasAttrOnDatapoint("http.route", "/health/live")'
-        - 'HasAttrOnDatapoint("http.route", "/health/ready")'
-        - 'HasAttrOnDatapoint("url.path", "/health/live")'
-        - 'HasAttrOnDatapoint("url.path", "/health/ready")'
+      datapoint:
+        - 'attributes["http.route"] == "/health/live"'
+        - 'attributes["http.route"] == "/health/ready"'
+        - 'attributes["url.path"] == "/health/live"'
+        - 'attributes["url.path"] == "/health/ready"'
 
 exporters:
   otlp_grpc/tempo:
