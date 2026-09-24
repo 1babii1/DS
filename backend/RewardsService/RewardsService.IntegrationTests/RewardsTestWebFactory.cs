@@ -1,4 +1,5 @@
 using System.Data.Common;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -58,6 +59,17 @@ public class RewardsTestWebFactory : WebApplicationFactory<Program>, IAsyncLifet
         // host's own auto-started instance, which would try to connect to a broker that
         // doesn't exist in this test run.
         services.RemoveAll<IHostedService>();
+
+        // Real authorization policies, fake identity: lets tests hit endpoints over HTTP as a
+        // chosen role (see TestAuthHandler) without a live OpenIddict server to mint tokens.
+        services.AddAuthentication(TestAuthHandler.Scheme)
+            .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.Scheme, _ => { });
+        services.PostConfigure<AuthenticationOptions>(o =>
+        {
+            o.DefaultScheme = TestAuthHandler.Scheme;
+            o.DefaultAuthenticateScheme = TestAuthHandler.Scheme;
+            o.DefaultChallengeScheme = TestAuthHandler.Scheme;
+        });
 
         services.RemoveAll<DbContextOptions<RewardsDbContext>>();
         services.RemoveAll<RewardsDbContext>();

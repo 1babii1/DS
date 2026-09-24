@@ -1,3 +1,4 @@
+using Shared.Ops;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Hosting;
 using NotificationService.Infrastructure.Postgres;
@@ -89,6 +90,8 @@ builder.Services.AddKafkaHealthCheck(
         ?? throw new InvalidOperationException("Configuration 'Kafka:BootstrapServers' is not set."),
     KafkaSecurityOptions.FromConfiguration(builder.Configuration));
 
+builder.Services.AddOpsPolicy();
+
 var app = builder.Build();
 
 app.UseRequestCorrelationId();
@@ -105,6 +108,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapDeadLetterOps<NotificationDbContext>("/api/notifications/ops");
 app.MapHub<NotificationsHub>("/hub/notifications");
 app.MapDefaultHealthChecks();
 

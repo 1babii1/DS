@@ -1,3 +1,4 @@
+using Shared.Ops;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -60,6 +61,9 @@ builder.Services.AddRateLimiter(options =>
         }));
 });
 
+builder.Services.AddOpsPolicy();
+builder.Services.AddStepUpPolicy();
+
 var app = builder.Build();
 
 app.UseProxyForwardedHeaders();
@@ -79,6 +83,8 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapControllers();
+app.MapOutboxOps<RewardsDbContext>("/api/rewards/ops");
+app.MapDeadLetterOps<RewardsDbContext>("/api/rewards/ops");
 app.MapDefaultHealthChecks();
 
 app.Run();

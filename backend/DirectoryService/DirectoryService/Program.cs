@@ -1,4 +1,5 @@
-﻿using System.Threading.RateLimiting;
+﻿using Shared.Ops;
+using System.Threading.RateLimiting;
 using DirectoryService.Application.Database;
 using Polly;
 using Polly.CircuitBreaker;
@@ -239,6 +240,9 @@ builder.Services.AddRateLimiter(options =>
         }));
 });
 
+builder.Services.AddOpsPolicy();
+builder.Services.AddStepUpPolicy();
+
 var app = builder.Build();
 
 app.UseProxyForwardedHeaders();
@@ -263,6 +267,7 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapControllers();
+app.MapOutboxOps<DirectoryServiceDbContext>("/api/ops/directory");
 app.MapDefaultHealthChecks();
 app.MapGrpcService<DirectoryLookupService>();
 

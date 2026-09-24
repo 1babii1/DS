@@ -1,4 +1,5 @@
-﻿using AuditService.Infrastructure;
+﻿using Shared.Ops;
+using AuditService.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Serilog;
 using Shared.HealthChecks;
@@ -31,6 +32,8 @@ builder.Services.AddAuditInfrastructure(builder.Configuration);
 
 builder.Services.AddDatabaseHealthCheck<AuditDbContext>();
 
+builder.Services.AddOpsPolicy();
+
 var app = builder.Build();
 
 app.UseRequestCorrelationId();
@@ -45,6 +48,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapDeadLetterOps<AuditDbContext>("/api/audit/ops");
 app.MapDefaultHealthChecks();
 
 app.Run();
