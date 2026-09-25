@@ -1,4 +1,5 @@
-﻿using McpServer.Api;
+﻿using McpServer.Agent;
+using McpServer.Api;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Shared.Observability;
 using Shared.Security;
@@ -25,12 +26,52 @@ builder.Services.AddHttpClient<EmployeeApiClient>(client =>
     .AddHttpMessageHandler<BearerForwardingHandler>()
     .AddResilienceHandler("employee-api", ServiceApiResilience.Configure);
 
+// The write side: what the user has approved is run through the same APIs, as the same caller. Separate
+// clients with no retry (see CommandClients).
+builder.Services.AddHttpClient<EmployeeCommandClient>(client =>
+        client.BaseAddress = new Uri(builder.Configuration["Services:Employee:BaseUrl"]
+            ?? throw new InvalidOperationException("Configuration 'Services:Employee:BaseUrl' is not set.")))
+    .AddHttpMessageHandler<BearerForwardingHandler>()
+    .AddResilienceHandler("employee-commands", ServiceApiResilience.ConfigureForWrites);
+
+builder.Services.AddHttpClient<RewardsCommandClient>(client =>
+        client.BaseAddress = new Uri(builder.Configuration["Services:Rewards:BaseUrl"]
+            ?? throw new InvalidOperationException("Configuration 'Services:Rewards:BaseUrl' is not set.")))
+    .AddHttpMessageHandler<BearerForwardingHandler>()
+    .AddResilienceHandler("rewards-commands", ServiceApiResilience.ConfigureForWrites);
+
+var agentOptions = builder.Configuration.GetSection(AgentOptions.SectionName).Get<AgentOptions>() ?? new AgentOptions();
+builder.Services.AddSingleton(agentOptions);
+builder.Services.AddSingleton(Microsoft.Extensions.Options.Options.Create(agentOptions));
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton(sp =>
+{
+    // Same rule as AuthService's at-rest key: required in Production, never silently weak. Elsewhere an
+    // ephemeral key keeps development working, at the price that plans die with the process.
+    if (string.IsNullOrWhiteSpace(agentOptions.SigningKeyBase64))
+    {
+        if (builder.Environment.IsProduction())
+        {
+            throw new InvalidOperationException(
+                "Agent:SigningKeyBase64 must be set in Production (32+ random bytes, base64: openssl rand -base64 32).");
+        }
+
+        sp.GetRequiredService<ILogger<PlanSigner>>().LogWarning(
+            "Agent:SigningKeyBase64 is not set: using an ephemeral key. Plans will not survive a restart or work across instances.");
+        return new PlanSigner(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32), sp.GetRequiredService<TimeProvider>());
+    }
+
+    return new PlanSigner(Convert.FromBase64String(agentOptions.SigningKeyBase64), sp.GetRequiredService<TimeProvider>());
+});
+builder.Services.AddScoped<PlanExecutor>();
+
 // Inbound: the same tokens and the same JWKS as every other service. The token that authenticates a
 // request here is also what BearerForwardingHandler passes on, so this is the one place the caller's
 // identity is established for everything a tool then reads.
 builder.Services.AddPlatformJwtAuthentication(builder.Configuration, builder.Environment);
 
 builder.Services.AddAuthorization();
+builder.Services.AddStepUpPolicy();
 
 builder.Services.AddHealthChecks();
 
@@ -45,6 +86,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapMcp("/mcp").RequireAuthorization();
+app.MapAgentEndpoints();
 
 // As elsewhere: liveness checks nothing (a restart does not fix an unreachable dependency);
 // readiness runs whatever is tagged "ready" - currently nothing, as McpServer owns no database.

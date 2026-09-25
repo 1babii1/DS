@@ -5,6 +5,8 @@ public enum ServiceApiFailure
     Unauthorized,
     Forbidden,
     NotFound,
+    Invalid,
+    Conflict,
     RateLimited,
     Unavailable,
 }
@@ -21,6 +23,9 @@ public sealed class ServiceApiException(ServiceApiFailure failure, string messag
         System.Net.HttpStatusCode.Unauthorized => new(ServiceApiFailure.Unauthorized, "Your session is not valid for this service."),
         System.Net.HttpStatusCode.Forbidden => new(ServiceApiFailure.Forbidden, "You are not allowed to do this."),
         System.Net.HttpStatusCode.NotFound => new(ServiceApiFailure.NotFound, "Not found."),
+        System.Net.HttpStatusCode.BadRequest => new(ServiceApiFailure.Invalid, "The service rejected the request as invalid."),
+        System.Net.HttpStatusCode.Conflict => new(ServiceApiFailure.Conflict, "This conflicts with data that already exists."),
+        System.Net.HttpStatusCode.UnprocessableEntity => new(ServiceApiFailure.Invalid, "The service rejected the request as invalid."),
         System.Net.HttpStatusCode.TooManyRequests => new(ServiceApiFailure.RateLimited, "Too many requests, try again shortly."),
         _ => new(ServiceApiFailure.Unavailable, "The service could not complete the request."),
     };

@@ -14,12 +14,31 @@ namespace McpServer.Api;
 // into a worse bucket, for everyone. Reads only, so retrying is safe.
 public static class ServiceApiResilience
 {
-    public static void Configure(ResiliencePipelineBuilder<HttpResponseMessage> builder)
-    {
-        var transientTrouble = new PredicateBuilder<HttpResponseMessage>()
+    private static PredicateBuilder<HttpResponseMessage> TransientTrouble() =>
+        new PredicateBuilder<HttpResponseMessage>()
             .Handle<HttpRequestException>()
             .Handle<TimeoutRejectedException>()
             .HandleResult(r => (int)r.StatusCode >= 500 || r.StatusCode == HttpStatusCode.RequestTimeout);
+
+    // Writes: no retry. A repeated write is a second effect unless the service can recognise it, so the
+    // only protection here is the breaker and the timeout; a failure is reported to the caller as it is.
+    public static void ConfigureForWrites(ResiliencePipelineBuilder<HttpResponseMessage> builder)
+    {
+        builder.AddCircuitBreaker(new CircuitBreakerStrategyOptions<HttpResponseMessage>
+        {
+            ShouldHandle = TransientTrouble(),
+            FailureRatio = 0.5,
+            SamplingDuration = TimeSpan.FromSeconds(30),
+            MinimumThroughput = 5,
+            BreakDuration = TimeSpan.FromSeconds(15),
+        });
+
+        builder.AddTimeout(TimeSpan.FromSeconds(15));
+    }
+
+    public static void Configure(ResiliencePipelineBuilder<HttpResponseMessage> builder)
+    {
+        var transientTrouble = TransientTrouble();
 
         builder.AddRetry(new RetryStrategyOptions<HttpResponseMessage>
         {

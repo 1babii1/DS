@@ -22,6 +22,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0013](0013-cell-based-isolation-target-architecture.md) | Cell-based isolation, Temporal, Citus (design only, not implemented) |
 | [0014](0014-multi-region-target-architecture.md) | Multi-region deployment (design only, not implemented) |
 | [0015](0015-mcp-tools-read-through-the-service-apis.md) | MCP tools read through the service APIs, as the caller |
+| [0016](0016-agent-proposes-user-confirms.md) | The agent proposes, the user confirms |
 
 Not yet written up, though each decision is already live in the codebase and explained
 in its own commit messages: gRPC for internal calls, local JWT validation via JWKS,
