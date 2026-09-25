@@ -26,17 +26,31 @@ public class GetSubtreeHandler(IDbConnectionFactory connectionFactory, int maxNo
 
         using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
 
-        // One extra row tells "exactly MaxNodes" from "more than MaxNodes". An inactive (deleted)
-        // department has no browsable tree, and inactive descendants are not part of it.
+        // One extra row tells "exactly maxNodes" from "more than maxNodes".
+        //
+        // Walks parent_id from the department downwards through ACTIVE departments only, rather than
+        // matching on the ltree path. Deleting a department changes only its own path; its children
+        // stay active and keep their old path, so a path match would keep listing them as if the
+        // deleted department were still there (found by SubtreeTests). Following live parents gives
+        // the tree a person can actually navigate: an inactive department has none, and nothing
+        // hanging under a deleted one is reachable from it.
         var rows = (await connection.QueryAsync<ReadDepartmentHierarchyDto>(
             new CommandDefinition(
                 """
-                SELECT d.id, d.name, d.parent_id, d.created_at, d.updated_at, d.is_active,
-                       d.identifier, d.path, d.depth
-                FROM departments d
-                WHERE d.is_active
-                  AND d.path <@ (SELECT path FROM departments WHERE id = @departmentId AND is_active)
-                ORDER BY d.depth, d.name
+                WITH RECURSIVE tree AS (
+                    SELECT d.id, d.name, d.parent_id, d.created_at, d.updated_at, d.is_active,
+                           d.identifier, d.path, d.depth
+                    FROM departments d
+                    WHERE d.id = @departmentId AND d.is_active
+                  UNION ALL
+                    SELECT c.id, c.name, c.parent_id, c.created_at, c.updated_at, c.is_active,
+                           c.identifier, c.path, c.depth
+                    FROM departments c
+                    JOIN tree t ON c.parent_id = t.id
+                    WHERE c.is_active
+                )
+                SELECT * FROM tree
+                ORDER BY depth, name
                 LIMIT @limit
                 """,
                 new { departmentId, limit = maxNodes + 1 },

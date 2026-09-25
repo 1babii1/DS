@@ -42,7 +42,11 @@ place to begin with.
 ## Consequences
 - Tool behavior changed where the API's rules are stricter, on purpose: employee listing is paged (the
   API's own cap of 200 per page) and returns `hasNext`; root departments are paged with `hasMore`; a
-  subtree over 500 nodes is cut and flagged; an inactive department has no browsable tree.
+  subtree over 500 nodes is cut and flagged; an inactive department has no browsable tree, and neither
+  do departments hanging under one: deleting a department changes only its own path and leaves its
+  children active, so the subtree follows active parents instead of matching the path (a path match
+  kept listing them - found by the first run of SubtreeTests). Whether deleting a department should
+  also handle its children is a Directory domain question this does not settle.
 - Forwarding the caller's token forwards every audience it carries. Token exchange to a narrow-audience
   token would be stricter and is deferred until write tools exist.
 - DirectoryService's search limiter is 30/min per source IP, and every user now arrives from McpServer's
