@@ -33,3 +33,24 @@ groups:
         annotations:
           summary: "{{ $labels.service_name }} outbox has been unpublished for over 5 minutes"
           description: "The oldest pending message is {{ $value | humanizeDuration }} old. Check the broker and the service's publisher."
+
+  - name: agent
+    rules:
+      # Someone presented a plan that belongs to another user. A plan is only ever handed to the user it
+      # was made for, so this is a leaked token or someone probing; it is never a normal event.
+      - alert: AgentPlanWrongUser
+        expr: increase(agent_confirmations_total{reason="wrong_user"}[15m]) > 0
+        labels:
+          severity: ticket
+        annotations:
+          summary: "A plan was presented by a user it was not made for"
+          description: "Plan tokens are bound to one user. Check for a leaked token or probing on the confirm endpoint."
+
+      # Plans that were confirmed, ran, and failed a step: the user approved something that did not fully happen.
+      - alert: AgentPlansFailing
+        expr: sum(increase(agent_confirmations_total{outcome="failed"}[30m])) > 3
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Confirmed agent plans keep failing"
+          description: "More than 3 confirmed plans failed a step in 30 minutes. Look at which step (agent_steps_total) and which service is refusing."

@@ -1,6 +1,7 @@
 using McpServer.Api;
 using Microsoft.Extensions.Logging;
 
+
 namespace McpServer.Agent;
 
 // Runs a plan the user has confirmed, as that user (the command clients forward the caller's token), one
@@ -10,10 +11,15 @@ public sealed class PlanExecutor(
     EmployeeCommandClient employees,
     RewardsCommandClient rewards,
     AgentOptions options,
-    ILogger<PlanExecutor> logger)
+    ILogger<PlanExecutor> logger,
+    AgentTelemetry telemetry)
 {
     public async Task<ExecutionReport> ExecuteAsync(Plan plan, CancellationToken ct)
     {
+        using var planSpan = telemetry.Source.StartActivity("agent.execute");
+        planSpan?.SetTag("agent.plan_id", plan.Id.ToString());
+        planSpan?.SetTag("agent.steps", plan.Steps.Count);
+
         var results = new List<StepResult>(plan.Steps.Count);
         var createdByStep = new Dictionary<int, Guid>();
         var stopped = false;
@@ -25,8 +31,13 @@ public sealed class PlanExecutor(
             if (stopped)
             {
                 results.Add(new StepResult(i, step.Summary, StepOutcome.NotRun, "An earlier step failed.", null));
+                telemetry.Step(step.Kind, StepOutcome.NotRun);
                 continue;
             }
+
+            using var stepSpan = telemetry.Source.StartActivity("agent.step");
+            stepSpan?.SetTag("agent.step.index", i);
+            stepSpan?.SetTag("agent.step.kind", step.Kind.ToString());
 
             try
             {
@@ -37,6 +48,8 @@ public sealed class PlanExecutor(
                 }
 
                 results.Add(new StepResult(i, step.Summary, StepOutcome.Applied, null, created));
+                telemetry.Step(step.Kind, StepOutcome.Applied);
+                stepSpan?.SetTag("agent.step.outcome", "Applied");
                 logger.LogInformation(
                     "Agent plan {PlanId} step {Step} ({Kind}) applied for user {UserId}", plan.Id, i, step.Kind, plan.UserId);
             }
@@ -48,6 +61,8 @@ public sealed class PlanExecutor(
                     ? ex.Message
                     : "The service could not be reached.";
                 results.Add(new StepResult(i, step.Summary, StepOutcome.Failed, detail, null));
+                telemetry.Step(step.Kind, StepOutcome.Failed);
+                stepSpan?.SetTag("agent.step.outcome", "Failed");
                 logger.LogWarning(
                     "Agent plan {PlanId} step {Step} ({Kind}) failed for user {UserId}: {Detail}",
                     plan.Id, i, step.Kind, plan.UserId, detail);
@@ -159,14 +174,42 @@ internal static class Require
     }
 }
 
-// Free text that ends up in a plan the user reads, and later in a service: single line, bounded, no control
-// characters, so a value cannot dress itself up as a second line of the summary or as markup for a reader.
+// Free text that ends up in a plan the user reads, and later in a service: single line, bounded, and free of
+// anything invisible or that changes how text is displayed. char.IsControl alone is not enough: a
+// right-to-left override, a zero-width space, a byte-order mark or a line separator are "format" and
+// "separator" characters, not controls, and each can make a name read differently from what it is.
+// Letters of any script, accents, apostrophes and emoji (valid surrogate pairs) stay allowed.
 internal static class Text
 {
-    public static bool IsClean(string? value, int max) =>
-        !string.IsNullOrWhiteSpace(value)
-        && value.Length <= max
-        && !value.Any(char.IsControl);
+    public static bool IsClean(string? value, int max)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length > max)
+        {
+            return false;
+        }
+
+        foreach (var rune in value.EnumerateRunes())
+        {
+            // A lone surrogate is enumerated as the replacement character: malformed text.
+            if (rune == System.Text.Rune.ReplacementChar)
+            {
+                return false;
+            }
+
+            switch (System.Text.Rune.GetUnicodeCategory(rune))
+            {
+                case System.Globalization.UnicodeCategory.Control:
+                case System.Globalization.UnicodeCategory.Format:
+                case System.Globalization.UnicodeCategory.LineSeparator:
+                case System.Globalization.UnicodeCategory.ParagraphSeparator:
+                case System.Globalization.UnicodeCategory.PrivateUse:
+                case System.Globalization.UnicodeCategory.OtherNotAssigned:
+                    return false;
+            }
+        }
+
+        return true;
+    }
 
     public static bool IsEmail(string? value) =>
         IsClean(value, 254)

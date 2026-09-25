@@ -22,4 +22,9 @@
       <ProjectReference Include="..\McpServer.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <!-- The guardrail eval corpus is data the tests read at run time. -->
+        <None Update="Evals\*.json" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
 </Project>

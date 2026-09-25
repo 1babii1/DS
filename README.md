@@ -57,6 +57,10 @@ isn't claimed.
   documents, rather than hides, a real read-side race between a grant landing and the
   account-lookup projection catching up.
 
+**Guardrails around an agent that can change data:** [`docs/agent-evals.md`](docs/agent-evals.md) - a reviewable corpus of
+hostile inputs and hostile-but-signed plans, scored in CI (what it found: invisible Unicode characters that could
+make a plan read differently from what it does). Says plainly that it measures the barriers, not any model.
+
 **Real numbers, not estimates:** [`docs/benchmarks/baseline.md`](docs/benchmarks/baseline.md) —
 a live k6 run against the full stack, including the two self-inflicted load-test bugs it
 took to get a number worth trusting (a request storm with no backoff, twice, against two

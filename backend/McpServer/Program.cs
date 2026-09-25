@@ -44,6 +44,7 @@ var agentOptions = builder.Configuration.GetSection(AgentOptions.SectionName).Ge
 builder.Services.AddSingleton(agentOptions);
 builder.Services.AddSingleton(Microsoft.Extensions.Options.Options.Create(agentOptions));
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<AgentTelemetry>();
 builder.Services.AddSingleton(sp =>
 {
     // Same rule as AuthService's at-rest key: required in Production, never silently weak. Elsewhere an

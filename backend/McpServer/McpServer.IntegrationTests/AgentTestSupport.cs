@@ -55,7 +55,8 @@ internal static class AgentTestSupport
             new EmployeeCommandClient(Client(employees)),
             new RewardsCommandClient(Client(rewards)),
             new AgentOptions { MaxGrantAmount = maxGrant },
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<PlanExecutor>.Instance);
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<PlanExecutor>.Instance,
+            new AgentTelemetry());
     }
 
     public static PlanStep Hire() => new(

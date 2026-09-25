@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Security.Claims;
 using Microsoft.Extensions.Options;
 using ModelContextProtocol;
@@ -17,7 +18,8 @@ public sealed class AgentTools(
     IHttpContextAccessor httpContextAccessor,
     PlanSigner signer,
     IOptions<AgentOptions> options,
-    TimeProvider clock)
+    TimeProvider clock,
+    AgentTelemetry telemetry)
 {
     private const string Next =
         "Nothing has been done yet. Show the user these steps and ask them to approve; only their own approval " +
@@ -54,7 +56,7 @@ public sealed class AgentTools(
                 Reason: grantReason));
         }
 
-        return Propose(steps);
+        return Propose("propose_hire_employee", steps);
     }
 
     [McpServerTool(Name = "propose_transfer_employee")]
@@ -63,7 +65,7 @@ public sealed class AgentTools(
         [Description("Employee id")] Guid employeeId,
         [Description("Target department id")] Guid departmentId,
         [Description("Target position id")] Guid positionId) =>
-        Propose([new PlanStep(
+        Propose("propose_transfer_employee", [new PlanStep(
             StepKind.TransferEmployee,
             $"Transfer employee {employeeId} to department {departmentId}, position {positionId}",
             EmployeeId: employeeId,
@@ -76,14 +78,34 @@ public sealed class AgentTools(
         [Description("Employee id")] Guid employeeId,
         [Description("Amount, more than 0")] decimal amount,
         [Description("Reason for the grant")] string reason) =>
-        Propose([new PlanStep(
+        Propose("propose_grant_currency", [new PlanStep(
             StepKind.GrantCurrency,
             $"Grant {amount} to employee {employeeId}: \"{reason}\"",
             EmployeeId: employeeId,
             Amount: amount,
             Reason: reason)]);
 
-    private PlanProposal Propose(List<PlanStep> steps)
+    private PlanProposal Propose(string tool, List<PlanStep> steps)
+    {
+        using var span = telemetry.Source.StartActivity("agent.propose");
+        span?.SetTag("gen_ai.tool.name", tool);
+        span?.SetTag("agent.steps", steps.Count);
+
+        try
+        {
+            var proposal = Build(steps);
+            telemetry.Proposal(tool, accepted: true);
+            return proposal;
+        }
+        catch (McpException)
+        {
+            telemetry.Proposal(tool, accepted: false);
+            span?.SetTag("agent.outcome", "refused");
+            throw;
+        }
+    }
+
+    private PlanProposal Build(List<PlanStep> steps)
     {
         var user = httpContextAccessor.HttpContext?.User.FindFirstValue("sub");
         if (!Guid.TryParse(user, out var userId))
@@ -101,6 +123,7 @@ public sealed class AgentTools(
             Validate(steps[i], i, options.Value);
         }
 
+        Activity.Current?.SetTag("agent.plan_id", plan.Id.ToString());
         return new PlanProposal(signer.Sign(plan), plan.ExpiresAt, steps.Select(s => s.Summary).ToList(), Next);
     }
 

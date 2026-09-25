@@ -36,7 +36,8 @@ public class AgentToolsTests
             new HttpContextAccessor { HttpContext = context },
             signer,
             Options.Create(new AgentOptions { MaxGrantAmount = maxGrant, PlanLifetime = TimeSpan.FromMinutes(10) }),
-            new Clock(Now));
+            new Clock(Now),
+            new AgentTelemetry());
         return (tools, signer);
     }
 

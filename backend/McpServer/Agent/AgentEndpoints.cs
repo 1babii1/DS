@@ -18,15 +18,18 @@ public static class AgentEndpoints
             PlanSigner signer,
             PlanExecutor executor,
             IAuthorizationService authorization,
+            AgentTelemetry telemetry,
             CancellationToken ct) =>
         {
             if (!Guid.TryParse(user.FindFirstValue("sub"), out var userId))
             {
+                telemetry.Confirmation("rejected", "unauthenticated");
                 return Results.Unauthorized();
             }
 
             if (string.IsNullOrWhiteSpace(request.Token))
             {
+                telemetry.Confirmation("rejected", "invalid");
                 return Results.BadRequest(new { error = "A plan token is required." });
             }
 
@@ -38,12 +41,18 @@ public static class AgentEndpoints
             catch (PlanTokenException ex)
             {
                 // Fixed answers only: nothing about why a signature failed, or whose plan it was.
-                return ex.Problem switch
+                switch (ex.Problem)
                 {
-                    PlanTokenProblem.WrongUser => Results.Json(new { error = "This plan is not yours to confirm." }, statusCode: StatusCodes.Status403Forbidden),
-                    PlanTokenProblem.Expired => Results.Json(new { error = "This plan has expired. Ask for a new one." }, statusCode: StatusCodes.Status410Gone),
-                    _ => Results.BadRequest(new { error = "This is not a valid plan." }),
-                };
+                    case PlanTokenProblem.WrongUser:
+                        telemetry.Confirmation("rejected", "wrong_user");
+                        return Results.Json(new { error = "This plan is not yours to confirm." }, statusCode: StatusCodes.Status403Forbidden);
+                    case PlanTokenProblem.Expired:
+                        telemetry.Confirmation("rejected", "expired");
+                        return Results.Json(new { error = "This plan has expired. Ask for a new one." }, statusCode: StatusCodes.Status410Gone);
+                    default:
+                        telemetry.Confirmation("rejected", "invalid");
+                        return Results.BadRequest(new { error = "This is not a valid plan." });
+                }
             }
 
             // Handing out money is the step a click must not be enough for: the caller has to have
@@ -52,12 +61,15 @@ public static class AgentEndpoints
             if (plan.Steps.Any(s => s.Kind == StepKind.GrantCurrency)
                 && !(await authorization.AuthorizeAsync(user, StepUpAuthorizationExtensions.PolicyName)).Succeeded)
             {
+                telemetry.Confirmation("rejected", "step_up_required");
                 return Results.Json(
                     new { error = "This plan hands out currency, so it needs a recent re-verification. Verify again and confirm." },
                     statusCode: StatusCodes.Status403Forbidden);
             }
 
-            return Results.Ok(await executor.ExecuteAsync(plan, ct));
+            var report = await executor.ExecuteAsync(plan, ct);
+            telemetry.Confirmation(report.Completed ? "completed" : "failed");
+            return Results.Ok(report);
         }).RequireAuthorization();
 
         return app;

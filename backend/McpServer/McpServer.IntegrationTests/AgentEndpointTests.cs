@@ -200,6 +200,54 @@ public class AgentEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task How_each_confirmation_ended_is_counted_with_a_reason_for_the_rejected_ones()
+    {
+        using var capture = new AgentTelemetryTests.Capture(_factory.Services.GetRequiredService<AgentTelemetry>());
+        var user = Guid.NewGuid();
+
+        await Confirm(TokenFor(user), user);                                                          // completed
+        await Confirm(TokenFor(user), Guid.NewGuid());                                                // wrong user
+        await Confirm(TokenFor(user, expires: DateTimeOffset.UtcNow.AddSeconds(-1)), user);           // expired
+        await Confirm(TokenFor(user, steps: [Hire(), GrantToHired(5m)]), user);                       // no step-up
+        await Confirm("garbage", user);                                                               // invalid
+        await Confirm(TokenFor(user), user: null);                                                    // unauthenticated
+
+        Assert.Equal(1, capture.Sum("agent_confirmations", ("outcome", "completed")));
+        Assert.Equal(1, capture.Sum("agent_confirmations", ("reason", "wrong_user")));
+        Assert.Equal(1, capture.Sum("agent_confirmations", ("reason", "expired")));
+        Assert.Equal(1, capture.Sum("agent_confirmations", ("reason", "step_up_required")));
+        Assert.Equal(1, capture.Sum("agent_confirmations", ("reason", "invalid")));
+
+        // Not counted here: a request with no session is turned away by the authorization middleware before
+        // the handler runs (it shows up as a 401 in the HTTP server metrics). The handler's own check is a
+        // backstop, not the door.
+        Assert.Equal(0, capture.Sum("agent_confirmations", ("reason", "unauthenticated")));
+    }
+
+    [Fact]
+    public async Task A_plan_that_ran_but_failed_is_counted_as_failed_not_rejected()
+    {
+        var user = Guid.NewGuid();
+
+        var refusing = new RecordingService((_, _) => RecordingService.Json(HttpStatusCode.Forbidden, "{}"));
+        await using var factory = _factory.WithWebHostBuilder(b => b.ConfigureTestServices(services =>
+            services.AddHttpClient<EmployeeCommandClient>().ConfigurePrimaryHttpMessageHandler(() => refusing)));
+        using var failedCapture = new AgentTelemetryTests.Capture(factory.Services.GetRequiredService<AgentTelemetry>());
+
+        var request = new HttpRequestMessage(HttpMethod.Post, Url)
+        {
+            Content = JsonContent.Create(new { token = factory.Services.GetRequiredService<PlanSigner>().Sign(new Plan(
+                Guid.NewGuid(), user, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow.AddMinutes(5), [Hire()])) }),
+        };
+        request.Headers.Add("Authorization", "Bearer t");
+        request.Headers.Add("X-Test-Sub", user.ToString());
+        await factory.CreateClient().SendAsync(request);
+
+        Assert.Equal(1, failedCapture.Sum("agent_confirmations", ("outcome", "failed")));
+        Assert.Equal(0, failedCapture.Sum("agent_confirmations", ("outcome", "rejected")));
+    }
+
+    [Fact]
     public async Task The_failure_answers_reveal_nothing_about_why_a_signature_failed()
     {
         var response = await Confirm("v1.abc.def", Guid.NewGuid());
