@@ -16,7 +16,10 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ComponentType, ReactNode } from 'react'
 
+import { NotificationBell } from '@/features/notifications/ui/notification-bell'
+import { WalletBalance } from '@/features/rewards/ui/wallet-balance'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/shared/ui/sheet'
+import { AccessState } from '@/shared/ui/access-state'
 
 import { CommandMenu } from './command-menu'
 import { ThemeToggle } from './theme-toggle'
@@ -116,9 +119,10 @@ function MobileNavigation() {
 	)
 }
 
-export function AppShell({ accountControl, children }: { accountControl: ReactNode; children: ReactNode }) {
+export function AppShell({ accountControl, authenticated, children }: { accountControl: ReactNode; authenticated: boolean; children: ReactNode }) {
 	const pathname = usePathname()
-	if (pathname.startsWith('/login')) return <>{children}</>
+	if (pathname.startsWith('/login') || pathname.startsWith('/register')) return <>{children}</>
+	const requiresSession = pathname !== '/' && pathname !== '/engineering'
 
 	return (
 		<div className='app-frame'>
@@ -130,12 +134,14 @@ export function AppShell({ accountControl, children }: { accountControl: ReactNo
 					<p className='app-topbar__context'>People operations workspace</p>
 					<div className='app-topbar__actions'>
 						<span className='environment-badge'><span aria-hidden='true' />Local environment</span>
-						<CommandMenu />
+						{authenticated ? <><CommandMenu />
+						<WalletBalance enabled />
+						<NotificationBell enabled /></> : null}
 						{accountControl}
 						<ThemeToggle />
 					</div>
 				</header>
-				<main id='main-content'>{children}</main>
+				<main id='main-content'>{requiresSession && !authenticated ? <AccessState resource='this workspace' status={401} /> : children}</main>
 			</div>
 		</div>
 	)

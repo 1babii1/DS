@@ -4,7 +4,7 @@ import { authConfiguration } from "@/shared/auth/config";
 
 export const dynamic = "force-dynamic";
 
-const allowedPrefixes = ["/api/departments", "/api/positions", "/api/locations", "/api/employees", "/api/audit"];
+const allowedPrefixes = ["/api/departments", "/api/positions", "/api/locations", "/api/employees", "/api/audit", "/api/search", "/api/rewards", "/api/notifications"];
 const forwardedRequestHeaders = ["accept", "content-type", "if-match"];
 const forwardedResponseHeaders = ["content-type", "location", "etag"];
 
