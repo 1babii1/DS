@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+﻿using CSharpFunctionalExtensions;
 using EmployeeService.Application.Database;
 using EmployeeService.Application.Directory;
 using EmployeeService.Application.Employees.Errors;
@@ -25,9 +25,14 @@ public class HireEmployeeHandler(
                 command.PositionId,
                 cancellationToken);
         }
-        catch (Exception ex)
+        catch (DirectoryLookupException ex) when (ex.Failure == DirectoryLookupFailure.Unauthorized)
         {
-            logger.LogWarning(ex, "DirectoryService gRPC call failed while hiring {Email}", command.Email);
+            logger.LogError(ex, "DirectoryService rejected credentials while hiring {Email}", command.Email);
+            return EmployeeErrors.DirectoryUnauthorized();
+        }
+        catch (DirectoryLookupException ex)
+        {
+            logger.LogWarning(ex, "DirectoryService unavailable while hiring {Email}", command.Email);
             return EmployeeErrors.DirectoryUnavailable();
         }
 
@@ -62,7 +67,8 @@ public class HireEmployeeHandler(
             command.DepartmentId,
             validation.DepartmentName,
             command.PositionId,
-            validation.PositionName);
+            validation.PositionName,
+            command.HiredByAccountId);
 
         if (employeeResult.IsFailure)
         {
@@ -75,9 +81,19 @@ public class HireEmployeeHandler(
         outboxWriter.Enqueue(
             EmployeeEventTypes.Hired,
             employee.Id.ToString(),
-            new EmployeeHiredEvent(employee.Id, employee.FullName, employee.Email, employee.DepartmentId, employee.PositionId));
+            new EmployeeHiredEvent(
+                employee.Id,
+                employee.FullName,
+                employee.Email,
+                employee.DepartmentId,
+                employee.PositionId,
+                employee.HiredByAccountId));
 
-        await repository.Save(cancellationToken);
+        var saveResult = await repository.Save(cancellationToken);
+        if (saveResult.IsFailure)
+        {
+            return saveResult.Error;
+        }
 
         return employee.Id;
     }

@@ -15,6 +15,15 @@ public partial record DepartmentPath
         Value = value;
     }
 
+    /// <summary>
+    /// Восстанавливает значение из хранилища без проверок. Данные уже прошли валидацию
+    /// при записи, а повторная проверка на чтении означает, что любое ужесточение правила
+    /// делает ранее сохранённые строки нечитаемыми: EF вызывает фабрику при материализации,
+    /// и .Value на неуспешном результате бросает исключение прямо внутри запроса.
+    /// Использовать только в конвертерах EF.
+    /// </summary>
+    public static DepartmentPath FromPersisted(string value) => new(value);
+
     public static Result<DepartmentPath, Error> CreateParent(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -85,6 +94,6 @@ public partial record DepartmentPath
         return new DepartmentPath(newPathValue);
     }
 
-    [GeneratedRegex(@"^[a-zA-Z.-]+$")]
+    [GeneratedRegex(@"^[a-zA-Z0-9.-]+$")]
     private static partial Regex LatinDotHyphenRegex();
 }

@@ -1,0 +1,40 @@
+@page "/auth/email/confirm"
+@model AuthService.Web.Pages.Email.ConfirmModel
+@{
+    Layout = null;
+}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Confirm email · DS</title>
+    <style>
+        :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #131a17; color: #f0f4f1; }
+        body { margin: 0; min-height: 100dvh; display: grid; place-items: center; }
+        main { width: min(26rem, calc(100% - 3rem)); padding-block: 3rem; }
+        .brand { font-weight: 700; letter-spacing: .15em; color: #a8d7b8; }
+        h1 { font-size: 2.5rem; letter-spacing: -.04em; margin-bottom: .75rem; }
+        p { color: #abb9b0; line-height: 1.6; }
+        .auth-switch { margin: 1.5rem 0 0; font-size: .9rem; }
+        .auth-switch a { color: #a8d7b8; font-weight: 600; }
+    </style>
+</head>
+<body>
+<main>
+    <div class="brand">DS / PEOPLE &amp; ORGANIZATION</div>
+    @if (Model.Confirmed)
+    {
+        <h1>Email confirmed.</h1>
+        <p>Your account is active. You can sign in now.</p>
+    }
+    else
+    {
+        <h1>Link invalid or expired.</h1>
+        <p>This confirmation link no longer works. Sign in and request a new one, or register again.</p>
+    }
+    <p class="auth-switch"><a href="/auth/sign-in">Sign in</a></p>
+</main>
+</body>
+</html>

@@ -2,51 +2,52 @@
 
 namespace Shared;
 
-/// <summary>
-/// Любой результат возвращаемый из нашего Api - оборачиваем в этот класс (для удобства работы)
-/// </summary>
-public class Envelope
+public record Envelope
 {
     public object? Result { get; }
 
-    public Errors? ErrorList { get; }
+    public Error? Error { get; }
 
-    public bool IsError => ErrorList != null || (ErrorList != null && ErrorList.Any());
+    public bool IsError => Error != null;
 
     public DateTime TimeGenerated { get; }
 
     [JsonConstructor]
-    private Envelope(object? result, Errors? errorList)
+    private Envelope(object? result, Error? error)
     {
         Result = result;
-        ErrorList = errorList;
+        Error = error;
         TimeGenerated = DateTime.UtcNow;
     }
 
-    public static Envelope Ok(object? result = null) => new(result, null);
+    public static Envelope Ok(object? result = null) =>
+        new(result, null);
 
-    public static Envelope Error(Errors errors) => new (null, errors);
+    public static Envelope Fail(Error error) =>
+        new(null, error);
 }
 
 public record Envelope<T>
 {
     public T? Result { get; }
 
-    public Errors? Errors { get; }
+    public Error? Error { get; }
 
-    public bool IsError => Errors != null || (Errors != null && Errors.Any());
+    public bool IsError => Error != null;
 
     public DateTime TimeGenerated { get; }
 
     [JsonConstructor]
-    public Envelope(T? result, Errors? errors)
+    private Envelope(T? result, Error? error)
     {
         Result = result;
-        Errors = errors;
+        Error = error;
         TimeGenerated = DateTime.UtcNow;
     }
 
-    public static Envelope<T> Ok(T? result = default) => new(result, null);
+    public static Envelope<T> Ok(T? result = default) =>
+        new(result, null);
 
-    public static Envelope<T> Error(Errors errors) => new(default, errors);
+    public static Envelope<T> Fail(Error error) =>
+        new(default, error);
 }

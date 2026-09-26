@@ -1,5 +1,9 @@
 namespace AuthService.Web.Configuration;
 
+// The confidential OIDC client for the Next.js/Auth.js BFF (issue #13) - disabled
+// by default so a deployment with no injected configuration behaves exactly as it
+// did before this existed, same reasoning as SigningKeys falling back to a dev
+// certificate rather than starting broken.
 public sealed class WebClientOptions
 {
     public const string SectionName = "Auth:WebClient";
@@ -14,7 +18,11 @@ public sealed class WebClientOptions
 
     public bool IsValid(bool isLocal)
     {
-        if (!Enabled) return true;
+        if (!Enabled)
+        {
+            return true;
+        }
+
         return ClientSecret.Length >= 32
             && Uri.TryCreate(FrontendOrigin, UriKind.Absolute, out var origin)
             && string.IsNullOrEmpty(origin.UserInfo)

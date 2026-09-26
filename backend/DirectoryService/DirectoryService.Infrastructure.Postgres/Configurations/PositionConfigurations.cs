@@ -20,18 +20,24 @@ public class PositionConfigurations : IEntityTypeConfiguration<Position>
             .HasColumnName("id");
 
         builder.Property(p => p.Name)
-            .HasConversion(p => p.Value, name => PositionName.Create(name).Value)
+            .HasConversion(p => p.Value, value => PositionName.FromPersisted(value))
             .IsRequired()
-            .HasMaxLength(LenghtConstants.LENGTH100)
+            .HasMaxLength(LengthConstants.MaxPositionNameLength)
             .HasColumnName("name");
 
         builder.Property(p => p.Description)
-            .HasConversion(p => p!.Value, description => PositionDescription.Create(description).Value)
-            .HasMaxLength(LenghtConstants.LENGTH1000)
+            .HasConversion(p => p!.Value, value => PositionDescription.FromPersisted(value))
+            .HasMaxLength(LengthConstants.MaxPositionDescriptionLength)
             .HasColumnName("description");
 
         builder.Property(p => p.IsActive)
             .HasColumnName("is_active");
+
+        // Mirrors LocationConfigurations' index: GetPositionsHandler sorts the catalogue
+        // by is_active DESC, name, id on every page, same reasoning as locations.
+        builder.HasIndex(p => new { p.IsActive, p.Name, p.Id })
+            .IsDescending(true, false, false)
+            .HasDatabaseName("ix_positions_is_active_name_id");
 
         builder.Property(p => p.CreatedAt)
             .HasColumnName("created_at");

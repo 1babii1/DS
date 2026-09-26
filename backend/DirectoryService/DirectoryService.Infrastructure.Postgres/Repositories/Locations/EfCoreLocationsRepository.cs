@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 using Shared;
+using Shared.Database;
 
 namespace DirectoryService.Infrastructure.Postgres.Repositories.Locations;
 
@@ -22,7 +23,7 @@ public class EfCoreLocationsRepository : ILocationsRepository
     }
 
     public async Task<Result<Guid, Error>> Add(
-        Domain.Locations.Locations locations,
+        Domain.Locations.Location locations,
         CancellationToken cancellationToken)
     {
         try
@@ -33,18 +34,18 @@ public class EfCoreLocationsRepository : ILocationsRepository
 
             return locations.Id.Value;
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
+        catch (DbUpdateException ex) when (ex.IsUniqueViolation() && ex.InnerException is PostgresException pgEx)
         {
             _logger.LogError(ex, "Error adding location");
 
             if (pgEx.ConstraintName == "ux_locations_name")
             {
-                return Error.Conflict(null!, "Locations name already exists");
+                return Error.Conflict(null!, "Location name already exists");
             }
 
             if (pgEx.ConstraintName == "ux_locations_address")
             {
-                return Error.Conflict(null!, "Locations address is already occupied");
+                return Error.Conflict(null!, "Location address is already occupied");
             }
 
             return Error.Failure("location.insert", "Fail to insert location");
@@ -57,7 +58,7 @@ public class EfCoreLocationsRepository : ILocationsRepository
         }
     }
 
-    public async Task<Result<IEnumerable<Domain.Locations.Locations>, Error>> GetOrphanLocationByDepartment(
+    public async Task<Result<IEnumerable<Domain.Locations.Location>, Error>> GetOrphanLocationByDepartment(
         DepartmentId departmentId,
         CancellationToken cancellationToken)
     {
@@ -75,11 +76,11 @@ public class EfCoreLocationsRepository : ILocationsRepository
                 var locations = await _dbContext.Locations
                     .Where(l => locationsDepartment.Contains(l.Id) && l.IsActive == true)
                     .ToListAsync(cancellationToken);
-                return Result.Success<IEnumerable<Domain.Locations.Locations>, Error>(locations);
+                return Result.Success<IEnumerable<Domain.Locations.Location>, Error>(locations);
             }
 
-            return Result.Success<IEnumerable<Domain.Locations.Locations>, Error>(
-                new List<Domain.Locations.Locations>());
+            return Result.Success<IEnumerable<Domain.Locations.Location>, Error>(
+                new List<Domain.Locations.Location>());
         }
         catch (Exception e)
         {
@@ -105,20 +106,6 @@ public class EfCoreLocationsRepository : ILocationsRepository
             var missedIds = enumerable.Except(allLocationIds);
 
             return Result.Success<IEnumerable<LocationId>, Error>(missedIds);
-        }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx)
-        {
-            if (pgEx.SqlState == "23503")
-            {
-                return Error.Conflict("foreign.key", "Related entity not found");
-            }
-
-            if (pgEx.SqlState == "23505")
-            {
-                return Error.Conflict("unique.constraint", "Duplicate value");
-            }
-
-            return Error.Failure("location.update", "Database error");
         }
         catch (Exception e)
         {

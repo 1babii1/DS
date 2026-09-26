@@ -1,4 +1,4 @@
-using EmployeeService.Application.Database;
+﻿using EmployeeService.Application.Database;
 using Microsoft.EntityFrameworkCore;
 
 namespace EmployeeService.Application.Employees.Queries;
@@ -18,6 +18,7 @@ public class GetEmployeeByIdHandler(IReadDbContext readDbContext)
                 e.PositionId,
                 e.PositionName,
                 e.Status.ToString(),
+                e.ProvisioningFailureReason,
                 e.HiredAt))
             .SingleOrDefaultAsync(cancellationToken);
     }

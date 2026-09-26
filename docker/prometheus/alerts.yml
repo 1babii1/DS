@@ -1,0 +1,35 @@
+groups:
+  - name: messaging
+    rules:
+      # A parked outbox message will not be retried on its own: it needs an operator
+      # (list and redrive via /<service>/ops/outbox/parked). Any parked message matters,
+      # so there is no threshold beyond "more than zero for a minute".
+      - alert: OutboxMessageParked
+        expr: outbox_parked_messages > 0
+        for: 1m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $labels.service_name }} has {{ $value }} parked outbox message(s)"
+          description: "Publishing keeps failing for these messages. Inspect and redrive them through the service's ops API."
+
+      # A message a consumer gave up on after its retries. Nothing reprocesses it automatically.
+      - alert: DeadLettersPresent
+        expr: dead_letters > 0
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "{{ $labels.service_name }} has {{ $value }} dead-lettered message(s)"
+          description: "A consumer exhausted its retries. Inspect via the service's ops dead-letters route."
+
+      # Publishing is slow or stopped without any single message failing (broker down, publisher
+      # crashed). Parked messages are excluded from this figure, so it is not the same alert twice.
+      - alert: OutboxBacklogStale
+        expr: outbox_oldest_pending_age_seconds > 300
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $labels.service_name }} outbox has been unpublished for over 5 minutes"
+          description: "The oldest pending message is {{ $value | humanizeDuration }} old. Check the broker and the service's publisher."

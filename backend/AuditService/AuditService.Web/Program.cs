@@ -1,6 +1,11 @@
+﻿using Shared.Ops;
 using AuditService.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Serilog;
+using Shared.HealthChecks;
+using Shared.Middlewares;
+using Shared.Observability;
+using Shared.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,29 +13,32 @@ builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 
 builder.Host.UseSerilog((context, _, configuration) =>
-    configuration.ReadFrom.Configuration(context.Configuration));
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .AddOtlpLogging(context.Configuration, "audit-service"));
+
+builder.Services.AddObservability(builder.Configuration, "audit-service");
 
 builder.Services.AddControllers();
+builder.Services.AddEnvelopeModelStateValidation();
 builder.Services.AddOpenApi();
 
-builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.MapInboundClaims = false;
-        options.MetadataAddress = builder.Configuration["Auth:MetadataAddress"];
-        options.RequireHttpsMetadata = builder.Environment.IsProduction();
-        options.TokenValidationParameters.ValidIssuer = builder.Configuration["Auth:Issuer"];
-        options.TokenValidationParameters.ValidateAudience = false;
-        options.TokenValidationParameters.RoleClaimType = "role";
-        options.TokenValidationParameters.NameClaimType = "name";
-    });
+builder.Services.AddPlatformJwtAuthentication(builder.Configuration, builder.Environment);
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("IsAdmin", policy => policy.RequireRole(RoleNames.Admin));
 
 builder.Services.AddAuditInfrastructure(builder.Configuration);
 
+builder.Services.AddDatabaseHealthCheck<AuditDbContext>();
+
+builder.Services.AddOpsPolicy();
+builder.Services.AddOpsMetrics<AuditDbContext>("audit-service");
+
 var app = builder.Build();
+
+app.UseRequestCorrelationId();
+app.UseExceptionMiddleware();
 
 app.UseSerilogRequestLogging();
 
@@ -41,6 +49,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapDeadLetterOps<AuditDbContext>("/api/audit/ops");
+app.MapDefaultHealthChecks();
 
 app.Run();
 

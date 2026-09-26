@@ -1,15 +1,20 @@
 using System.ComponentModel.DataAnnotations;
 using AuthService.Domain;
+using AuthService.Web.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 
 namespace AuthService.Web.Pages;
 
 [AllowAnonymous]
+[EnableRateLimiting("auth")]
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
-public class RegisterModel(UserManager<Account> userManager, SignInManager<Account> signInManager) : PageModel
+public class RegisterModel(UserManager<Account> userManager, AccountRecoveryService recovery, IOptions<GoogleOptions> googleOptions)
+    : PageModel
 {
     [BindProperty]
     [Required]
@@ -30,9 +35,15 @@ public class RegisterModel(UserManager<Account> userManager, SignInManager<Accou
     [BindProperty(SupportsGet = true)]
     public string ReturnUrl { get; set; } = string.Empty;
 
+    /// <summary>Set once registration succeeds, so the page can render a "check your
+    /// email" state instead of the form - there is no session to redirect with yet.</summary>
+    public bool Registered { get; private set; }
+
+    public bool GoogleSignInEnabled => googleOptions.Value.Enabled;
+
     public IActionResult OnGet() => IsAuthorizationReturnUrl() ? Page() : BadRequest();
 
-    public async Task<IActionResult> OnPostAsync()
+    public async Task<IActionResult> OnPostAsync(CancellationToken cancellationToken)
     {
         if (!IsAuthorizationReturnUrl()) return BadRequest();
         if (!ModelState.IsValid) return Page();
@@ -63,8 +74,12 @@ public class RegisterModel(UserManager<Account> userManager, SignInManager<Accou
             return Page();
         }
 
-        await signInManager.SignInAsync(user, isPersistent: true);
-        return LocalRedirect(ReturnUrl);
+        // No SignInAsync: that call does not consult RequireConfirmedAccount, so it would
+        // silently hand out a session before the email address is verified.
+        await recovery.SendConfirmationEmailAsync(user, cancellationToken);
+
+        Registered = true;
+        return Page();
     }
 
     private bool IsAuthorizationReturnUrl() => Url.IsLocalUrl(ReturnUrl)

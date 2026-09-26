@@ -1,6 +1,7 @@
 ﻿using CSharpFunctionalExtensions;
 using DirectoryService.Application.Database;
 using DirectoryService.Application.Department;
+using DirectoryService.Application.IntegrationEvents;
 using DirectoryService.Application.Position.Errors;
 using DirectoryService.Application.Validation;
 using DirectoryService.Contracts.Request.Position;
@@ -38,15 +39,18 @@ public class CreatePositionHandle
     private readonly IPositionRepository _positionRepository;
     private readonly IDepartmentRepository _departmentRepository;
     private readonly CreatePositionValidation _validator;
+    private readonly IOutboxWriter _outboxWriter;
     private readonly ILogger<CreatePositionHandle> _logger;
 
     public CreatePositionHandle(
         IPositionRepository positionRepository,
         CreatePositionValidation validator,
+        IOutboxWriter outboxWriter,
         ILogger<CreatePositionHandle> logger, IDepartmentRepository departmentRepository)
     {
         _positionRepository = positionRepository;
         _validator = validator;
+        _outboxWriter = outboxWriter;
         _logger = logger;
         _departmentRepository = departmentRepository;
     }
@@ -57,13 +61,10 @@ public class CreatePositionHandle
     {
         CreatePositionRequest request = positionCommand.request;
 
-        // Валидация входных данных
-        _logger.LogInformation("Validating department");
         ValidationResult validateResult = await _validator.ValidateAsync(positionCommand, cancellationToken);
         if (!validateResult.IsValid)
         {
-            _logger.LogError("Failed to validate location111");
-
+            _logger.LogWarning("Invalid position request for {PositionName}", request.Name.Value);
             return validateResult.ToError();
         }
 
@@ -71,59 +72,62 @@ public class CreatePositionHandle
         var departmentIdsNotFound = await _departmentRepository.GetDepartmentsIds(request.DepartmentIds, cancellationToken);
         if (departmentIdsNotFound.IsFailure)
         {
-            _logger.LogError("Failed to get departments ids" + departmentIdsNotFound.Error.Messages);
+            _logger.LogError("Failed to look up departments for a new position");
             return departmentIdsNotFound.Error;
         }
 
         if (departmentIdsNotFound.Value.Any())
         {
-            _logger.LogError("Departments not found" + string.Join(", ", departmentIdsNotFound.Value));
+            _logger.LogWarning(
+                "Department not found: {MissingDepartmentIds}",
+                departmentIdsNotFound.Value.Select(id => id.Value));
             return PositionErrors.DepartmentIdsNotFound();
         }
 
         PositionId positionId = PositionId.NewPositionId();
 
-        var positionNameResult = PositionName.Create(request.Name.Value);
-        if (positionNameResult.IsFailure)
-        {
-            _logger.LogError("Failed to create position name");
-            return positionNameResult.Error;
-        }
+        // Валидатор уже прогнал те же фабрики через MustBeValueObject.
+        PositionName positionName = PositionName.Create(request.Name.Value).Value;
+        PositionDescription? positionDescription = request.Description is null
+            ? null
+            : PositionDescription.Create(request.Description.Value).Value;
 
-        PositionName positionName = positionNameResult.Value;
-
-        var positionDescriptionResult = request.Description != null
-            ? PositionDescription.Create(request.Description.Value)
-            : Result.Success<PositionDescription, Error>(null!);
-
-        if (positionDescriptionResult.IsFailure)
-        {
-            _logger.LogError("Failed to create position description");
-            return positionDescriptionResult.Error;
-        }
-
-        PositionDescription? positionDescription = positionDescriptionResult.Value;
-
-        List<DepartmentPosition> departmentPositions = new List<DepartmentPosition>();
+        List<DepartmentPosition> departmentPositions = [];
         foreach (var departmentId in request.DepartmentIds)
         {
-            var departments = DepartmentPosition.Create(null, departmentId, positionId);
-            departmentPositions.Add(departments.Value);
+            var link = DepartmentPosition.Create(null, departmentId, positionId);
+            if (link.IsFailure)
+            {
+                _logger.LogError("Failed to link position to department {DepartmentId}", departmentId.Value);
+                return Error.Failure("position.department.link", "Failed to link position to department");
+            }
+
+            departmentPositions.Add(link.Value);
         }
 
         Domain.Positions.Position position = new(positionId, positionName, departmentPositions,
             positionDescription);
 
-        var result = await _positionRepository.Add(position, cancellationToken);
+        // Enqueue before Add(): IOutboxWriter only stages the message on the same scoped
+        // DbContext, and Add() is what actually calls SaveChangesAsync - so this lands
+        // both writes in that one commit without changing the repository's contract.
+        _outboxWriter.Enqueue(
+            PositionEventTypes.Created,
+            positionId.Value.ToString(),
+            new PositionCreatedEvent(
+                positionId.Value,
+                positionName.Value,
+                positionDescription?.Value,
+                request.DepartmentIds.Select(id => id.Value).ToArray()));
 
+        var result = await _positionRepository.Add(position, cancellationToken);
         if (result.IsFailure)
         {
-            _logger.LogError("Failed to create position");
+            _logger.LogError("Failed to persist position {PositionId}", positionId.Value);
             return result.Error;
         }
 
-        _logger.LogInformation("Position created successfully");
-
+        _logger.LogInformation("Position {PositionId} created", positionId.Value);
         return result;
     }
 }

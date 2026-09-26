@@ -43,7 +43,6 @@ public class CreateDepartmentValidation : AbstractValidator<CreateDepartmentRequ
 
 public class CreateDepartmentHandler
 {
-    private static readonly SemaphoreSlim _semaphoreSlim = new(3, 3);
     private readonly IDepartmentRepository _departmentRepository;
     private readonly ILocationsRepository _locationRepository;
     private readonly ITransactionManager _transactionManager;
@@ -75,7 +74,7 @@ public class CreateDepartmentHandler
         ValidationResult validateResult = await _validator.ValidateAsync(request);
         if (!validateResult.IsValid)
         {
-            _logger.LogError("Failed to validate department");
+            _logger.LogWarning("Invalid department request");
             return validateResult.ToError();
         }
 
@@ -83,19 +82,19 @@ public class CreateDepartmentHandler
         var locationIdsNotFound = await _locationRepository.GetLocationsIds(request.LocationsIds, cancellationToken);
         if (locationIdsNotFound.IsFailure)
         {
-            _logger.LogError("Failed to get locations ids " + locationIdsNotFound.Error.Messages);
+            _logger.LogError("Failed to look up locations for a new department");
             return locationIdsNotFound.Error;
         }
 
         // Проверка на существование Подразделения(если передан)
-        Departments? departmentFromDB = null;
+        Domain.Departments.Department? departmentFromDB = null;
         if (request.ParentDepartmentId != null)
         {
             var getResult =
                 await _departmentRepository.GetByIdIncludeLocations(request.ParentDepartmentId, cancellationToken);
             if (getResult.IsFailure)
             {
-                _logger.LogError("Parent department not found " + getResult.Error.Messages);
+                _logger.LogWarning("Parent department {ParentId} not found", request.ParentDepartmentId!.Value);
                 return Error.Failure("department.notfound", "Parent department not found");
             }
 
@@ -104,56 +103,46 @@ public class CreateDepartmentHandler
 
         if (locationIdsNotFound.Value.Any())
         {
-            _logger.LogError("Locations not found " + string.Join(", ", locationIdsNotFound.Value));
+            _logger.LogWarning("Location not found: {MissingLocationIds}", locationIdsNotFound.Value.Select(id => id.Value));
             return DepartmentErrors.LocationsIdsNotFound();
         }
 
-        var departmentNameResult = DepartmentName.Create(request.Name.Value);
-        if (departmentNameResult.IsFailure)
-        {
-            _logger.LogError("Failed to create department name");
-            return departmentNameResult.Error;
-        }
-
-        DepartmentName departmentName = departmentNameResult.Value;
-
-        var departmentIdentifierResult = DepartmentIdentifier.Create(request.Identifier.Value);
-        if (departmentIdentifierResult.IsFailure)
-        {
-            _logger.LogError("Failed to create department identifier");
-            return departmentIdentifierResult.Error;
-        }
-
-        DepartmentIdentifier departmentIdentifier = departmentIdentifierResult.Value;
+        // Валидатор уже прогнал те же фабрики через MustBeValueObject.
+        DepartmentName departmentName = DepartmentName.Create(request.Name.Value).Value;
+        DepartmentIdentifier departmentIdentifier = DepartmentIdentifier.Create(request.Identifier.Value).Value;
 
         var department = departmentFromDB is null
-            ? Departments.CreateParent(departmentName, departmentIdentifier, request.LocationsIds,
+            ? Domain.Departments.Department.CreateParent(departmentName, departmentIdentifier, request.LocationsIds,
                 request.DepartmentId)
-            : Departments.CreateChild(departmentName, departmentIdentifier, departmentFromDB,
+            : Domain.Departments.Department.CreateChild(departmentName, departmentIdentifier, departmentFromDB,
                 request.LocationsIds, request.DepartmentId);
         if (department.IsFailure)
         {
-            _logger.LogError("Failed to create department");
+            _logger.LogWarning("Department could not be constructed from the request");
             return department.Error;
         }
 
-        List<DepartmentLocation> departmentLocationsList = new List<DepartmentLocation>();
+        List<DepartmentLocation> departmentLocationsList = [];
         foreach (var locationIdValue in request.LocationsIds)
         {
             var departmentLocation = DepartmentLocation.Create(null, department.Value.Id, locationIdValue);
+            if (departmentLocation.IsFailure)
+            {
+                _logger.LogError("Failed to link department to location {LocationId}", locationIdValue.Value);
+                return Error.Failure("department.location.link", "Failed to link department to location");
+            }
+
             departmentLocationsList.Add(departmentLocation.Value);
         }
 
         department.Value.SetDepartmentsLocationsList(departmentLocationsList);
 
-        await _semaphoreSlim.WaitAsync(cancellationToken);
         try
         {
             var result = await _departmentRepository.Add(department.Value, cancellationToken);
-            _logger.LogInformation("Department created successfully");
             if (result.IsFailure)
             {
-                _logger.LogError("Failed to create department");
+                _logger.LogError("Failed to stage department {DepartmentId}", department.Value.Id.Value);
                 return result.Error;
             }
 
@@ -166,33 +155,47 @@ public class CreateDepartmentHandler
                     departmentIdentifier.Value,
                     departmentFromDB?.Id.Value));
 
+            // Один коммит на департамент, его связи с локациями и запись в outbox.
             var save = await _transactionManager.SaveChangesAsync(cancellationToken);
             if (save.IsFailure)
             {
-                _logger.LogError("Failed to create department");
+                _logger.LogError("Failed to persist department {DepartmentId}", department.Value.Id.Value);
                 return save.Error;
             }
 
+            _logger.LogInformation("Department {DepartmentId} created", department.Value.Id.Value);
+
             // Добавление в кэш
-            await _cache.SetAsync(
+            await _cache.SetOrIgnoreAsync(
+                _logger,
                 key: GetKey.DepartmentKey.ById(department.Value.Id),
                 value: department.Value,
                 options: new()
                 {
-                    LocalCacheExpiration = TimeSpan.FromMinutes(5), Expiration = TimeSpan.FromMinutes(30),
+                    LocalCacheExpiration = TimeSpan.FromMinutes(5),
+                    Expiration = TimeSpan.FromMinutes(30),
                 },
                 cancellationToken: cancellationToken);
+
+            // The new department is invisible to its parent's cached children list
+            // (and to the aggregate top-by-positions view) until these are evicted -
+            // that cache entry was populated before this row existed and has no way
+            // to know about it otherwise.
+            if (departmentFromDB is not null)
+            {
+                await _cache.RemoveOrIgnoreAsync(
+                    _logger, key: GetKey.DepartmentKey.Children(departmentFromDB.Id.Value), cancellationToken);
+            }
+
+            await _cache.RemoveOrIgnoreAsync(
+                _logger, key: GetKey.DepartmentKey.TopByPositions(), cancellationToken);
 
             return result;
         }
         catch (Exception e)
         {
-            _logger.LogError($"Failed to create department: {e}", e);
+            _logger.LogError(e, "Failed to create department");
             throw;
-        }
-        finally
-        {
-            _semaphoreSlim.Release();
         }
     }
 }

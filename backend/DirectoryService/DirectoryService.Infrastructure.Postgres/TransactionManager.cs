@@ -1,9 +1,9 @@
-﻿using System.Data;
-using CSharpFunctionalExtensions;
+﻿using CSharpFunctionalExtensions;
 using DirectoryService.Application.Database;
-using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Shared;
+using Shared.Database;
 
 namespace DirectoryService.Infrastructure.Postgres
 {
@@ -29,7 +29,10 @@ namespace DirectoryService.Infrastructure.Postgres
 
                 var transactionScopeLogger = _loggerFactory.CreateLogger<TransactionScope>();
 
-                var transactionScope = new TransactionScope(transaction.GetDbTransaction(), transactionScopeLogger);
+                // IDbContextTransaction itself has CommitAsync/RollbackAsync - unwrapping to
+                // the raw ADO.NET IDbTransaction via GetDbTransaction() (the previous shape of
+                // this code) threw that away and left only the blocking sync members.
+                var transactionScope = new TransactionScope(transaction, transactionScopeLogger);
 
                 return transactionScope;
             }
@@ -47,10 +50,18 @@ namespace DirectoryService.Infrastructure.Postgres
                 await _dbContext.SaveChangesAsync(cancellationToken);
                 return UnitResult.Success<Error>();
             }
+            catch (DbUpdateException ex) when (ex.IsUniqueViolation())
+            {
+                // A department path collides with an existing one - most likely two
+                // siblings (or two roots) created with the same identifier at the same
+                // time, both past application-level validation before either committed.
+                _logger.LogWarning(ex, "Unique constraint violation saving changes");
+                return UnitResult.Failure<Error>(GeneralErrors.UniqueConstraintViolation());
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error saving changes");
-                return UnitResult.Failure<Error>(Error.Failure());
+                return UnitResult.Failure<Error>(GeneralErrors.DatabaseError());
             }
         }
     }

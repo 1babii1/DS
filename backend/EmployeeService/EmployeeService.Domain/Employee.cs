@@ -1,4 +1,4 @@
-using CSharpFunctionalExtensions;
+﻿using CSharpFunctionalExtensions;
 using Shared;
 
 namespace EmployeeService.Domain;
@@ -23,6 +23,17 @@ public class Employee
 
     public EmployeeStatus Status { get; private set; }
 
+    // Only set when Status is ProvisioningFailed - the reason AuthService
+    // reported for why the login account couldn't be created (e.g. a
+    // duplicate email), surfaced to whoever needs to retry the hire.
+    public string? ProvisioningFailureReason { get; private set; }
+
+    // Null for employees hired before actor tracking existed - genuinely
+    // unknown, not an oversight, so nullable rather than backfilled. Lets
+    // AccountProvisioningFailed notify whoever did the hiring; a null here
+    // just means that notification is skipped, not an error.
+    public Guid? HiredByAccountId { get; private set; }
+
     public DateTime HiredAt { get; private set; }
 
     public DateTime CreatedAt { get; private set; }
@@ -39,7 +50,8 @@ public class Employee
         Guid departmentId,
         string departmentName,
         Guid positionId,
-        string positionName)
+        string positionName,
+        Guid? hiredByAccountId = null)
     {
         if (string.IsNullOrWhiteSpace(fullName))
         {
@@ -55,14 +67,15 @@ public class Employee
 
         return new Employee
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.CreateVersion7(),
             FullName = fullName,
             Email = email,
             DepartmentId = departmentId,
             DepartmentName = departmentName,
             PositionId = positionId,
             PositionName = positionName,
-            Status = EmployeeStatus.Active,
+            Status = EmployeeStatus.PendingProvisioning,
+            HiredByAccountId = hiredByAccountId,
             HiredAt = now,
             CreatedAt = now,
             UpdatedAt = now,
@@ -83,6 +96,36 @@ public class Employee
         UpdatedAt = DateTime.UtcNow;
 
         return UnitResult.Success<Error>();
+    }
+
+    // Called from AuthEventsConsumer on AccountProvisioned. Only ever leaves
+    // PendingProvisioning - already Active (a redelivered event) or any other
+    // status is a no-op, not an error, so an at-least-once Kafka consumer can
+    // safely process the same event twice.
+    public void CompleteProvisioning()
+    {
+        if (Status != EmployeeStatus.PendingProvisioning)
+        {
+            return;
+        }
+
+        Status = EmployeeStatus.Active;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    // Called from AuthEventsConsumer on AccountProvisioningFailed - the
+    // compensating step of the Hire Employee saga. Same idempotency reasoning
+    // as CompleteProvisioning: redelivery of the same event is a safe no-op.
+    public void FailProvisioning(string reason)
+    {
+        if (Status != EmployeeStatus.PendingProvisioning)
+        {
+            return;
+        }
+
+        Status = EmployeeStatus.ProvisioningFailed;
+        ProvisioningFailureReason = reason;
+        UpdatedAt = DateTime.UtcNow;
     }
 
     public UnitResult<Error> Terminate()

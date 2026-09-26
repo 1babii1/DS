@@ -1,3 +1,3 @@
-namespace AuthService.Web.Contracts;
+﻿namespace AuthService.Web.Contracts;
 
 public record LoginRequest(string Email, string Password);

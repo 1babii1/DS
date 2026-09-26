@@ -8,13 +8,13 @@ namespace DirectoryService.Application.Database;
 
 public interface ILocationsRepository
 {
-    Task<Result<Guid, Error>> Add(Locations locations, CancellationToken cancellationToken = default);
+    Task<Result<Guid, Error>> Add(Domain.Locations.Location locations, CancellationToken cancellationToken = default);
 
     Task<Result<IEnumerable<LocationId>, Error>> GetLocationsIds(
         IEnumerable<LocationId> locationIds,
         CancellationToken cancellationToken);
 
-    Task<Result<IEnumerable<Domain.Locations.Locations>, Error>> GetOrphanLocationByDepartment(
+    Task<Result<IEnumerable<Domain.Locations.Location>, Error>> GetOrphanLocationByDepartment(
         DepartmentId departmentId,
         CancellationToken cancellationToken);
 }

@@ -1,10 +1,8 @@
+using Shared.Kafka;
+
 namespace AuditService.Infrastructure;
 
-public class AuditConsumerOptions
+public class AuditConsumerOptions : KafkaConsumerOptions
 {
-    public string BootstrapServers { get; set; } = null!;
-
-    public string[] Topics { get; set; } = [];
-
-    public string GroupId { get; set; } = "audit-service";
+    public AuditConsumerOptions() => GroupId = "audit-service";
 }

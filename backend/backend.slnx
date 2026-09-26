@@ -1,0 +1,63 @@
+<Solution>
+  <Folder Name="/AuditService/">
+    <Project Path="AuditService/AuditService.Domain/AuditService.Domain.csproj" />
+    <Project Path="AuditService/AuditService.Infrastructure/AuditService.Infrastructure.csproj" />
+    <Project Path="AuditService/AuditService.IntegrationTests/AuditService.IntegrationTests.csproj" />
+    <Project Path="AuditService/AuditService.Web/AuditService.Web.csproj" />
+  </Folder>
+  <Folder Name="/AuthService/">
+    <Project Path="AuthService/AuthService.Application/AuthService.Application.csproj" />
+    <Project Path="AuthService/AuthService.ArchitectureTests/AuthService.ArchitectureTests.csproj" />
+    <Project Path="AuthService/AuthService.Contracts/AuthService.Contracts.csproj" />
+    <Project Path="AuthService/AuthService.Domain/AuthService.Domain.csproj" />
+    <Project Path="AuthService/AuthService.Infrastructure.Postgres/AuthService.Infrastructure.Postgres.csproj" />
+    <Project Path="AuthService/AuthService.IntegrationTests/AuthService.IntegrationTests.csproj" />
+    <Project Path="AuthService/AuthService.Web/AuthService.Web.csproj" />
+  </Folder>
+  <Folder Name="/DirectoryService/">
+    <Project Path="DirectoryService/DirectoryService.Application/DirectoryService.Application.csproj" />
+    <Project Path="DirectoryService/DirectoryService.ArchitectureTests/DirectoryService.ArchitectureTests.csproj" />
+    <Project Path="DirectoryService/DirectoryService.Contracts/DirectoryService.Contracts.csproj" />
+    <Project Path="DirectoryService/DirectoryService.Domain/DirectoryService.Domain.csproj" />
+    <Project Path="DirectoryService/DirectoryService.Infrastructure.Postgres/DirectoryService.Infrastructure.Postgres.csproj" />
+    <Project Path="DirectoryService/DirectoryService.IntegrationTests/DirectoryService.IntegrationTests.csproj" />
+    <Project Path="DirectoryService/DirectoryService/DirectoryService.csproj" />
+  </Folder>
+  <Folder Name="/EmployeeService/">
+    <Project Path="EmployeeService/EmployeeService.Application/EmployeeService.Application.csproj" />
+    <Project Path="EmployeeService/EmployeeService.Contracts/EmployeeService.Contracts.csproj" />
+    <Project Path="EmployeeService/EmployeeService.Domain/EmployeeService.Domain.csproj" />
+    <Project Path="EmployeeService/EmployeeService.Infrastructure.DirectoryGrpc/EmployeeService.Infrastructure.DirectoryGrpc.csproj" />
+    <Project Path="EmployeeService/EmployeeService.Infrastructure.Postgres/EmployeeService.Infrastructure.Postgres.csproj" />
+    <Project Path="EmployeeService/EmployeeService.IntegrationTests/EmployeeService.IntegrationTests.csproj" />
+    <Project Path="EmployeeService/EmployeeService.Web/EmployeeService.Web.csproj" />
+  </Folder>
+  <Project Path="McpServer/McpServer.IntegrationTests/McpServer.IntegrationTests.csproj" />
+  <Project Path="McpServer/McpServer.csproj" />
+  <Folder Name="/NotificationService/">
+    <Project Path="NotificationService/NotificationService.ArchitectureTests/NotificationService.ArchitectureTests.csproj" />
+    <Project Path="NotificationService/NotificationService.Domain/NotificationService.Domain.csproj" />
+    <Project Path="NotificationService/NotificationService.Infrastructure.Postgres/NotificationService.Infrastructure.Postgres.csproj" />
+    <Project Path="NotificationService/NotificationService.IntegrationTests/NotificationService.IntegrationTests.csproj" />
+    <Project Path="NotificationService/NotificationService.Web/NotificationService.Web.csproj" />
+  </Folder>
+  <Folder Name="/RewardsService/">
+    <Project Path="RewardsService/RewardsService.ArchitectureTests/RewardsService.ArchitectureTests.csproj" />
+    <Project Path="RewardsService/RewardsService.Domain/RewardsService.Domain.csproj" />
+    <Project Path="RewardsService/RewardsService.Infrastructure/RewardsService.Infrastructure.csproj" />
+    <Project Path="RewardsService/RewardsService.IntegrationTests/RewardsService.IntegrationTests.csproj" />
+    <Project Path="RewardsService/RewardsService.Web/RewardsService.Web.csproj" />
+  </Folder>
+  <Folder Name="/SearchService/">
+    <Project Path="SearchService/SearchService.ArchitectureTests/SearchService.ArchitectureTests.csproj" />
+    <Project Path="SearchService/SearchService.Domain/SearchService.Domain.csproj" />
+    <Project Path="SearchService/SearchService.Infrastructure.Elasticsearch/SearchService.Infrastructure.Elasticsearch.csproj" />
+    <Project Path="SearchService/SearchService.Infrastructure.Postgres/SearchService.Infrastructure.Postgres.csproj" />
+    <Project Path="SearchService/SearchService.IntegrationTests/SearchService.IntegrationTests.csproj" />
+    <Project Path="SearchService/SearchService.Web/SearchService.Web.csproj" />
+  </Folder>
+  <Project Path="Shared/Shared.csproj" />
+  <Project Path="ChaosTests/ChaosTests.csproj" />
+  <Project Path="EventContracts.Tests/EventContracts.Tests.csproj" />
+  <Project Path="Shared.UnitTests/Shared.UnitTests.csproj" />
+</Solution>

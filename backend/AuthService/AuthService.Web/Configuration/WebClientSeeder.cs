@@ -10,7 +10,10 @@ public static class WebClientSeeder
     {
         using var scope = services.CreateScope();
         var options = scope.ServiceProvider.GetRequiredService<IOptions<WebClientOptions>>().Value;
-        if (!options.Enabled) return;
+        if (!options.Enabled)
+        {
+            return;
+        }
 
         var manager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
         var origin = new Uri(options.FrontendOrigin);
@@ -38,8 +41,15 @@ public static class WebClientSeeder
             },
             Requirements = { Requirements.Features.ProofKeyForCodeExchange },
         };
+
         var application = await manager.FindByClientIdAsync(WebClientOptions.ClientId);
-        if (application is null) await manager.CreateAsync(descriptor);
-        else await manager.UpdateAsync(application, descriptor);
+        if (application is null)
+        {
+            await manager.CreateAsync(descriptor);
+        }
+        else
+        {
+            await manager.UpdateAsync(application, descriptor);
+        }
     }
 }

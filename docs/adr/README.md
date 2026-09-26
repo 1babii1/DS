@@ -1,0 +1,27 @@
+# Architecture Decision Records
+
+Short records of the significant technical decisions made while building this platform,
+in [MADR](https://adr.github.io/madr/)-style format: context, decision, consequences.
+Written after the fact, from the actual reasoning captured in commit messages and PR
+descriptions as each phase shipped, not backfilled generically.
+
+| ADR | Decision |
+|---|---|
+| [0001](0001-schema-per-service-shared-database.md) | Schema-per-service in one shared Postgres database |
+| [0002](0002-outbox-pattern-for-integration-events.md) | Transactional outbox for cross-service events |
+| [0003](0003-choreography-saga-for-hire-employee.md) | Choreography saga for the Hire Employee → provision account flow |
+| [0004](0004-no-api-gateway-aggregation.md) | No API Gateway aggregation / BFF, for now |
+| [0005](0005-rewards-ledger-design.md) | Rewards ledger design and no cross-service employee validation in v1 |
+| [0006](0006-signalr-notification-center.md) | SignalR for the in-app notification center |
+| [0007](0007-elasticsearch-cross-service-search.md) | Elasticsearch-backed cross-service search |
+| [0008](0008-mcp-server-cross-schema-reporting-layer.md) | McpServer as a read-only cross-schema reporting layer |
+| [0009](0009-postgres-backup-and-restore.md) | Postgres backup and restore |
+| [0010](0010-kubernetes-migration-target-architecture.md) | Kubernetes migration target architecture (design only, not implemented) |
+| [0011](0011-kafka-cluster-and-cdc-target-architecture.md) | Kafka cluster, Debezium CDC, event contracts (design only, not implemented) |
+| [0012](0012-reliability-as-a-process.md) | SLOs, canary delivery, chaos testing (design only, not implemented) |
+| [0013](0013-cell-based-isolation-target-architecture.md) | Cell-based isolation, Temporal, Citus (design only, not implemented) |
+| [0014](0014-multi-region-target-architecture.md) | Multi-region deployment (design only, not implemented) |
+
+Not yet written up, though each decision is already live in the codebase and explained
+in its own commit messages: gRPC for internal calls, local JWT validation via JWKS,
+OpenIddict as the OIDC provider, pgvector + local Ollama for semantic search.

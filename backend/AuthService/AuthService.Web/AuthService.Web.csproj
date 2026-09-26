@@ -1,7 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
     <ItemGroup>
+      <PackageReference Include="Fido2" />
+      <PackageReference Include="Fido2.AspNet" />
+      <PackageReference Include="MailKit" />
+      <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" />
       <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+      <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+      <PackageReference Include="OpenIddict.Quartz" />
+      <PackageReference Include="Quartz.Extensions.Hosting" />
       <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />
       <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
         <PrivateAssets>all</PrivateAssets>
@@ -12,7 +19,6 @@
       <PackageReference Include="OpenIddict.Validation.AspNetCore" />
       <PackageReference Include="OpenIddict.Validation.ServerIntegration" />
       <PackageReference Include="Serilog.AspNetCore" />
-      <PackageReference Include="Serilog.Sinks.Seq" />
     </ItemGroup>
 
     <ItemGroup>
@@ -20,6 +26,7 @@
       <ProjectReference Include="..\AuthService.Domain\AuthService.Domain.csproj" />
       <ProjectReference Include="..\AuthService.Infrastructure.Postgres\AuthService.Infrastructure.Postgres.csproj" />
       <ProjectReference Include="..\AuthService.Contracts\AuthService.Contracts.csproj" />
+      <ProjectReference Include="..\..\Shared\Shared.csproj" />
     </ItemGroup>
 
     <ItemGroup>

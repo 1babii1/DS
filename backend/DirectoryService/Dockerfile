@@ -1,5 +1,9 @@
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
+# curl - единственная зависимость, добавленная сверх runtime-образа, нужна
+# только для docker-compose HEALTHCHECK (/health/ready).
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 EXPOSE 5129
 EXPOSE 5179
 

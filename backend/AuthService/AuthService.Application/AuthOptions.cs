@@ -1,4 +1,4 @@
-namespace AuthService.Application;
+﻿namespace AuthService.Application;
 
 public class AuthOptions
 {

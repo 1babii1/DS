@@ -1,0 +1,82 @@
+@page "/auth/sessions/manage"
+@model AuthService.Web.Pages.Sessions.ManageModel
+@{
+    Layout = null;
+}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Sessions · DS</title>
+    <style>
+        :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #131a17; color: #f0f4f1; }
+        body { margin: 0; min-height: 100dvh; display: grid; place-items: center; }
+        main { width: min(34rem, calc(100% - 3rem)); padding-block: 3rem; }
+        .brand { font-weight: 700; letter-spacing: .15em; color: #a8d7b8; }
+        h1 { font-size: 2rem; letter-spacing: -.03em; margin-bottom: .75rem; }
+        h2 { font-size: 1.15rem; margin: 2rem 0 .5rem; }
+        p { color: #abb9b0; line-height: 1.6; }
+        button { border: 0; background: #a8d7b8; color: #131a17; font-weight: 600; cursor: pointer; border-radius: .75rem; padding: .5rem .875rem; font: inherit; }
+        button:disabled { opacity: .6; cursor: default; }
+        .session-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: #1c2520; border: 1px solid #53685b; border-radius: .75rem; padding: .875rem 1rem; margin-bottom: .5rem; }
+        .session-row__meta { font-size: .85rem; color: #abb9b0; }
+        .session-row button { background: transparent; border: 1px solid #53685b; color: #ffb5b5; }
+        .badge--current { display: inline-block; margin-left: .5rem; padding: .1rem .5rem; border-radius: 999px; background: #1f3a28; color: #a8d7b8; font-size: .75rem; font-weight: 600; }
+        .message--empty { color: #abb9b0; font-size: .9rem; }
+    </style>
+</head>
+<body>
+<main>
+    <div class="brand">DS / PEOPLE &amp; ORGANIZATION</div>
+    <h1>Sessions</h1>
+    <p>Every browser currently signed in to your account. Revoking one signs it out immediately, without affecting the others.</p>
+
+    <div id="session-list"><p class="message--empty">Loading…</p></div>
+    <p style="margin-top: 2rem; font-size: .9rem;"><a href="/auth/account/settings" style="color: #a8d7b8;">Account settings →</a></p>
+</main>
+<script>
+    function escapeHtml(value) {
+        const div = document.createElement("div");
+        div.textContent = value;
+        return div.innerHTML;
+    }
+
+    async function loadSessions() {
+        const response = await fetch("/auth/sessions");
+        const list = document.getElementById("session-list");
+        if (!response.ok) {
+            list.innerHTML = '<p class="message--empty">Could not load your sessions.</p>';
+            return;
+        }
+
+        const sessions = await response.json();
+        list.innerHTML = sessions.map((s) => `
+            <div class="session-row">
+                <div>
+                    <div>${escapeHtml(s.ipAddress || "Unknown IP")}${s.isCurrent ? '<span class="badge--current">This device</span>' : ""}</div>
+                    <div class="session-row__meta">${escapeHtml(s.userAgent || "Unknown device")}</div>
+                    <div class="session-row__meta">Signed in ${new Date(s.createdAt).toLocaleString()}</div>
+                </div>
+                <button type="button" data-revoke="${s.id}">Sign out</button>
+            </div>
+        `).join("");
+
+        list.querySelectorAll("[data-revoke]").forEach((button) => {
+            button.addEventListener("click", async () => {
+                button.disabled = true;
+                const response = await fetch(`/auth/sessions/${button.dataset.revoke}`, { method: "DELETE" });
+                if (response.ok) {
+                    await loadSessions();
+                } else {
+                    button.disabled = false;
+                }
+            });
+        });
+    }
+
+    loadSessions();
+</script>
+</body>
+</html>

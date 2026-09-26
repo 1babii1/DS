@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,6 +18,7 @@ public static class DependencyInjectionExtensions
                 ?? throw new InvalidOperationException("Configuration 'Kafka:BootstrapServers' is not set.");
 
             options.BootstrapServers = bootstrapServers;
+            options.Security = KafkaSecurityOptions.FromConfiguration(configuration);
             options.Topic = topic;
         });
 

@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -21,10 +21,17 @@ public class OutboxPublisher<TContext>(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await KafkaTopicProvisioner.EnsureTopicsExistAsync(_options.BootstrapServers, _options.Topic);
+        await KafkaTopicProvisioner.WaitForTopicsAsync(
+            _options.BootstrapServers, _options.Security, logger, stoppingToken, _options.Topic);
 
-        _producer = new ProducerBuilder<string, string>(
-            new ProducerConfig { BootstrapServers = _options.BootstrapServers }).Build();
+        if (stoppingToken.IsCancellationRequested)
+        {
+            return;
+        }
+
+        var producerConfig = new ProducerConfig { BootstrapServers = _options.BootstrapServers };
+        _options.Security.ApplyTo(producerConfig);
+        _producer = new ProducerBuilder<string, string>(producerConfig).Build();
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -32,12 +39,21 @@ public class OutboxPublisher<TContext>(
             {
                 await PublishPendingAsync(stoppingToken);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogError(ex, "Outbox publish cycle failed for topic {Topic}", _options.Topic);
             }
 
-            await Task.Delay(_options.PollInterval, stoppingToken);
+            // Отмена при остановке - это штатное завершение, а не сбой: вылетевшее
+            // отсюда исключение тоже остановило бы хост.
+            try
+            {
+                await Task.Delay(_options.PollInterval, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
         }
     }
 
@@ -47,7 +63,7 @@ public class OutboxPublisher<TContext>(
         var dbContext = scope.ServiceProvider.GetRequiredService<TContext>();
 
         var pending = await dbContext.Set<OutboxMessage>()
-            .Where(m => m.ProcessedAt == null)
+            .Where(m => m.ProcessedAt == null && m.ParkedAt == null)
             .OrderBy(m => m.OccurredAt)
             .Take(_options.BatchSize)
             .ToListAsync(cancellationToken);
@@ -57,25 +73,35 @@ public class OutboxPublisher<TContext>(
             return;
         }
 
-        foreach (var message in pending)
-        {
-            var kafkaMessage = new Message<string, string>
+        var result = await OutboxBatch.ProcessAsync(
+            pending,
+            async (message, ct) =>
             {
-                Key = message.AggregateId,
-                Value = message.Payload,
-                Headers = new Headers
+                var kafkaMessage = new Message<string, string>
                 {
-                    { "message-id", System.Text.Encoding.UTF8.GetBytes(message.Id.ToString()) },
-                    { "message-type", System.Text.Encoding.UTF8.GetBytes(message.Type) },
-                },
-            };
+                    Key = message.AggregateId,
+                    Value = message.Payload,
+                    Headers = new Headers
+                    {
+                        { "message-id", System.Text.Encoding.UTF8.GetBytes(message.Id.ToString()) },
+                        { "message-type", System.Text.Encoding.UTF8.GetBytes(message.Type) },
+                    },
+                };
 
-            await _producer!.ProduceAsync(_options.Topic, kafkaMessage, cancellationToken);
-            message.MarkProcessed();
+                await _producer!.ProduceAsync(_options.Topic, kafkaMessage, ct);
+            },
+            _options.MaxAttempts,
+            logger,
+            cancellationToken);
+
+        // Failed messages carry updated attempt counts too, so save whenever anything changed.
+        if (result.Succeeded > 0 || result.Failed > 0)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Published {Count} outbox message(s) to {Topic}", pending.Count, _options.Topic);
+        logger.LogInformation(
+            "Published {Succeeded}/{Total} outbox message(s) to {Topic}", result.Succeeded, pending.Count, _options.Topic);
     }
 
     public override void Dispose()

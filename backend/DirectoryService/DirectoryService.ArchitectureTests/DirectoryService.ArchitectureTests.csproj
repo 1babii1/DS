@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>true</IsTestProject>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Using Include="Xunit" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="xunit" />
+        <PackageReference Include="xunit.runner.visualstudio">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="coverlet.collector">
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+            <PrivateAssets>all</PrivateAssets>
+        </PackageReference>
+        <PackageReference Include="NetArchTest.Rules" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- References every layer by design: the whole point is asserting what each
+             layer's compiled assembly is (and is not) allowed to depend on. -->
+        <ProjectReference Include="..\DirectoryService.Domain\DirectoryService.Domain.csproj" />
+        <ProjectReference Include="..\DirectoryService.Application\DirectoryService.Application.csproj" />
+        <ProjectReference Include="..\DirectoryService.Infrastructure.Postgres\DirectoryService.Infrastructure.Postgres.csproj" />
+        <ProjectReference Include="..\DirectoryService\DirectoryService.csproj" />
+    </ItemGroup>
+
+</Project>
