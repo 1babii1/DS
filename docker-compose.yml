@@ -354,6 +354,7 @@ services:
       - ASPNETCORE_URLS=http://*:5133
       - Services__Directory__BaseUrl=http://directory_service:5129/
       - Services__Employee__BaseUrl=http://employee_service:5131/
+      - Services__Audit__BaseUrl=http://audit_service:5132/
       - Services__Rewards__BaseUrl=http://rewards_service:5134/
       - Agent__SigningKeyBase64=${AGENT_PLAN_SIGNING_KEY_BASE64:-}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317

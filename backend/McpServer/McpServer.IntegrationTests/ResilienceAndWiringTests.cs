@@ -174,4 +174,30 @@ public class ResilienceAndWiringTests
 
         Assert.Equal("Bearer callers-own", Assert.Single(seenToken));
     }
+
+    // The history read goes to AuditService through its own registered client, as the caller like every other read.
+    [Fact]
+    public async Task The_real_dependency_injection_setup_gives_the_org_history_tool_the_callers_token()
+    {
+        var seenToken = new System.Collections.Concurrent.ConcurrentBag<string>();
+        var stub = new CountingStub(request =>
+        {
+            seenToken.Add(request.Headers.Authorization?.ToString() ?? "<none>");
+            return new HttpResponseMessage(HttpStatusCode.Forbidden);
+        });
+
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
+            b.ConfigureTestServices(services =>
+                services.AddHttpClient<McpServer.Api.AuditApiClient>().ConfigurePrimaryHttpMessageHandler(() => stub)));
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var context = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
+        context.Request.Headers.Authorization = "Bearer callers-own";
+        scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext = context;
+
+        var tools = ActivatorUtilities.CreateInstance<McpServer.Tools.OrgHistoryTools>(scope.ServiceProvider);
+        await Assert.ThrowsAsync<ModelContextProtocol.McpException>(() => tools.GetOrgSnapshot("2026-03-31"));
+
+        Assert.Equal("Bearer callers-own", Assert.Single(seenToken));
+    }
 }
