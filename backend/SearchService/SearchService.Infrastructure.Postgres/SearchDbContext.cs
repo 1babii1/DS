@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SearchService.Domain;
+using SearchService.Infrastructure.Postgres.Embeddings;
 using Shared.Kafka;
 
 namespace SearchService.Infrastructure.Postgres;
@@ -8,9 +9,30 @@ public class SearchDbContext(DbContextOptions<SearchDbContext> options) : DbCont
 {
     public DbSet<DeadLetterEntry> DeadLetters => Set<DeadLetterEntry>();
 
+    public DbSet<DocumentEmbedding> DocumentEmbeddings => Set<DocumentEmbedding>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         builder.HasDefaultSchema("search");
+
+        builder.Entity<DocumentEmbedding>(entity =>
+        {
+            entity.ToTable("document_embeddings");
+            entity.HasKey(e => e.DocumentId);
+
+            entity.Property(e => e.DocumentId).HasMaxLength(100);
+            entity.Property(e => e.Kind).HasMaxLength(20).IsRequired();
+            entity.Property(e => e.Title).IsRequired();
+            entity.Property(e => e.Text).IsRequired();
+            entity.Property(e => e.TextHash).HasMaxLength(64).IsRequired();
+            entity.Property(e => e.Embedding).HasColumnType("vector(768)");
+
+            // Semantic search orders by cosine distance; the index is what lets a LIMIT be pushed into it.
+            entity.HasIndex(e => e.Embedding)
+                .HasMethod("hnsw")
+                .HasOperators("vector_cosine_ops");
+            entity.HasIndex(e => e.Kind);
+        });
 
         builder.Entity<DeadLetterEntry>(entity =>
         {

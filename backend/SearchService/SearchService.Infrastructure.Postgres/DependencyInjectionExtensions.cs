@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Pgvector.EntityFrameworkCore;
+using SearchService.Infrastructure.Postgres.Embeddings;
 
 namespace SearchService.Infrastructure.Postgres;
 
@@ -13,7 +15,9 @@ public static class DependencyInjectionExtensions
         var connectionString = configuration.GetConnectionString("SearchServiceDb")
             ?? throw new InvalidOperationException("Connection string 'SearchServiceDb' is not configured.");
 
-        services.AddDbContext<SearchDbContext>(options => options.UseNpgsql(connectionString));
+        services.AddDbContext<SearchDbContext>(options => options.UseNpgsql(connectionString, o => o.UseVector()));
+
+        services.AddScoped<EmbeddingStaging>();
 
         return services;
     }
