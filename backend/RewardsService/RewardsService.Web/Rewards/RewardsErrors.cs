@@ -16,6 +16,10 @@ public static class RewardsErrors
             "Idempotency-Key header is required",
             "Idempotency-Key");
 
+    public static Error AgentGrantOverLimit(decimal max) =>
+        Error.Validation(
+            "rewards.agent_grant.over_limit", $"An assistant may grant at most {max} at a time", "amount");
+
     public static Error CannotGrantToSelf() =>
         Error.Authorization("rewards.grant.self", "You cannot grant currency to yourself", "employeeId");
 

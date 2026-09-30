@@ -204,6 +204,64 @@ public class GrantCurrencyTests : IClassFixture<RewardsTestWebFactory>, IAsyncLi
         Assert.Equal(StatusCodes.Status200OK, status);
     }
 
+    // Agent grants are a separate, stricter route: a small ceiling per grant and their own ledger source, so an
+    // assistant that has been talked into something has a bounded reach. The manual route keeps its contract.
+    [Fact]
+    public async Task An_agent_grant_within_the_ceiling_is_recorded_with_its_own_source()
+    {
+        var employeeId = Guid.NewGuid();
+        var grantedBy = Guid.NewGuid();
+
+        var (status, _) = await Grant(grantedBy, new GrantCurrencyRequest(employeeId, 500, "Release"), agent: true);
+
+        Assert.Equal(StatusCodes.Status200OK, status);
+        var transaction = await ReadInDb(db => db.Transactions.SingleAsync(t => t.EmployeeId == employeeId));
+        Assert.Equal(TransactionSource.AgentGrant, transaction.Source);
+        Assert.Equal(grantedBy, transaction.GrantedByAccountId);
+    }
+
+    [Fact]
+    public async Task An_agent_grant_above_the_ceiling_is_refused_and_writes_nothing_while_the_manual_route_still_allows_it()
+    {
+        var employeeId = Guid.NewGuid();
+
+        var (agentStatus, agentCode) = await Grant(
+            Guid.NewGuid(), new GrantCurrencyRequest(employeeId, 501, "Too much"), agent: true);
+        var (manualStatus, _) = await Grant(Guid.NewGuid(), new GrantCurrencyRequest(employeeId, 501, "Manual"));
+
+        Assert.Equal(StatusCodes.Status400BadRequest, agentStatus);
+        Assert.Equal("rewards.agent_grant.over_limit", agentCode);
+        Assert.Equal(StatusCodes.Status200OK, manualStatus);
+        Assert.Equal(1, await ReadInDb(db => db.Transactions.CountAsync(t => t.EmployeeId == employeeId)));
+    }
+
+    [Fact]
+    public async Task An_agent_grant_to_the_callers_own_employee_is_refused()
+    {
+        var callerAccount = Guid.NewGuid();
+        var callerEmployee = Guid.NewGuid();
+        await SeedAccountLink(callerEmployee, callerAccount);
+
+        var (status, code) = await Grant(
+            callerAccount, new GrantCurrencyRequest(callerEmployee, 100, "Me"), agent: true);
+
+        Assert.Equal(StatusCodes.Status403Forbidden, status);
+        Assert.Equal("rewards.grant.self", code);
+    }
+
+    [Fact]
+    public async Task An_agent_grant_repeated_with_the_same_key_returns_the_original_and_grants_once()
+    {
+        var employeeId = Guid.NewGuid();
+        var request = new GrantCurrencyRequest(employeeId, 100, "Once");
+
+        var first = await GrantReturningTransactionId(Guid.NewGuid(), request, "agent-key", agent: true);
+        var second = await GrantReturningTransactionId(Guid.NewGuid(), request, "agent-key", agent: true);
+
+        Assert.Equal(first.TransactionId, second.TransactionId);
+        Assert.Equal(1, await ReadInDb(db => db.Transactions.CountAsync(t => t.EmployeeId == employeeId)));
+    }
+
     private async Task SeedAccountLink(Guid employeeId, Guid accountId)
     {
         await using var scope = _services.CreateAsyncScope();
@@ -235,22 +293,22 @@ public class GrantCurrencyTests : IClassFixture<RewardsTestWebFactory>, IAsyncLi
     // care about idempotency still gets a valid request instead of hitting the new
     // required-header rejection.
     private async Task<(int Status, string? ErrorCode)> Grant(
-        Guid grantedBy, GrantCurrencyRequest request, string? idempotencyKey = "default")
+        Guid grantedBy, GrantCurrencyRequest request, string? idempotencyKey = "default", bool agent = false)
     {
         var (status, errorCode, _) = await GrantInternal(
-            grantedBy, request, idempotencyKey == "default" ? Guid.NewGuid().ToString() : idempotencyKey);
+            grantedBy, request, idempotencyKey == "default" ? Guid.NewGuid().ToString() : idempotencyKey, agent);
         return (status, errorCode);
     }
 
     private async Task<(int Status, Guid? TransactionId)> GrantReturningTransactionId(
-        Guid grantedBy, GrantCurrencyRequest request, string idempotencyKey)
+        Guid grantedBy, GrantCurrencyRequest request, string idempotencyKey, bool agent = false)
     {
-        var (status, _, transactionId) = await GrantInternal(grantedBy, request, idempotencyKey);
+        var (status, _, transactionId) = await GrantInternal(grantedBy, request, idempotencyKey, agent);
         return (status, transactionId);
     }
 
     private async Task<(int Status, string? ErrorCode, Guid? TransactionId)> GrantInternal(
-        Guid grantedBy, GrantCurrencyRequest request, string? idempotencyKey)
+        Guid grantedBy, GrantCurrencyRequest request, string? idempotencyKey, bool agent = false)
     {
         await using var scope = _services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<RewardsDbContext>();
@@ -261,7 +319,9 @@ public class GrantCurrencyTests : IClassFixture<RewardsTestWebFactory>, IAsyncLi
             Response = { Body = new MemoryStream() },
         };
 
-        await Controller(dbContext, grantedBy).Grant(idempotencyKey, request).ExecuteAsync(httpContext);
+        var controller = Controller(dbContext, grantedBy);
+        await (agent ? controller.AgentGrant(idempotencyKey, request) : controller.Grant(idempotencyKey, request))
+            .ExecuteAsync(httpContext);
 
         httpContext.Response.Body.Seek(0, SeekOrigin.Begin);
         using var document = await JsonDocument.ParseAsync(httpContext.Response.Body);
