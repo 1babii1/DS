@@ -39,6 +39,39 @@ public class AuditConsumerTests : IClassFixture<AuditTestWebFactory>, IAsyncLife
         Assert.Equal("DepartmentCreated", entry.EventType);
     }
 
+    // The time an entry sits at is when the event happened, as the producer says, not when this consumer got to it:
+    // an outage or a replay must not move history.
+    [Fact]
+    public async Task An_entry_is_placed_at_the_producers_event_time_not_at_the_time_it_was_received()
+    {
+        var messageId = Guid.NewGuid();
+        var happened = new DateTime(2026, 3, 5, 10, 15, 30, DateTimeKind.Utc);
+        var result = BuildResult(
+            messageId, "directory.events", "dep-1", "DepartmentCreated", "{}", happened.ToString("O"));
+
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(result, CancellationToken.None));
+
+        var entry = await ExecuteInDb(db => db.Entries.SingleAsync(e => e.MessageId == messageId));
+        Assert.Equal(happened, entry.OccurredAt);
+        Assert.True(entry.ReceivedAt > happened.AddDays(30));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("yesterday")]
+    [InlineData("")]
+    public async Task Without_a_usable_event_time_the_entry_falls_back_to_the_time_it_was_received(string? header)
+    {
+        var messageId = Guid.NewGuid();
+        var before = DateTime.UtcNow.AddSeconds(-1);
+        var result = BuildResult(messageId, "directory.events", "dep-1", "DepartmentCreated", "{}", header);
+
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(result, CancellationToken.None));
+
+        var entry = await ExecuteInDb(db => db.Entries.SingleAsync(e => e.MessageId == messageId));
+        Assert.InRange(entry.OccurredAt, before, DateTime.UtcNow.AddSeconds(1));
+    }
+
     [Fact]
     public async Task Redelivering_the_same_message_id_does_not_duplicate_it()
     {
@@ -114,13 +147,17 @@ public class AuditConsumerTests : IClassFixture<AuditTestWebFactory>, IAsyncLife
     public async Task DisposeAsync() => await _resetDatabase();
 
     private static ConsumeResult<string, string> BuildResult(
-        Guid messageId, string topic, string key, string messageType, string payload)
+        Guid messageId, string topic, string key, string messageType, string payload, string? occurredAtHeader = null)
     {
         var headers = new Headers
         {
             { "message-id", Encoding.UTF8.GetBytes(messageId.ToString()) },
             { "message-type", Encoding.UTF8.GetBytes(messageType) },
         };
+        if (occurredAtHeader is not null)
+        {
+            headers.Add("occurred-at", Encoding.UTF8.GetBytes(occurredAtHeader));
+        }
 
         return new ConsumeResult<string, string>
         {

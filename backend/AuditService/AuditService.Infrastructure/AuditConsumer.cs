@@ -1,10 +1,11 @@
-using AuditService.Domain;
+﻿using AuditService.Domain;
 using Confluent.Kafka;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Shared.Kafka;
+using Shared.Outbox;
 
 namespace AuditService.Infrastructure;
 
@@ -21,6 +22,15 @@ public class AuditConsumer(
     : KafkaRetryConsumer<AuditDbContext>(scopeFactory, options.Value, logger)
 {
     protected override string MessageKind => "audit";
+
+    // When the event happened, as its producer recorded it. The consumer's own clock only says when the message
+    // arrived, which is wrong for anything delayed, replayed or read after an outage; it is the fallback for messages
+    // that carry no usable time (older ones, other producers).
+    private static DateTime EventTime(ConsumeResult<string, string> result) =>
+        result.Message.Headers.TryGetLastBytes(OutboxMessageHeaders.OccurredAt, out var bytes)
+        && OutboxMessageHeaders.TryReadOccurredAt(bytes, out var occurredAt)
+            ? occurredAt
+            : DateTime.UtcNow;
 
     protected override Task ProcessMessageAsync(
         ConsumeResult<string, string> result, CancellationToken cancellationToken)
@@ -49,7 +59,7 @@ public class AuditConsumer(
             messageType ?? "Unknown",
             result.Message.Key,
             result.Message.Value,
-            DateTime.UtcNow);
+            EventTime(result));
 
         dbContext.Entries.Add(entry);
 
