@@ -18,6 +18,7 @@ public static class DependencyInjectionExtensions
         services.AddDbContext<SearchDbContext>(options => options.UseNpgsql(connectionString, o => o.UseVector()));
 
         services.AddScoped<EmbeddingStaging>();
+        services.AddScoped<SemanticSearch>();
 
         return services;
     }

@@ -34,7 +34,18 @@ public sealed class FakeEmbeddingClient : IEmbeddingClient
         return new Vector(values.Select(v => v / norm).ToArray());
     }
 
-    public Task<Vector> EmbedAsync(string text, CancellationToken cancellationToken)
+    // How long a call takes, honouring cancellation like a real HTTP call would.
+    public static TimeSpan Delay { get; set; }
+
+    // Words a real model would place close together: each group shares one slot, so a query using one word finds a
+    // document using another, which a keyword match cannot.
+    private static readonly Dictionary<string, string> Synonyms = new[]
+    {
+        new[] { "invoices", "invoice", "billing", "bills" },
+        new[] { "hiring", "recruitment", "talent" },
+    }.SelectMany(group => group.Select(word => (word, canonical: group[0]))).ToDictionary(x => x.word, x => x.canonical);
+
+    public async Task<Vector> EmbedAsync(string text, CancellationToken cancellationToken)
     {
         if (Fail)
         {
@@ -42,11 +53,17 @@ public sealed class FakeEmbeddingClient : IEmbeddingClient
         }
 
         DuringEmbed?.Invoke();
-        return Task.FromResult(For(text));
+        if (Delay > TimeSpan.Zero)
+        {
+            await Task.Delay(Delay, cancellationToken);
+        }
+
+        return For(text);
     }
 
     private static int Slot(string word)
     {
+        word = Synonyms.GetValueOrDefault(word, word);
         var hash = 2166136261u;
         foreach (var character in word)
         {

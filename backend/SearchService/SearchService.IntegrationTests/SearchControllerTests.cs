@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using SearchService.Domain;
 using SearchService.Infrastructure.Elasticsearch;
+using SearchService.Infrastructure.Postgres.Embeddings;
 using SearchService.Web.Controllers;
 
 namespace SearchService.IntegrationTests;
@@ -21,7 +22,8 @@ public class SearchControllerTests : IClassFixture<SearchTestWebFactory>, IAsync
     {
         _resetDatabase = factory.ResetDatabaseAsync;
         _indexClient = factory.Services.GetRequiredService<SearchIndexClient>();
-        _sut = new SearchController(_indexClient, NullLogger<SearchController>.Instance);
+        _sut = new SearchController(
+            _indexClient, factory.Services.CreateScope().ServiceProvider.GetRequiredService<SemanticSearch>(), NullLogger<SearchController>.Instance);
     }
 
     [Theory]
@@ -29,7 +31,7 @@ public class SearchControllerTests : IClassFixture<SearchTestWebFactory>, IAsync
     [InlineData("")]
     public async Task Query_shorter_than_two_characters_is_rejected(string query)
     {
-        var result = await _sut.Search(query, null, null, CancellationToken.None);
+        var result = await _sut.Search(query, null, null, "keyword", CancellationToken.None);
 
         await AssertErrorAsync(result);
     }
@@ -37,7 +39,7 @@ public class SearchControllerTests : IClassFixture<SearchTestWebFactory>, IAsync
     [Fact]
     public async Task Query_longer_than_100_characters_is_rejected()
     {
-        var result = await _sut.Search(new string('x', 101), null, null, CancellationToken.None);
+        var result = await _sut.Search(new string('x', 101), null, null, "keyword", CancellationToken.None);
 
         await AssertErrorAsync(result);
     }
@@ -45,7 +47,7 @@ public class SearchControllerTests : IClassFixture<SearchTestWebFactory>, IAsync
     [Fact]
     public async Task Unknown_type_is_rejected()
     {
-        var result = await _sut.Search("marketing", "not-a-real-kind", null, CancellationToken.None);
+        var result = await _sut.Search("marketing", "not-a-real-kind", null, "keyword", CancellationToken.None);
 
         await AssertErrorAsync(result);
     }
@@ -53,7 +55,7 @@ public class SearchControllerTests : IClassFixture<SearchTestWebFactory>, IAsync
     [Fact]
     public async Task Valid_query_with_no_matches_returns_an_empty_result_not_an_error()
     {
-        var result = await _sut.Search("zzzznomatchzzzz", null, null, CancellationToken.None);
+        var result = await _sut.Search("zzzznomatchzzzz", null, null, "keyword", CancellationToken.None);
 
         var response = await GetSuccessValueAsync(result);
         Assert.Empty(response.Results);
@@ -80,7 +82,7 @@ public class SearchControllerTests : IClassFixture<SearchTestWebFactory>, IAsync
             CancellationToken.None);
         await _indexClient.RefreshAsync(CancellationToken.None);
 
-        var result = await _sut.Search("Marketing", SearchKind.Department, null, CancellationToken.None);
+        var result = await _sut.Search("Marketing", SearchKind.Department, null, "keyword", CancellationToken.None);
         var response = await GetSuccessValueAsync(result);
 
         var ids = response.Results.Select(r => r.Id).ToList();
@@ -104,7 +106,7 @@ public class SearchControllerTests : IClassFixture<SearchTestWebFactory>, IAsync
 
         await _indexClient.RefreshAsync(CancellationToken.None);
 
-        var result = await _sut.Search("Clamp Test Position", SearchKind.Position, 500, CancellationToken.None);
+        var result = await _sut.Search("Clamp Test Position", SearchKind.Position, 500, "keyword", CancellationToken.None);
         var response = await GetSuccessValueAsync(result);
 
         Assert.True(response.Results.Count <= 20);
