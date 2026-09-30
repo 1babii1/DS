@@ -147,6 +147,29 @@ public class AgentResolutionTests
         await Assert.ThrowsAsync<McpException>(() => tools.ProposeGrant(Guid.NewGuid(), 10m, "thanks"));
     }
 
+    [Theory]
+    [InlineData("Terminated")]
+    [InlineData("ProvisioningFailed")]
+    public async Task An_employee_who_is_gone_or_never_came_through_is_refused_for_a_transfer_and_a_grant(string status)
+    {
+        var gone = Guid.NewGuid();
+        var org = Org().WithEmployee(new FakeOrg.Emp(gone, "Dana Gone", "d@x.test", Payments, "Payments", Developer, "Developer", status));
+        var (tools, _) = Make(org);
+
+        await Assert.ThrowsAsync<McpException>(() => tools.ProposeTransfer(gone, Design, Designer));
+        await Assert.ThrowsAsync<McpException>(() => tools.ProposeGrant(gone, 10m, "thanks"));
+    }
+
+    [Fact]
+    public async Task A_new_hire_still_waiting_for_their_account_can_receive_a_grant()
+    {
+        var fresh = Guid.NewGuid();
+        var org = Org().WithEmployee(new FakeOrg.Emp(fresh, "Nina New", "n@x.test", Payments, "Payments", Developer, "Developer", "PendingProvisioning"));
+        var (tools, _) = Make(org);
+
+        Assert.NotNull((await tools.ProposeGrant(fresh, 10m, "welcome")).PlanToken);
+    }
+
     [Fact]
     public async Task A_department_id_used_as_an_employee_is_refused()
     {

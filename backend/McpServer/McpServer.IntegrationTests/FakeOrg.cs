@@ -78,7 +78,7 @@ internal sealed class FakeOrg : HttpMessageHandler
                 departmentName = employee.DeptName,
                 positionId = employee.PosId,
                 positionName = employee.PosName,
-                status = "Active",
+                status = employee.Status,
                 hiredAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             })));
         }
@@ -128,5 +128,6 @@ internal sealed class FakeOrg : HttpMessageHandler
         public HttpContext? HttpContext { get; set; } = context;
     }
 
-    internal sealed record Emp(Guid Id, string Name, string Email, Guid DeptId, string DeptName, Guid PosId, string PosName);
+    internal sealed record Emp(
+        Guid Id, string Name, string Email, Guid DeptId, string DeptName, Guid PosId, string PosName, string Status = "Active");
 }

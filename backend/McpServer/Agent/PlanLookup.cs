@@ -15,6 +15,11 @@ public sealed class PlanLookup(DirectoryApiClient directory, EmployeeApiClient e
     {
         var employee = await employees.GetAsync(employeeId, ct)
             ?? throw new McpException("There is no employee with that id. Look the employee up first and use the id you find.");
+        if (employee.Status is "Terminated" or "ProvisioningFailed")
+        {
+            throw new McpException("That employee is no longer with the organization, so nothing can be proposed for them.");
+        }
+
         Shown(employee.FullName);
         Shown(employee.DepartmentName);
         Shown(employee.PositionName);
