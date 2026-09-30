@@ -1,5 +1,9 @@
 'use client'
 
+import {
+	affectedPlanQueryKeys,
+	assistantPlanKeys
+} from '@/features/assistant/lib/plan-card-queries'
 import { describeProposalExpiry } from '@/features/assistant/lib/plan-card-state'
 import { axiosInstance } from '@/shared/api/axiosInstance'
 import { Button } from '@/shared/ui/button'
@@ -10,7 +14,7 @@ import {
 	CardHeader,
 	CardTitle
 } from '@/shared/ui/card'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
 import {
 	BadgeCheck,
@@ -72,8 +76,9 @@ function answerOf(error: unknown, fallback: string): string {
 
 // Every visible action detail comes from the signed-plan preview. The model reply stays untrusted display text.
 export function PlanCard({ token }: { token: string }) {
+	const queryClient = useQueryClient()
 	const preview = useQuery({
-		queryKey: ['assistant-plan-preview', token],
+		queryKey: assistantPlanKeys.preview(token),
 		queryFn: async () =>
 			(
 				await axiosInstance.post<PlanCardData>('/mcp/plans/preview', {
@@ -86,7 +91,15 @@ export function PlanCard({ token }: { token: string }) {
 	const confirm = useMutation({
 		mutationFn: async () =>
 			(await axiosInstance.post<Report>('/mcp/plans/confirm', { token }))
-				.data
+				.data,
+		onSuccess: async report => {
+			if (!report.steps.some(step => step.outcome === 'Applied')) return
+			await Promise.all(
+				affectedPlanQueryKeys(preview.data?.steps ?? []).map(queryKey =>
+					queryClient.invalidateQueries({ queryKey })
+				)
+			)
+		}
 	})
 
 	if (preview.isPending)
@@ -236,7 +249,7 @@ export function PlanCard({ token }: { token: string }) {
 									/>
 								)}
 								<span>
-									{step.outcome}
+									{step.summary}: {step.outcome}
 									{step.detail ? `: ${step.detail}` : ''}
 								</span>
 							</li>
