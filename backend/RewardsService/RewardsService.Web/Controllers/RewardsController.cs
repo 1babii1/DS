@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using RewardsService.Domain;
 using RewardsService.Infrastructure;
 using RewardsService.Web.Rewards;
@@ -21,6 +22,9 @@ public static class AgentGrantLimits
     // An assistant can be talked into things; this bounds what one grant can cost. McpServer keeps a copy of the
     // number only to refuse early with a readable message - this is the one that holds.
     public const decimal MaxPerGrant = 500;
+
+    // Per granting account per UTC day. The ledger enforces it, not the assistant.
+    public const decimal MaxPerDay = 2000;
 }
 
 public record GrantCurrencyRequest(Guid EmployeeId, decimal Amount, string Reason);
@@ -112,6 +116,15 @@ public class RewardsController(RewardsDbContext dbContext, CurrencyGrantWriter w
         }
 
         var grantedBy = Guid.Parse(User.FindFirstValue("sub")!);
+
+        // The quota moves in the same transaction as the ledger write and is committed only with it, so a request
+        // that loses the idempotency race below never spends it.
+        using var quotaTransaction = source == TransactionSource.AgentGrant ? dbContext.Database.BeginTransaction() : null;
+        if (quotaTransaction is not null && !TryUseDailyQuota(grantedBy, request.Amount))
+        {
+            return RewardsErrors.AgentQuotaExceeded(AgentGrantLimits.MaxPerDay);
+        }
+
         var transaction = writer.Grant(
             request.EmployeeId, request.Amount, request.Reason, source, grantedBy);
 
@@ -121,9 +134,12 @@ public class RewardsController(RewardsDbContext dbContext, CurrencyGrantWriter w
         try
         {
             dbContext.SaveChanges();
+            quotaTransaction?.Commit();
         }
         catch (DbUpdateException ex) when (ex.IsUniqueViolation())
         {
+            // Not committed, so the quota this loser had taken is undone when the transaction is disposed.
+
             // Raced another request on the same key - wallet update, transaction, outbox
             // message and this row are all one SaveChanges call, so the loser's writes never
             // partially committed. Re-read and return the winner's result instead of retrying
@@ -137,6 +153,23 @@ public class RewardsController(RewardsDbContext dbContext, CurrencyGrantWriter w
         }
 
         return transaction.Id;
+    }
+
+    // One statement, so there is no gap between "how much is used" and "add mine": a first use inserts the row, a
+    // later one adds to it only while the total stays within the limit. Zero rows changed means it would not fit.
+    // A first insert cannot exceed the limit because a single grant is already capped well below it.
+    private bool TryUseDailyQuota(Guid account, decimal amount)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var max = AgentGrantLimits.MaxPerDay;
+        var changed = dbContext.Database.ExecuteSqlInterpolated($"""
+            INSERT INTO rewards.agent_grant_usage ("GrantedByAccountId", "Day", "Used")
+            VALUES ({account}, {today}, {amount})
+            ON CONFLICT ("GrantedByAccountId", "Day")
+            DO UPDATE SET "Used" = rewards.agent_grant_usage."Used" + EXCLUDED."Used"
+            WHERE rewards.agent_grant_usage."Used" + EXCLUDED."Used" <= {max}
+            """);
+        return changed == 1;
     }
 
     private static string HashRequest(GrantCurrencyRequest request)

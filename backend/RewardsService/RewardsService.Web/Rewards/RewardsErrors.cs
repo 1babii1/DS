@@ -20,6 +20,10 @@ public static class RewardsErrors
         Error.Validation(
             "rewards.agent_grant.over_limit", $"An assistant may grant at most {max} at a time", "amount");
 
+    public static Error AgentQuotaExceeded(decimal max) =>
+        Error.Validation(
+            "rewards.agent_grant.over_quota", $"An assistant may grant at most {max} per day for you", "amount");
+
     public static Error CannotGrantToSelf() =>
         Error.Authorization("rewards.grant.self", "You cannot grant currency to yourself", "employeeId");
 

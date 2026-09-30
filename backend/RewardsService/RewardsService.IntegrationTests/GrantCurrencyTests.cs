@@ -262,6 +262,117 @@ public class GrantCurrencyTests : IClassFixture<RewardsTestWebFactory>, IAsyncLi
         Assert.Equal(1, await ReadInDb(db => db.Transactions.CountAsync(t => t.EmployeeId == employeeId)));
     }
 
+    // The daily limit (2000 per granting account) lives in the ledger, not in the assistant.
+    [Fact]
+    public async Task Agent_grants_stop_at_the_daily_limit_for_that_account_only()
+    {
+        var account = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        for (var i = 0; i < 4; i++)
+        {
+            var (ok, _) = await Grant(account, new GrantCurrencyRequest(Guid.NewGuid(), 500, "Spend"), agent: true);
+            Assert.Equal(StatusCodes.Status200OK, ok);
+        }
+
+        var (overStatus, overCode) = await Grant(
+            account, new GrantCurrencyRequest(Guid.NewGuid(), 1, "One more"), agent: true);
+        var (otherStatus, _) = await Grant(other, new GrantCurrencyRequest(Guid.NewGuid(), 500, "Fresh"), agent: true);
+        var (manualStatus, _) = await Grant(account, new GrantCurrencyRequest(Guid.NewGuid(), 500, "By hand"));
+
+        Assert.Equal(StatusCodes.Status400BadRequest, overStatus);
+        Assert.Equal("rewards.agent_grant.over_quota", overCode);
+        Assert.Equal(StatusCodes.Status200OK, otherStatus);
+        Assert.Equal(StatusCodes.Status200OK, manualStatus);
+    }
+
+    [Fact]
+    public async Task Yesterdays_usage_does_not_count_against_today()
+    {
+        var account = Guid.NewGuid();
+        var yesterday = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
+        await using (var scope = _services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RewardsDbContext>();
+            db.AgentGrantUsages.Add(AgentGrantUsage.Create(account, yesterday, 2000));
+            await db.SaveChangesAsync();
+        }
+
+        var (status, _) = await Grant(account, new GrantCurrencyRequest(Guid.NewGuid(), 500, "Today"), agent: true);
+
+        Assert.Equal(StatusCodes.Status200OK, status);
+    }
+
+    // The limit is a sum, so it is only meaningful against an account that has already used part of it: a fresh
+    // account passes a check-then-write version by accident. 1500 is used first, then two 400s arrive together;
+    // only one fits, and the other must be refused rather than both reading 1500 and both passing.
+    [Fact]
+    public async Task Two_simultaneous_agent_grants_cannot_both_pass_the_remaining_quota()
+    {
+        var account = Guid.NewGuid();
+        for (var i = 0; i < 3; i++)
+        {
+            await Grant(account, new GrantCurrencyRequest(Guid.NewGuid(), 500, "Used"), agent: true);
+        }
+
+        var results = await Concurrently(
+            () => Grant(account, new GrantCurrencyRequest(Guid.NewGuid(), 400, "A"), agent: true),
+            () => Grant(account, new GrantCurrencyRequest(Guid.NewGuid(), 400, "B"), agent: true));
+
+        Assert.Single(results, r => r.Status == StatusCodes.Status200OK);
+        Assert.Single(results, r => r.ErrorCode == "rewards.agent_grant.over_quota");
+        var used = await ReadInDb(db => db.AgentGrantUsages.SingleAsync(u => u.GrantedByAccountId == account));
+        Assert.Equal(1900, used.Used);
+    }
+
+    // Several requests with the same key at once: one wins the idempotency race, the others must not keep the quota
+    // they had already taken: the count is 500, not 500 times the number of requests.
+    [Fact]
+    public async Task Many_simultaneous_agent_grants_with_one_key_use_the_quota_once()
+    {
+        var account = Guid.NewGuid();
+        var request = new GrantCurrencyRequest(Guid.NewGuid(), 500, "Once");
+
+        // Eight, not two: the losing path only runs when a request passes the "already granted?" read before
+        // another has committed, and two requests very often do not overlap that closely.
+        var results = await Concurrently(Enumerable.Range(0, 8)
+            .Select<int, Func<Task<(int Status, string? ErrorCode)>>>(_ => () => Grant(account, request, "shared-key", agent: true))
+            .ToArray());
+
+        Assert.All(results, r => Assert.Equal(StatusCodes.Status200OK, r.Status));
+        var used = await ReadInDb(db => db.AgentGrantUsages.SingleAsync(u => u.GrantedByAccountId == account));
+        Assert.Equal(500, used.Used);
+        Assert.Equal(1, await ReadInDb(db => db.Transactions.CountAsync(t => t.EmployeeId == request.EmployeeId)));
+    }
+
+    [Fact]
+    public async Task Repeating_an_agent_grant_with_the_same_key_does_not_use_the_quota_twice()
+    {
+        var account = Guid.NewGuid();
+        var request = new GrantCurrencyRequest(Guid.NewGuid(), 500, "Once");
+        await GrantReturningTransactionId(account, request, "same-key", agent: true);
+        await GrantReturningTransactionId(account, request, "same-key", agent: true);
+
+        var used = await ReadInDb(db => db.AgentGrantUsages.SingleAsync(u => u.GrantedByAccountId == account));
+
+        Assert.Equal(500, used.Used);
+    }
+
+    // The controller body is synchronous, so Task.WhenAll over two calls would run them one after the other. Each call
+    // goes to its own thread and all start together, so the requests genuinely overlap in the database.
+    private static async Task<(int Status, string? ErrorCode)[]> Concurrently(
+        params Func<Task<(int Status, string? ErrorCode)>>[] calls)
+    {
+        using var gate = new ManualResetEventSlim(false);
+        var running = calls.Select(call => Task.Run(() =>
+        {
+            gate.Wait();
+            return call();
+        })).ToArray();
+        await Task.Delay(100);
+        gate.Set();
+        return await Task.WhenAll(running);
+    }
+
     private async Task SeedAccountLink(Guid employeeId, Guid accountId)
     {
         await using var scope = _services.CreateAsyncScope();
