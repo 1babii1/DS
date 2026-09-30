@@ -25,12 +25,14 @@ public sealed class EmployeeCommandClient(HttpClient http)
     }
 }
 
+// Grants an assistant makes go to their own route in RewardsService, which has the assistant's limits (a ceiling per
+// grant and a daily quota) and records where the money came from. The manual grant route is not used from here.
 public sealed class RewardsCommandClient(HttpClient http)
 {
     public async Task<Guid> GrantAsync(
         Guid employeeId, decimal amount, string reason, string idempotencyKey, CancellationToken ct)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "api/rewards/grants")
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/rewards/agent-grants")
         {
             Content = JsonContent.Create(new { employeeId, amount, reason }),
         };

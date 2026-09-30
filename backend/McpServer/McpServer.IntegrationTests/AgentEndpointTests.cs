@@ -257,4 +257,101 @@ public class AgentEndpointTests : IAsyncLifetime
     }
 
     private static PlanStep GrantToHiredOnly() => new(StepKind.GrantCurrency, "g", EmployeeId: Guid.NewGuid(), Amount: 5m, Reason: "r");
+
+    // ---- preview: what the approval card is drawn from ------------------------------------------------------
+
+    private async Task<HttpResponseMessage> Preview(string? token, Guid? user)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/mcp/plans/preview")
+        {
+            Content = JsonContent.Create(new { token }),
+        };
+        request.Headers.Add("Authorization", "Bearer user-session-token");
+        if (user is not null)
+        {
+            request.Headers.Add("X-Test-Sub", user.ToString());
+        }
+
+        return await _factory.CreateClient().SendAsync(request);
+    }
+
+    private static PlanStep NamedGrant() => new(
+        StepKind.GrantCurrency,
+        "Grant 200 to \"Anna Ivanova\" (\"Payments\", \"Developer\"): \"release bonus\"",
+        EmployeeId: Guid.NewGuid(),
+        Amount: 200m,
+        Reason: "release bonus",
+        EmployeeName: "Anna Ivanova",
+        DepartmentName: "Payments",
+        PositionName: "Developer");
+
+    [Fact]
+    public async Task The_owner_can_preview_a_plan_and_nothing_is_run()
+    {
+        var user = Guid.NewGuid();
+
+        var response = await Preview(TokenFor(user, steps: NamedGrant()), user);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var card = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        var step = card.GetProperty("steps")[0];
+        Assert.Equal("GrantCurrency", step.GetProperty("kind").GetString());
+        Assert.Equal("Anna Ivanova", step.GetProperty("employeeName").GetString());
+        Assert.Equal("Payments", step.GetProperty("departmentName").GetString());
+        Assert.Equal(200m, step.GetProperty("amount").GetDecimal());
+        Assert.Equal("release bonus", step.GetProperty("reason").GetString());
+        Assert.True(card.GetProperty("needsReverification").GetBoolean());
+        Assert.Empty(_employees.Requests);
+        Assert.Empty(_rewards.Requests);
+    }
+
+    [Fact]
+    public async Task A_plan_without_currency_previews_as_not_needing_reverification()
+    {
+        var user = Guid.NewGuid();
+
+        var response = await Preview(TokenFor(user), user);
+
+        var card = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        Assert.False(card.GetProperty("needsReverification").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_preview_carries_no_ids_and_not_the_token()
+    {
+        var user = Guid.NewGuid();
+        var token = TokenFor(user, steps: NamedGrant());
+
+        var body = await (await Preview(token, user)).Content.ReadAsStringAsync();
+
+        Assert.DoesNotMatch(
+            "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", body);
+        Assert.DoesNotContain(token, body);
+    }
+
+    [Fact]
+    public async Task Previewing_someone_elses_plan_is_forbidden_expired_is_gone_and_altered_is_rejected()
+    {
+        var owner = Guid.NewGuid();
+        var parts = TokenFor(owner).Split('.');
+        var flipped = parts[2][..^2] + (parts[2][^2] == 'A' ? "B" : "A") + parts[2][^1];
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await Preview(TokenFor(owner), Guid.NewGuid())).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Gone,
+            (await Preview(TokenFor(owner, expires: DateTimeOffset.UtcNow.AddSeconds(-1)), owner)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Preview($"{parts[0]}.{parts[1]}.{flipped}", owner)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Preview("garbage", owner)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Preview(null, owner)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Previewing_without_being_signed_in_is_unauthorized()
+    {
+        var user = Guid.NewGuid();
+
+        var response = await Preview(TokenFor(user), user: null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
 }

@@ -38,6 +38,9 @@ public class PlanExecutorTests
 
         var grant = Assert.Single(rewards.Requests);
         Assert.Equal(CallerToken, grant.Authorization);
+
+        // Money from an assistant goes through the route that has the assistant's limits, never the manual one.
+        Assert.Equal("/api/rewards/agent-grants", grant.Path);
         Assert.Contains($"\"employeeId\":\"{hired}\"", grant.Body);
         Assert.Contains("\"amount\":500", grant.Body);
     }

@@ -6,6 +6,21 @@ namespace McpServer.Agent;
 
 public sealed record ConfirmPlanRequest(string? Token);
 
+// What the approval card is drawn from. Built from the signed plan on the server: names and amounts the person is
+// about to approve, no ids and not the token, and nothing the model wrote after the plan was made.
+public sealed record PlanCard(DateTimeOffset ExpiresAt, bool NeedsReverification, IReadOnlyList<PlanCardStep> Steps);
+
+public sealed record PlanCardStep(
+    string Kind,
+    string Summary,
+    string? FullName,
+    string? Email,
+    string? EmployeeName,
+    string? DepartmentName,
+    string? PositionName,
+    decimal? Amount,
+    string? Reason);
+
 public static class AgentEndpoints
 {
     // The user's own decision, made over their own authenticated session. Not an MCP tool, so nothing the
@@ -33,27 +48,13 @@ public static class AgentEndpoints
                 return Results.BadRequest(new { error = "A plan token is required." });
             }
 
-            Plan plan;
-            try
+            var opened = Open(signer, request.Token, userId, telemetry);
+            if (opened.Failure is not null)
             {
-                plan = signer.Verify(request.Token, userId);
+                return opened.Failure;
             }
-            catch (PlanTokenException ex)
-            {
-                // Fixed answers only: nothing about why a signature failed, or whose plan it was.
-                switch (ex.Problem)
-                {
-                    case PlanTokenProblem.WrongUser:
-                        telemetry.Confirmation("rejected", "wrong_user");
-                        return Results.Json(new { error = "This plan is not yours to confirm." }, statusCode: StatusCodes.Status403Forbidden);
-                    case PlanTokenProblem.Expired:
-                        telemetry.Confirmation("rejected", "expired");
-                        return Results.Json(new { error = "This plan has expired. Ask for a new one." }, statusCode: StatusCodes.Status410Gone);
-                    default:
-                        telemetry.Confirmation("rejected", "invalid");
-                        return Results.BadRequest(new { error = "This is not a valid plan." });
-                }
-            }
+
+            var plan = opened.Plan!;
 
             // Handing out money is the step a click must not be enough for: the caller has to have
             // re-verified recently (the same "sudo mode" claim EmployeeService asks for on termination).
@@ -72,6 +73,63 @@ public static class AgentEndpoints
             return Results.Ok(report);
         }).RequireAuthorization();
 
+        // What the person is about to approve, read from the signed plan. Runs nothing and asks nothing of
+        // the services; it answers the same fixed messages as confirm for a plan that is not theirs, expired or not genuine.
+        app.MapPost("/mcp/plans/preview", (
+            ConfirmPlanRequest request,
+            ClaimsPrincipal user,
+            PlanSigner signer,
+            AgentTelemetry telemetry) =>
+        {
+            if (!Guid.TryParse(user.FindFirstValue("sub"), out var userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Token))
+            {
+                return Results.BadRequest(new { error = "A plan token is required." });
+            }
+
+            var opened = Open(signer, request.Token, userId, telemetry: null);
+            if (opened.Failure is not null)
+            {
+                return opened.Failure;
+            }
+
+            var plan = opened.Plan!;
+            return Results.Ok(new PlanCard(
+                plan.ExpiresAt,
+                plan.Steps.Any(s => s.Kind == StepKind.GrantCurrency),
+                plan.Steps.Select(s => new PlanCardStep(
+                    s.Kind.ToString(), s.Summary, s.FullName, s.Email, s.EmployeeName, s.DepartmentName, s.PositionName,
+                    s.Amount, s.Reason)).ToList()));
+        }).RequireAuthorization();
+
         return app;
+    }
+
+    // Fixed answers only: nothing about why a signature failed, or whose plan it was.
+    private static (Plan? Plan, IResult? Failure) Open(PlanSigner signer, string token, Guid userId, AgentTelemetry? telemetry)
+    {
+        try
+        {
+            return (signer.Verify(token, userId), null);
+        }
+        catch (PlanTokenException ex)
+        {
+            switch (ex.Problem)
+            {
+                case PlanTokenProblem.WrongUser:
+                    telemetry?.Confirmation("rejected", "wrong_user");
+                    return (null, Results.Json(new { error = "This plan is not yours to confirm." }, statusCode: StatusCodes.Status403Forbidden));
+                case PlanTokenProblem.Expired:
+                    telemetry?.Confirmation("rejected", "expired");
+                    return (null, Results.Json(new { error = "This plan has expired. Ask for a new one." }, statusCode: StatusCodes.Status410Gone));
+                default:
+                    telemetry?.Confirmation("rejected", "invalid");
+                    return (null, Results.BadRequest(new { error = "This is not a valid plan." }));
+            }
+        }
     }
 }
