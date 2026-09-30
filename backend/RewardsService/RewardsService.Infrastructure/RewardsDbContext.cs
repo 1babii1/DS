@@ -11,6 +11,8 @@ public class RewardsDbContext(DbContextOptions<RewardsDbContext> options) : DbCo
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
 
+    public DbSet<AgentGrantUsage> AgentGrantUsages => Set<AgentGrantUsage>();
+
     public DbSet<AccountLookup> AccountLookups => Set<AccountLookup>();
 
     public DbSet<DeadLetterEntry> DeadLetters => Set<DeadLetterEntry>();
@@ -52,6 +54,14 @@ public class RewardsDbContext(DbContextOptions<RewardsDbContext> options) : DbCo
 
             entity.HasIndex(e => e.EmployeeId, "IX_transactions_EmployeeId");
             entity.HasIndex(e => e.CreatedAt);
+        });
+
+        builder.Entity<AgentGrantUsage>(entity =>
+        {
+            entity.ToTable("agent_grant_usage");
+            entity.HasKey(e => new { e.GrantedByAccountId, e.Day });
+
+            entity.Property(e => e.Used).HasColumnType("numeric(18,2)");
         });
 
         builder.Entity<AccountLookup>(entity =>

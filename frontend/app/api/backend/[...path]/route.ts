@@ -4,7 +4,9 @@ import { authConfiguration } from "@/shared/auth/config";
 
 export const dynamic = "force-dynamic";
 
-const allowedPrefixes = ["/api/departments", "/api/positions", "/api/locations", "/api/employees", "/api/audit", "/api/search", "/api/rewards", "/api/notifications"];
+// The browser can only reach workspace APIs and the two human approval endpoints.
+// MCP tools themselves remain server-to-server and never receive a browser request.
+const allowedPrefixes = ["/api/departments", "/api/positions", "/api/locations", "/api/employees", "/api/audit", "/api/search", "/api/rewards", "/api/notifications", "/mcp/plans"];
 const forwardedRequestHeaders = ["accept", "content-type", "if-match"];
 const forwardedResponseHeaders = ["content-type", "location", "etag"];
 

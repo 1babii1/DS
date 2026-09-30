@@ -281,6 +281,99 @@
         },
         "overrides": []
       }
+    },
+    {
+      "id": 20,
+      "title": "Agent proposals",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 8,
+        "h": 7
+      },
+      "description": "What a model proposed and whether the guardrails accepted it. A rising 'refused' share means the model is emitting things the barriers stop.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (gen_ai_tool_name, outcome)(increase(agent_proposals_total[5m]))",
+          "legendFormat": "{{gen_ai_tool_name}} {{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 21,
+      "title": "Agent confirmations",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 21,
+        "w": 8,
+        "h": 7
+      },
+      "description": "How confirmations ended. wrong_user is never normal; step_up_required is a user who has to re-verify.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (outcome, reason)(increase(agent_confirmations_total[5m]))",
+          "legendFormat": "{{outcome}} {{reason}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 22,
+      "title": "Agent plan steps",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 21,
+        "w": 8,
+        "h": 7
+      },
+      "description": "Step outcomes. Failed with NotRun behind it is a plan that stopped at its first failure.",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (kind, outcome)(increase(agent_steps_total[5m]))",
+          "legendFormat": "{{kind}} {{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
     }
   ],
   "description": "Outbox health, dead letters and user-journey SLIs. Read while running scripts/chaos/freeze.sh."

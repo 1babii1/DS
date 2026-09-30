@@ -14,15 +14,14 @@
          project's own files (and its generated obj/ output) into McpServer itself. -->
     <Compile Remove="McpServer.IntegrationTests/**/*.cs" />
     <Content Remove="McpServer.IntegrationTests/**/*" />
+    <Compile Remove="McpServer.ModelEval/**/*.cs" />
+    <Content Remove="McpServer.ModelEval/**/*" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
-    <PackageReference Include="Dapper" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
-    <PackageReference Include="Npgsql" />
-    <PackageReference Include="Pgvector" />
   </ItemGroup>
 
   <ItemGroup>

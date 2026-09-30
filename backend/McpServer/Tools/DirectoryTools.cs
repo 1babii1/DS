@@ -1,133 +1,80 @@
-﻿using System.ComponentModel;
-using Dapper;
-using McpServer.Embeddings;
-using Microsoft.Extensions.Options;
+using System.ComponentModel;
+using McpServer.Api;
+using ModelContextProtocol;
 using ModelContextProtocol.Server;
-using Npgsql;
+using Shared;
 
 namespace McpServer.Tools;
 
+// Every tool reads through the owning service's own API with the caller's token (see
+// BearerForwardingHandler) - not from that service's database. What each service allows,
+// filters and pages is decided in one place, its own, and applies here without a second copy.
 [McpServerToolType]
-public sealed class DirectoryTools(
-    NpgsqlDataSource dataSource,
-    OllamaEmbeddingClient embeddingClient,
-    IOptions<EmbeddingsOptions> embeddingOptions)
+public sealed class DirectoryTools(DirectoryApiClient directory, EmployeeApiClient employees)
 {
     [McpServerTool(Name = "search_departments")]
     [Description("Semantic search for departments by meaning (e.g. \"teams working on payments\"), not exact text match. Returns id, name, identifier and a similarity score (0-1, higher is closer).")]
-    public async Task<IReadOnlyList<DepartmentSearchResult>> SearchDepartments(
+    public Task<IReadOnlyList<DepartmentSearchResult>> SearchDepartments(
         [Description("Free-text description of what you're looking for")] string query,
         [Description("Max results to return (1-50)")] int limit = 10,
-        CancellationToken cancellationToken = default)
-    {
-        limit = Math.Clamp(limit, 1, 50);
-        var vector = await embeddingClient.EmbedAsync(embeddingOptions.Value.Model, query, cancellationToken);
-
-        await using var connection = dataSource.CreateConnection();
-        await connection.OpenAsync(cancellationToken);
-
-        await using var command = connection.CreateCommand();
-        command.CommandText = """
-            select d.id, d.name, d.identifier, 1 - (e.embedding <=> $1) as score
-            from directory.department_embeddings e
-            join directory.departments d on d.id = e.department_id
-            where d.is_active
-            order by e.embedding <=> $1
-            limit $2
-            """;
-        command.Parameters.Add(new NpgsqlParameter { Value = vector });
-        command.Parameters.Add(new NpgsqlParameter { Value = limit });
-
-        var results = new List<DepartmentSearchResult>();
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            results.Add(new DepartmentSearchResult(
-                reader.GetGuid(0),
-                reader.GetString(1),
-                reader.GetString(2),
-                reader.GetDouble(3)));
-        }
-
-        return results;
-    }
+        CancellationToken cancellationToken = default) =>
+        Run(() => directory.SearchAsync(query, Math.Clamp(limit, 1, 50), cancellationToken));
 
     [McpServerTool(Name = "get_department_tree")]
-    [Description("Returns a department and all of its descendants using the org structure hierarchy. Pass no id to list top-level (root) departments only.")]
-    public async Task<IReadOnlyList<DepartmentNode>> GetDepartmentTree(
+    [Description("Returns a department and all of its active descendants, shallowest first (hasMore is true if the subtree was too large and got cut). Pass no id to list top-level (root) departments instead, one page at a time: hasMore then means another page probably exists.")]
+    public Task<DepartmentTreeResult> GetDepartmentTree(
         [Description("Department id to root the subtree at; omit for the top-level departments")] Guid? departmentId = null,
-        CancellationToken cancellationToken = default)
-    {
-        await using var connection = dataSource.CreateConnection();
-        await connection.OpenAsync(cancellationToken);
-
-        if (departmentId is null)
-        {
-            const string rootsSql = """
-                select id, name, identifier, depth, parent_id
-                from directory.departments
-                where is_active and parent_id is null
-                order by name
-                """;
-            var roots = await connection.QueryAsync<DepartmentNode>(
-                new CommandDefinition(rootsSql, cancellationToken: cancellationToken));
-            return roots.ToList();
-        }
-
-        const string subtreeSql = """
-            select d.id, d.name, d.identifier, d.depth, d.parent_id
-            from directory.departments d
-            where d.is_active
-              and d.path <@ (select path from directory.departments where id = @departmentId)
-            order by d.depth, d.name
-            """;
-        var subtree = await connection.QueryAsync<DepartmentNode>(
-            new CommandDefinition(subtreeSql, new { departmentId }, cancellationToken: cancellationToken));
-        return subtree.ToList();
-    }
+        [Description("Page of top-level departments (only used when no id is given)")] int page = 1,
+        CancellationToken cancellationToken = default) =>
+        Run(() => departmentId is null
+            ? directory.RootsAsync(ClampPage(page), cancellationToken)
+            : directory.SubtreeAsync(departmentId.Value, cancellationToken));
 
     [McpServerTool(Name = "get_employee")]
     [Description("Looks up a single employee by id.")]
-    public async Task<EmployeeDetails?> GetEmployee(
+    public Task<EmployeeDetails?> GetEmployee(
         [Description("Employee id")] Guid employeeId,
-        CancellationToken cancellationToken = default)
-    {
-        await using var connection = dataSource.CreateConnection();
-        await connection.OpenAsync(cancellationToken);
-        const string sql = """
-            select "Id" as Id, "FullName" as FullName, "Email" as Email,
-                   "DepartmentId" as DepartmentId, "DepartmentName" as DepartmentName,
-                   "PositionId" as PositionId, "PositionName" as PositionName,
-                   "Status" as Status, "HiredAt" as HiredAt
-            from employee.employees
-            where "Id" = @employeeId
-            """;
-        return await connection.QuerySingleOrDefaultAsync<EmployeeDetails>(
-            new CommandDefinition(sql, new { employeeId }, cancellationToken: cancellationToken));
-    }
+        CancellationToken cancellationToken = default) =>
+        Run(() => employees.GetAsync(employeeId, cancellationToken));
 
     [McpServerTool(Name = "list_employees_by_department")]
-    [Description("Lists employees currently assigned to a department.")]
-    public async Task<IReadOnlyList<EmployeeDetails>> ListEmployeesByDepartment(
+    [Description("Lists employees currently assigned to a department, one page at a time. Check hasNext and ask for the next page for more.")]
+    public Task<PagedResponse<EmployeeDetails>> ListEmployeesByDepartment(
         [Description("Department id")] Guid departmentId,
-        CancellationToken cancellationToken = default)
+        [Description("Page number, starting at 1")] int page = 1,
+        [Description("Page size (the service caps this)")] int size = PagedResponse<EmployeeDetails>.DefaultSize,
+        CancellationToken cancellationToken = default) =>
+        Run(() => employees.ListByDepartmentAsync(
+            departmentId, ClampPage(page), Math.Clamp(size, 1, PagedResponse<EmployeeDetails>.MaxSize), cancellationToken));
+
+    // Far beyond any real page count, but small enough that the services' (page - 1) * size cannot overflow.
+    private static int ClampPage(int page) => Math.Clamp(page, 1, 100_000);
+
+    // Only the fixed, category-level message of a failed call reaches the model. McpException is
+    // the type whose message the MCP SDK passes through; anything else is replaced by a generic one.
+    private static async Task<T> Run<T>(Func<Task<T>> call)
     {
-        await using var connection = dataSource.CreateConnection();
-        await connection.OpenAsync(cancellationToken);
-        const string sql = """
-            select "Id" as Id, "FullName" as FullName, "Email" as Email,
-                   "DepartmentId" as DepartmentId, "DepartmentName" as DepartmentName,
-                   "PositionId" as PositionId, "PositionName" as PositionName,
-                   "Status" as Status, "HiredAt" as HiredAt
-            from employee.employees
-            where "DepartmentId" = @departmentId
-            order by "FullName"
-            """;
-        var employees = await connection.QueryAsync<EmployeeDetails>(
-            new CommandDefinition(sql, new { departmentId }, cancellationToken: cancellationToken));
-        return employees.ToList();
+        try
+        {
+            return await call();
+        }
+        catch (ServiceApiException ex)
+        {
+            throw new McpException(ex.Message, ex);
+        }
+        catch (Exception ex) when (ex is HttpRequestException
+            or Polly.CircuitBreaker.BrokenCircuitException
+            or Polly.Timeout.TimeoutRejectedException)
+        {
+            // Unreachable, timed out, or the breaker is open: one fixed sentence for all three, not the
+            // SDK's generic error path.
+            throw new McpException("The service could not be reached.", ex);
+        }
     }
 }
+
+/// <param name="HasMore">There is more than was returned (a next page, or a subtree that was cut).</param>
+public sealed record DepartmentTreeResult(IReadOnlyList<DepartmentNode> Nodes, bool HasMore);
 
 public sealed record DepartmentSearchResult(Guid Id, string Name, string Identifier, double Score);
 

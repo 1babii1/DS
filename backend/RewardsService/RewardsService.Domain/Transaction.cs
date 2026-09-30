@@ -4,6 +4,7 @@ public enum TransactionSource
 {
     ManualGrant,
     WelcomeBonus,
+    AgentGrant,
 }
 
 // Append-only ledger: rows are never updated or deleted, unlike Wallet.Balance which is

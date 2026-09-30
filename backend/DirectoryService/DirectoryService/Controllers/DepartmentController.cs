@@ -84,6 +84,13 @@ public class DepartmentController : ControllerBase
         CancellationToken cancellationToken) =>
         await handler.Handle(request, cancellationToken);
 
+    [HttpGet("{departmentId:guid}/subtree")]
+    public async Task<EndpointResult<DepartmentSubtreeDto>> GetSubtree(
+        [FromRoute] Guid departmentId,
+        [FromServices] GetSubtreeHandler handler,
+        CancellationToken cancellationToken) =>
+        await handler.Handle(departmentId, cancellationToken);
+
     [HttpGet("{parentId:guid}/children")]
     public async Task<EndpointResult<List<ReadDepartmentHierarchyDto>>> GetChildrenLazy(
         [FromRoute] Guid parentId,

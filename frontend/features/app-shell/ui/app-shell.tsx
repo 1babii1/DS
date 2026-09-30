@@ -3,6 +3,7 @@
 import {
 	Activity,
 	BadgeCheck,
+	Bot,
 	BriefcaseBusiness,
 	Building2,
 	ChevronRight,
@@ -35,7 +36,8 @@ const navigation: ReadonlyArray<{
 	{ label: 'People', href: '/people', icon: UsersRound, description: 'Employee directory' },
 	{ label: 'Positions', href: '/positions', icon: BriefcaseBusiness, description: 'Role catalogue' },
 	{ label: 'Locations', href: '/locations', icon: MapPin, description: 'Office footprint' },
-	{ label: 'Activity', href: '/activity', icon: Activity, description: 'Audit events' }
+	{ label: 'Activity', href: '/activity', icon: Activity, description: 'Audit events' },
+	{ label: 'Assistant', href: '/assistant', icon: Bot, description: 'Ask, and approve proposed changes' }
 ]
 
 function isActive(pathname: string, href: string) {

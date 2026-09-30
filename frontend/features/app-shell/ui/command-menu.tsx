@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import * as Dialog from '@radix-ui/react-dialog'
-import { Activity, BriefcaseBusiness, Building2, Command, LayoutDashboard, MapPin, Search, UsersRound } from 'lucide-react'
+import { Activity, Bot, BriefcaseBusiness, Building2, Command, LayoutDashboard, MapPin, Search, UsersRound } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType, KeyboardEvent as ReactKeyboardEvent } from 'react'
@@ -29,6 +29,7 @@ const navigationCommands: CommandItem[] = [
 	{ id: 'navigate-positions', href: '/positions', label: 'Positions', description: 'Role catalogue', icon: BriefcaseBusiness },
 	{ id: 'navigate-locations', href: '/locations', label: 'Locations', description: 'Office footprint', icon: MapPin },
 	{ id: 'navigate-activity', href: '/activity', label: 'Activity', description: 'Audit events', icon: Activity },
+	{ id: 'navigate-assistant', href: '/assistant', label: 'Assistant', description: 'Ask, then review proposed changes', icon: Bot },
 ]
 
 const resultIcons: Record<SearchKind, CommandItem['icon']> = {

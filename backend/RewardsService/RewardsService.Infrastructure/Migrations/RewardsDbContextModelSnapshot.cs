@@ -43,6 +43,22 @@ namespace RewardsService.Infrastructure.Migrations
                     b.ToTable("account_lookups", "rewards");
                 });
 
+            modelBuilder.Entity("RewardsService.Domain.AgentGrantUsage", b =>
+                {
+                    b.Property<Guid>("GrantedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("Day")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("Used")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.HasKey("GrantedByAccountId", "Day");
+
+                    b.ToTable("agent_grant_usage", "rewards");
+                });
+
             modelBuilder.Entity("RewardsService.Domain.IdempotencyRecord", b =>
                 {
                     b.Property<Guid>("Id")

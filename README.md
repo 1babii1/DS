@@ -57,6 +57,10 @@ isn't claimed.
   documents, rather than hides, a real read-side race between a grant landing and the
   account-lookup projection catching up.
 
+**Guardrails around an agent that can change data:** [`docs/agent-evals.md`](docs/agent-evals.md) - a reviewable corpus of
+hostile inputs and hostile-but-signed plans, scored in CI (what it found: invisible Unicode characters that could
+make a plan read differently from what it does). Says plainly that it measures the barriers, not any model.
+
 **Real numbers, not estimates:** [`docs/benchmarks/baseline.md`](docs/benchmarks/baseline.md) —
 a live k6 run against the full stack, including the two self-inflicted load-test bugs it
 took to get a number worth trusting (a request storm with no backoff, twice, against two
@@ -126,7 +130,7 @@ to reason about.
 | **RewardsService** | an internal currency ledger — manual grants and an automatic welcome bonus on hire | REST, Kafka producer + consumer |
 | **NotificationService** | a real in-app notification center — persisted feed, unread counts, and a live SignalR push, not a log line | REST + SignalR, Kafka consumer |
 | **SearchService** | cross-entity search (employees, departments, positions, locations, audit history) over an Elasticsearch index materialized from the same event stream | REST, Kafka consumer |
-| **McpServer** | read-only [MCP](https://modelcontextprotocol.io) tools (semantic search, org tree, employee lookup) for AI assistants | Streamable HTTP, JWT-authenticated |
+| **McpServer** | read-only [MCP](https://modelcontextprotocol.io) tools (semantic search, org tree, employee lookup) for AI assistants; every tool calls the owning service's API with the caller's own token, no database access ([ADR 0015](docs/adr/0015-mcp-tools-read-through-the-service-apis.md)) | Streamable HTTP, JWT-authenticated |
 
 All REST traffic goes through nginx at `/`; gRPC between EmployeeService and
 DirectoryService is internal-only, never exposed to the host.

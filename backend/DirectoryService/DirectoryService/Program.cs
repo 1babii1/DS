@@ -178,6 +178,8 @@ builder.Services.AddScoped<GetParentDepartmentsHandler>();
 
 builder.Services.AddScoped<GetChildrenLazyHandler>();
 
+builder.Services.AddScoped<GetSubtreeHandler>();
+
 builder.Services.AddScoped<SoftDeleteDepartmentHandler>();
 
 builder.Services.AddStackExchangeRedisCache(setup =>
