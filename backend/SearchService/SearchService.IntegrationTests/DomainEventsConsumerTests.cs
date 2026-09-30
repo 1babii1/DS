@@ -63,6 +63,33 @@ public class DomainEventsConsumerTests : IClassFixture<SearchTestWebFactory>, IA
     }
 
     [Fact]
+    public async Task DepartmentRenamed_reindexes_the_department_under_its_new_name_and_not_the_old_one()
+    {
+        var departmentId = Guid.NewGuid();
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(
+            BuildResult(Guid.NewGuid(), "directory.events", departmentId.ToString(), "DepartmentCreated",
+                $$"""{"DepartmentId":"{{departmentId}}","Name":"Payments","Identifier":"payments","ParentDepartmentId":null}"""),
+            CancellationToken.None));
+
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(
+            BuildResult(Guid.NewGuid(), "directory.events", departmentId.ToString(), "DepartmentRenamed",
+                $$"""{"DepartmentId":"{{departmentId}}","Name":"Treasury operations","Identifier":"payments"}"""),
+            CancellationToken.None));
+
+        var doc = await _indexClient.GetAsync(SearchDocument.EntityId(SearchKind.Department, departmentId), CancellationToken.None);
+        Assert.NotNull(doc);
+        Assert.Equal("Treasury operations", doc!.Title);
+        Assert.Equal("payments", doc.Subtitle);
+        Assert.True(doc.IsActive);
+
+        await _indexClient.RefreshAsync(CancellationToken.None);
+        var byNewName = await _indexClient.SearchAsync("Treasury", [SearchKind.Department], 10, CancellationToken.None);
+        Assert.Contains(byNewName, h => h.SourceId == departmentId);
+        var byOldName = await _indexClient.SearchAsync("Payments", [SearchKind.Department], 10, CancellationToken.None);
+        Assert.DoesNotContain(byOldName, h => h.SourceId == departmentId && h.Title == "Payments");
+    }
+
+    [Fact]
     public async Task EmployeeHired_resolves_department_and_position_names_into_the_subtitle()
     {
         var departmentId = Guid.NewGuid();

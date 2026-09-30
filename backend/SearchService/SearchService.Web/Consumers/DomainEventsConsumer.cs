@@ -66,6 +66,9 @@ public class DomainEventsConsumer(
             case DepartmentCreatedEvent.MessageType:
                 await HandleDepartmentCreated(result.Message.Value, occurredAt, cancellationToken);
                 break;
+            case DepartmentRenamedEvent.MessageType:
+                await HandleDepartmentRenamed(result.Message.Value, occurredAt, cancellationToken);
+                break;
             case DepartmentDeletedEvent.MessageType:
                 await HandleDepartmentDeleted(result.Message.Value, cancellationToken);
                 break;
@@ -91,6 +94,27 @@ public class DomainEventsConsumer(
     {
         var @event = JsonSerializer.Deserialize<DepartmentCreatedEvent>(payload)
             ?? throw new InvalidOperationException($"Could not deserialize {DepartmentCreatedEvent.MessageType} payload");
+
+        return indexClient.UpsertAsync(
+            new SearchDocument(
+                SearchDocument.EntityId(SearchKind.Department, @event.DepartmentId),
+                SearchKind.Department,
+                @event.DepartmentId,
+                @event.Name,
+                @event.Identifier,
+                $"{@event.Name} {@event.Identifier}",
+                true,
+                occurredAt),
+            cancellationToken);
+    }
+
+    // The event carries the whole set of fields the document is built from, so the document is rebuilt and
+    // overwritten (the same idempotent full re-index as on creation). Only active departments can be renamed at the
+    // source, so the document stays active.
+    private Task HandleDepartmentRenamed(string payload, DateTime occurredAt, CancellationToken cancellationToken)
+    {
+        var @event = JsonSerializer.Deserialize<DepartmentRenamedEvent>(payload)
+            ?? throw new InvalidOperationException($"Could not deserialize {DepartmentRenamedEvent.MessageType} payload");
 
         return indexClient.UpsertAsync(
             new SearchDocument(
