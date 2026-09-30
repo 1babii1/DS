@@ -73,20 +73,21 @@ public class AgentTelemetryTests
             new PlanSigner(RandomNumberGenerator.GetBytes(32), new Clock()),
             Options.Create(new AgentOptions()),
             new Clock(),
-            telemetry);
+            telemetry,
+            FakeOrg.LenientOrg().Lookup());
     }
 
     [Fact]
-    public void Accepted_and_refused_proposals_are_counted_per_tool()
+    public async Task Accepted_and_refused_proposals_are_counted_per_tool()
     {
         using var telemetry = new AgentTelemetry();
         using var capture = new Capture(telemetry);
         var tools = Tools(telemetry);
 
-        tools.ProposeGrant(Guid.NewGuid(), 10m, "thanks");
-        tools.ProposeGrant(Guid.NewGuid(), 10m, "thanks");
-        Assert.Throws<McpException>(() => tools.ProposeGrant(Guid.NewGuid(), 99999m, "too much"));
-        Assert.Throws<McpException>(() => tools.ProposeHire("Anna\nX", "a@x.test", Dept, Pos));
+        await tools.ProposeGrant(Guid.NewGuid(), 10m, "thanks");
+        await tools.ProposeGrant(Guid.NewGuid(), 10m, "thanks");
+        await Assert.ThrowsAsync<McpException>(() => tools.ProposeGrant(Guid.NewGuid(), 99999m, "too much"));
+        await Assert.ThrowsAsync<McpException>(() => tools.ProposeHire("Anna\nX", "a@x.test", Dept, Pos));
 
         Assert.Equal(2, capture.Sum("agent_proposals", ("gen_ai.tool.name", "propose_grant_currency"), ("outcome", "proposed")));
         Assert.Equal(1, capture.Sum("agent_proposals", ("gen_ai.tool.name", "propose_grant_currency"), ("outcome", "refused")));
@@ -94,12 +95,12 @@ public class AgentTelemetryTests
     }
 
     [Fact]
-    public void A_proposal_without_a_signed_in_user_counts_as_refused()
+    public async Task A_proposal_without_a_signed_in_user_counts_as_refused()
     {
         using var telemetry = new AgentTelemetry();
         using var capture = new Capture(telemetry);
 
-        Assert.Throws<McpException>(() => Tools(telemetry, signedIn: false).ProposeGrant(Guid.NewGuid(), 10m, "x"));
+        await Assert.ThrowsAsync<McpException>(() => Tools(telemetry, signedIn: false).ProposeGrant(Guid.NewGuid(), 10m, "x"));
 
         Assert.Equal(1, capture.Sum("agent_proposals", ("outcome", "refused")));
     }
@@ -144,7 +145,7 @@ public class AgentTelemetryTests
         using var telemetry = new AgentTelemetry();
         using var capture = new Capture(telemetry);
         var tools = Tools(telemetry);
-        var proposal = tools.ProposeHire("Secret Name Person", "secret.mail@x.test", Dept, Pos, 50m, "secret reason text");
+        var proposal = await tools.ProposeHire("Secret Name Person", "secret.mail@x.test", Dept, Pos);
         var executor = ExecutorWith(
             new RecordingService((_, _) => RecordingService.Ok(Guid.NewGuid())),
             new RecordingService((_, _) => RecordingService.Ok(Guid.NewGuid())),

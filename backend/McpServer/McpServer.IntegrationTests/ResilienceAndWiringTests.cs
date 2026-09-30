@@ -148,4 +148,30 @@ public class ResilienceAndWiringTests
             Assert.Equal(caller.Token, seen[$"/api/employees/{caller.Id}"]);
         }
     }
+
+    // The lookups behind the proposal tools are reads like any other: registered, and made as the caller.
+    [Fact]
+    public async Task The_real_dependency_injection_setup_gives_the_plan_lookup_the_callers_token()
+    {
+        var seenToken = new System.Collections.Concurrent.ConcurrentBag<string>();
+        var stub = new CountingStub(request =>
+        {
+            seenToken.Add(request.Headers.Authorization?.ToString() ?? "<none>");
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
+            b.ConfigureTestServices(services =>
+                services.AddHttpClient<EmployeeApiClient>().ConfigurePrimaryHttpMessageHandler(() => stub)));
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var context = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
+        context.Request.Headers.Authorization = "Bearer callers-own";
+        scope.ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext = context;
+
+        var lookup = scope.ServiceProvider.GetRequiredService<McpServer.Agent.PlanLookup>();
+        await Assert.ThrowsAsync<ModelContextProtocol.McpException>(() => lookup.EmployeeAsync(Guid.NewGuid(), CancellationToken.None));
+
+        Assert.Equal("Bearer callers-own", Assert.Single(seenToken));
+    }
 }

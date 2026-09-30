@@ -44,6 +44,43 @@ public sealed class DirectoryApiClient(HttpClient http)
             (subtree?.Nodes ?? []).Select(ToNode).ToList(), HasMore: subtree?.Truncated ?? false);
     }
 
+    // The service answers an unknown id with a successful empty result, so null here means "no such department".
+    public async Task<DepartmentInfo?> GetDepartmentAsync(Guid departmentId, CancellationToken ct)
+    {
+        var department = await GetEnvelopeAsync<DepartmentDto>($"api/departments/department/{departmentId}", ct);
+        return department is null ? null : new DepartmentInfo(department.Id, department.Name, department.IsActive);
+    }
+
+    // The positions the department really has. Asking for these, rather than for one position by id, is what
+    // ties a position to a department: a position of another department, or a department id passed as a
+    // position, is simply not in the list.
+    public async Task<IReadOnlyList<PositionInfo>> ActivePositionsOfAsync(Guid departmentId, CancellationToken ct)
+    {
+        var found = new List<PositionInfo>();
+        for (var page = 1; page <= MaxPositionPages; page++)
+        {
+            using var response = await http.GetAsync(
+                $"api/positions?departmentId={departmentId}&isActive=true&page={page}&size={PositionsPageSize}", ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw ServiceApiException.From(response.StatusCode);
+            }
+
+            var paged = await response.Content.ReadFromJsonAsync<PositionsPageDto>(Json, ct)
+                ?? throw ServiceApiException.From(System.Net.HttpStatusCode.InternalServerError);
+            found.AddRange(paged.Items.Select(p => new PositionInfo(p.Id, p.Name)));
+            if (found.Count >= paged.Total || paged.Items.Count == 0)
+            {
+                break;
+            }
+        }
+
+        return found;
+    }
+
+    private const int PositionsPageSize = 200;
+    private const int MaxPositionPages = 5;
+
     private static DepartmentNode ToNode(HierarchyDto d) =>
         new(d.Id, d.Name, d.Identifier, (short)d.Depth, d.ParentId);
 
@@ -70,5 +107,15 @@ public sealed class DirectoryApiClient(HttpClient http)
 
     private sealed record HierarchyDto(Guid Id, Guid? ParentId, string Name, string Identifier, int Depth, bool IsActive);
 
+    private sealed record DepartmentDto(Guid Id, string Name, bool IsActive);
+
+    private sealed record PositionDto(Guid Id, string Name);
+
+    private sealed record PositionsPageDto(List<PositionDto> Items, int Total);
+
     private sealed record SubtreeDto(List<HierarchyDto> Nodes, bool Truncated);
 }
+
+public sealed record DepartmentInfo(Guid Id, string Name, bool IsActive);
+
+public sealed record PositionInfo(Guid Id, string Name);

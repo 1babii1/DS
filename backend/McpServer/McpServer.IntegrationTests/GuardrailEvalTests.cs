@@ -36,7 +36,7 @@ public class GuardrailEvalTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Every_proposal_is_refused_or_accepted_as_the_corpus_expects()
+    public async Task Every_proposal_is_refused_or_accepted_as_the_corpus_expects()
     {
         var signer = new PlanSigner(Key, new Clock());
         var tools = new AgentTools(
@@ -50,7 +50,8 @@ public class GuardrailEvalTests(ITestOutputHelper output)
             signer,
             Options.Create(new AgentOptions()),
             new Clock(),
-            new AgentTelemetry());
+            new AgentTelemetry(),
+            FakeOrg.LenientOrg().Lookup());
 
         var failures = new List<string>();
         var cases = Corpus().GetProperty("proposals").EnumerateArray().ToList();
@@ -64,7 +65,7 @@ public class GuardrailEvalTests(ITestOutputHelper output)
             McpException? refused = null;
             try
             {
-                proposal = Call(tools, c.GetProperty("tool").GetString()!, c.GetProperty("args"));
+                proposal = await Call(tools, c.GetProperty("tool").GetString()!, c.GetProperty("args"));
             }
             catch (McpException ex)
             {
@@ -176,15 +177,13 @@ public class GuardrailEvalTests(ITestOutputHelper output)
 
     // ---- corpus -> calls ---------------------------------------------------------------------------
 
-    private static PlanProposal Call(AgentTools tools, string tool, JsonElement a) => tool switch
+    private static Task<PlanProposal> Call(AgentTools tools, string tool, JsonElement a) => tool switch
     {
         "propose_hire_employee" => tools.ProposeHire(
             Text(a, "fullName", "Anna Ivanova")!,
             Text(a, "email", "anna@x.test")!,
             Id(a, "departmentId", Dept),
-            Id(a, "positionId", Pos),
-            a.TryGetProperty("grantAmount", out var g) ? g.GetDecimal() : null,
-            Text(a, "grantReason", null)),
+            Id(a, "positionId", Pos)),
         "propose_transfer_employee" => tools.ProposeTransfer(
             Id(a, "employeeId", Guid.NewGuid()), Id(a, "departmentId", Dept), Id(a, "positionId", Pos)),
         "propose_grant_currency" => tools.ProposeGrant(

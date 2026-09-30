@@ -10,7 +10,7 @@ public sealed class AgentOptions
 
     public TimeSpan PlanLifetime { get; init; } = TimeSpan.FromMinutes(10);
 
-    // A ceiling on what one plan may hand out, so a manipulated or mistaken request cannot propose an
-    // arbitrary amount. Who may grant at all stays with RewardsService.
-    public decimal MaxGrantAmount { get; init; } = 1000m;
+    // An early, readable refusal for a grant the ledger would refuse anyway: RewardsService holds the same limit
+    // for agent grants (500) and is the one that enforces it, together with the daily quota.
+    public decimal MaxGrantAmount { get; init; } = 500m;
 }

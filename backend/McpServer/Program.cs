@@ -65,6 +65,7 @@ builder.Services.AddSingleton(sp =>
     return new PlanSigner(Convert.FromBase64String(agentOptions.SigningKeyBase64), sp.GetRequiredService<TimeProvider>());
 });
 builder.Services.AddScoped<PlanExecutor>();
+builder.Services.AddTransient<PlanLookup>();
 
 // Inbound: the same tokens and the same JWKS as every other service. The token that authenticates a
 // request here is also what BearerForwardingHandler passes on, so this is the one place the caller's
