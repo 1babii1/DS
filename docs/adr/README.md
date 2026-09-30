@@ -24,6 +24,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0015](0015-mcp-tools-read-through-the-service-apis.md) | MCP tools read through the service APIs, as the caller |
 | [0016](0016-agent-proposes-user-confirms.md) | The agent proposes, the user confirms |
 | [0017](0017-approval-is-informed-and-bounded.md) | Approval is informed and bounded, not a promise about the model |
+| [0019](0019-org-time-machine-from-the-event-log.md) | The org on a past date, folded from the event log |
 
 Not yet written up, though each decision is already live in the codebase and explained
 in its own commit messages: gRPC for internal calls, local JWT validation via JWKS,
