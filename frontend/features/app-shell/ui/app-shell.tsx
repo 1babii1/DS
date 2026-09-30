@@ -5,6 +5,7 @@ import {
 	BadgeCheck,
 	Bot,
 	BriefcaseBusiness,
+	History,
 	Building2,
 	ChevronRight,
 	LayoutDashboard,
@@ -37,6 +38,7 @@ const navigation: ReadonlyArray<{
 	{ label: 'Positions', href: '/positions', icon: BriefcaseBusiness, description: 'Role catalogue' },
 	{ label: 'Locations', href: '/locations', icon: MapPin, description: 'Office footprint' },
 	{ label: 'Activity', href: '/activity', icon: Activity, description: 'Audit events' },
+	{ label: 'Org history', href: '/history', icon: History, description: 'The organization on a past date' },
 	{ label: 'Assistant', href: '/assistant', icon: Bot, description: 'Ask, and approve proposed changes' }
 ]
 

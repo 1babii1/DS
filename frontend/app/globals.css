@@ -865,3 +865,22 @@ h1 { max-width: 46rem; margin: 0; font-size: clamp(2rem, 4vw, 3.6rem); font-weig
 		max-width: 68%;
 	}
 }
+
+.history { display: grid; gap: 1.6rem; max-width: 52rem; }
+.history-slider { display: grid; gap: .5rem; padding: 1rem 1.1rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--surface-raised); }
+.history-slider label { color: var(--muted-foreground); font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.history-slider output { font-size: 1.25rem; font-weight: 650; letter-spacing: -.02em; }
+.history-slider input[type='range'] { width: 100%; accent-color: var(--primary); }
+.history-slider__ends { display: flex; justify-content: space-between; color: var(--muted-foreground); font-size: .7rem; }
+.history-tree { display: grid; gap: .75rem; margin: 0; padding: 0; list-style: none; }
+.history-tree .history-tree { margin-top: .75rem; padding-left: 1.1rem; border-left: 1px solid var(--border); }
+.history-node { padding: .85rem 1rem; border: 1px solid var(--border); border-radius: .5rem; background: var(--surface-raised); }
+.history-tree .history-node .history-node { background: transparent; }
+.history-node__head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.history-node__head span { display: inline-flex; align-items: center; gap: .3rem; color: var(--muted-foreground); font-size: .74rem; font-weight: 650; }
+.history-people { display: grid; gap: .3rem; margin: .6rem 0 0; padding: 0; list-style: none; font-size: .82rem; }
+.history-people li { display: flex; justify-content: space-between; gap: 1rem; }
+.history-people li span { color: var(--muted-foreground); font-size: .74rem; }
+.history-unplaced h2 { margin: 0 0 .2rem; font-size: .94rem; }
+.history-unplaced p, .history-note { margin: 0; color: var(--muted-foreground); font-size: .78rem; }
+.history-tree[aria-busy='true'] { opacity: .6; }
