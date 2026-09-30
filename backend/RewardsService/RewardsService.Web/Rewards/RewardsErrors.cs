@@ -16,6 +16,9 @@ public static class RewardsErrors
             "Idempotency-Key header is required",
             "Idempotency-Key");
 
+    public static Error CannotGrantToSelf() =>
+        Error.Authorization("rewards.grant.self", "You cannot grant currency to yourself", "employeeId");
+
     // Same key reused with a different request body - not a retry, a caller bug (or, worst
     // case, two different callers colliding on a client-generated key). 422, per the IETF
     // Idempotency-Key draft, not a silent "here's the first grant's result".

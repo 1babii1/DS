@@ -61,6 +61,14 @@ public class RewardsController(RewardsDbContext dbContext, CurrencyGrantWriter w
             return RewardsErrors.ReasonRequired();
         }
 
+        // "sub" is an account, wallets are keyed by employee: the AccountProvisioned projection links them. An
+        // account with no linked employee cannot be granting to itself, so the rule then does not apply.
+        var callerAccount = Guid.Parse(User.FindFirstValue("sub")!);
+        if (dbContext.AccountLookups.Any(l => l.AccountId == callerAccount && l.EmployeeId == request.EmployeeId))
+        {
+            return RewardsErrors.CannotGrantToSelf();
+        }
+
         var requestHash = HashRequest(request);
 
         var existing = dbContext.IdempotencyRecords

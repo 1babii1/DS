@@ -176,6 +176,42 @@ public class GrantCurrencyTests : IClassFixture<RewardsTestWebFactory>, IAsyncLi
         Assert.Equal(employeeId, wallet.EmployeeId);
     }
 
+    // Nobody grants themselves currency. The caller's identity is an account, the wallet is keyed by employee;
+    // the projection of AccountProvisioned links the two. A second, unrelated employee is the control: the same
+    // caller can still grant to them, so the refusal is about "me", not about granting in general.
+    [Fact]
+    public async Task A_grant_to_the_callers_own_employee_is_refused_and_writes_nothing()
+    {
+        var callerAccount = Guid.NewGuid();
+        var callerEmployee = Guid.NewGuid();
+        var colleague = Guid.NewGuid();
+        await SeedAccountLink(callerEmployee, callerAccount);
+
+        var (ownStatus, ownCode) = await Grant(callerAccount, new GrantCurrencyRequest(callerEmployee, 100, "Me"));
+        var (otherStatus, _) = await Grant(callerAccount, new GrantCurrencyRequest(colleague, 100, "Them"));
+
+        Assert.Equal(StatusCodes.Status403Forbidden, ownStatus);
+        Assert.Equal("rewards.grant.self", ownCode);
+        Assert.Equal(0, await ReadInDb(db => db.Transactions.CountAsync(t => t.EmployeeId == callerEmployee)));
+        Assert.Equal(StatusCodes.Status200OK, otherStatus);
+    }
+
+    [Fact]
+    public async Task An_account_with_no_linked_employee_is_not_affected_by_the_self_grant_rule()
+    {
+        var (status, _) = await Grant(Guid.NewGuid(), new GrantCurrencyRequest(Guid.NewGuid(), 100, "Fine"));
+
+        Assert.Equal(StatusCodes.Status200OK, status);
+    }
+
+    private async Task SeedAccountLink(Guid employeeId, Guid accountId)
+    {
+        await using var scope = _services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<RewardsDbContext>();
+        db.AccountLookups.Add(AccountLookup.Create(employeeId, accountId));
+        await db.SaveChangesAsync();
+    }
+
     public Task InitializeAsync() => Task.CompletedTask;
 
     public Task DisposeAsync() => _resetDatabase();
