@@ -18,7 +18,7 @@ export class AuthenticationRequiredError extends Error {
   }
 }
 
-export async function getAccessToken(userId: string): Promise<string> {
+export async function getAccessToken(userId: string, forceRefresh = false): Promise<string> {
   return withTransaction(async (client) => {
     const result = await client.query<AccountRow>(
       `SELECT access_token, refresh_token, expires_at
@@ -34,7 +34,7 @@ export async function getAccessToken(userId: string): Promise<string> {
     }
 
     const now = Math.floor(Date.now() / 1000);
-    if (account.expires_at && account.expires_at > now + tokenRefreshSkewSeconds) {
+    if (!forceRefresh && account.expires_at && account.expires_at > now + tokenRefreshSkewSeconds) {
       return account.access_token;
     }
 
@@ -84,6 +84,13 @@ export async function getAccessToken(userId: string): Promise<string> {
 
     return refreshed.access_token;
   });
+}
+
+// Step-up changes the account record at the issuer. A token minted before it cannot gain
+// the elevated_until claim retroactively, so callers that have just verified must rotate
+// their stored OAuth token before they call a resource protected by StepUp.
+export async function refreshAccessToken(userId: string): Promise<string> {
+  return getAccessToken(userId, true);
 }
 
 export async function revokeCurrentProviderAccount(userId: string): Promise<void> {
