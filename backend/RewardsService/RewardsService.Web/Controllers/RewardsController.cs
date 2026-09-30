@@ -138,7 +138,9 @@ public class RewardsController(RewardsDbContext dbContext, CurrencyGrantWriter w
         }
         catch (DbUpdateException ex) when (ex.IsUniqueViolation())
         {
-            // Not committed, so the quota this loser had taken is undone when the transaction is disposed.
+            // Not committed, so the quota this loser had taken is undone when the transaction is disposed. The read
+            // below runs in that same transaction: it works because EF wraps SaveChanges in a savepoint when a
+            // transaction is already open, so the failed insert does not abort it (a same-key race test covers this).
 
             // Raced another request on the same key - wallet update, transaction, outbox
             // message and this row are all one SaveChanges call, so the loser's writes never

@@ -32,7 +32,8 @@ protection is that this reaches a person as a readable card, is bounded, and run
 **Proposals are written from what the services say.** `propose_*` resolve every id against the owning services, as
 the caller (reads only, through `PlanLookup`), before a plan exists. An unknown employee, an unknown or inactive
 department, or a position the department does not have is refused; the last also catches a position id passed as a
-department. The plan stores the names it resolved (signed with everything else) and its text reads
+department. The plan stores the names it resolved (signed with everything else; the department, position and employee
+names come from the services, while a hire's name and email and a grant's reason are the model's, only quoted) and its text reads
 `Grant 200 to "Anna Ivanova" ("Payments", "Developer"): "release bonus"`. A name that could reshape the display
 (control, format or separator characters) is refused rather than shown. Instruction-like but printable text in a
 name is shown, quoted, on one line: hiding it would hide what the data says from the approver.
