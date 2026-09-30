@@ -103,6 +103,10 @@ public class DirectoryTestWEbFactory : WebApplicationFactory<Program>, IAsyncLif
             // ошибки, потому что Ollama и Kafka в тестовом окружении не подняты.
             service.RemoveAll<IHostedService>();
 
+            // No Ollama in the test environment: embeddings come from words, deterministically.
+            service.RemoveAll<DirectoryService.Infrastructure.Postgres.Embeddings.IEmbeddingClient>();
+            service.AddSingleton<DirectoryService.Infrastructure.Postgres.Embeddings.IEmbeddingClient, FakeEmbeddingClient>();
+
             // Program.cs wires JWT Bearer against a real AuthService JWKS endpoint this
             // test host doesn't have. Query-contract tests need [Authorize] to actually
             // run (not a real credential check) to prove the HTTP-level status/body a
