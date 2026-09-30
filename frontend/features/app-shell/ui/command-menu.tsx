@@ -13,6 +13,7 @@ const commands = [
 	{ href: '/positions', label: 'Positions', description: 'Role catalogue' },
 	{ href: '/locations', label: 'Locations', description: 'Office footprint' },
 	{ href: '/activity', label: 'Activity', description: 'Audit events' },
+	{ href: '/assistant', label: 'Assistant', description: 'Ask, and approve proposed changes' },
 	{ href: '/engineering', label: 'Engineering view', description: 'Architecture and delivery' },
 ]
 

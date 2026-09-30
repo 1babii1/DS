@@ -4,7 +4,15 @@ import { authConfiguration } from "@/shared/auth/config";
 
 export const dynamic = "force-dynamic";
 
-const allowedPrefixes = ["/api/departments", "/api/positions", "/api/locations", "/api/employees", "/api/audit"];
+const allowedPrefixes = [
+  "/api/departments",
+  "/api/positions",
+  "/api/locations",
+  "/api/employees",
+  "/api/audit",
+  // Only the assistant's approval endpoints (preview and confirm), not the MCP tool surface, which the browser never needs.
+  "/mcp/plans",
+];
 const forwardedRequestHeaders = ["accept", "content-type", "if-match"];
 const forwardedResponseHeaders = ["content-type", "location", "etag"];
 
