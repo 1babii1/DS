@@ -33,6 +33,7 @@
     <Project Path="EmployeeService/EmployeeService.Web/EmployeeService.Web.csproj" />
   </Folder>
   <Project Path="McpServer/McpServer.IntegrationTests/McpServer.IntegrationTests.csproj" />
+  <Project Path="McpServer/McpServer.ModelEval/McpServer.ModelEval.csproj" />
   <Project Path="McpServer/McpServer.csproj" />
   <Folder Name="/NotificationService/">
     <Project Path="NotificationService/NotificationService.ArchitectureTests/NotificationService.ArchitectureTests.csproj" />
