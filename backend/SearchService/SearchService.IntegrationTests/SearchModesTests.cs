@@ -15,6 +15,9 @@ namespace SearchService.IntegrationTests;
 // One endpoint, three ways to answer it. Keyword matches the words typed; semantic matches what they mean (here, words
 // a real model would treat as close); hybrid fuses both. A semantic side that is missing, broken or slow must cost the
 // answer only its semantic half.
+// The fake model keeps its switches (fail, delay, hook) in statics, so the classes that flip them must not run at the
+// same time as each other.
+[Collection(FakeEmbedderCollection.Name)]
 public class SearchModesTests : IClassFixture<SearchTestWebFactory>, IAsyncLifetime
 {
     private readonly Func<Task> _resetDatabase;
@@ -65,6 +68,30 @@ public class SearchModesTests : IClassFixture<SearchTestWebFactory>, IAsyncLifet
         Assert.Equal(both, hybrid.Results[0].Id);
         Assert.Contains(hybrid.Results, r => r.Id == semanticOnly);
         Assert.True(hybrid.Results[0].Rank > hybrid.Results.Single(r => r.Id == semanticOnly).Rank);
+    }
+
+    // A joining word ("and") must not be a reason to match: without this a query about vendors returned every department
+    // whose name has an "and" in it.
+    [Fact]
+    public async Task A_joining_word_in_the_query_does_not_pull_in_names_that_merely_contain_it()
+    {
+        var mixed = await Department("Research and Development", "rnd");
+        var vendors = await Department("Vendors desk", "vendors");
+
+        var keyword = await Search("vendors and buyers", "keyword");
+
+        Assert.Contains(keyword.Results, r => r.Id == vendors);
+        Assert.DoesNotContain(keyword.Results, r => r.Id == mixed);
+    }
+
+    [Fact]
+    public async Task A_query_of_only_joining_words_still_searches_for_what_was_typed()
+    {
+        var mixed = await Department("Research and Development", "rnd");
+
+        var keyword = await Search("and", "keyword");
+
+        Assert.Contains(keyword.Results, r => r.Id == mixed);
     }
 
     [Fact]

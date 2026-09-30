@@ -96,7 +96,7 @@ public class SearchController(
     {
         try
         {
-            var hits = await indexClient.SearchAsync(query, kinds, size, cancellationToken);
+            var hits = await indexClient.SearchAsync(QueryText.ForKeywordSearch(query), kinds, size, cancellationToken);
             return Success(query, SearchModes.Keyword, hits.Select(h => ToDto(h)).ToList());
         }
         catch (Exception ex)
@@ -135,7 +135,8 @@ public class SearchController(
         IReadOnlyList<SearchHit> keywordHits;
         try
         {
-            keywordHits = await indexClient.SearchAsync(query, kinds, CandidateDepth, cancellationToken);
+            keywordHits = await indexClient.SearchAsync(
+                QueryText.ForKeywordSearch(query), kinds, CandidateDepth, cancellationToken);
         }
         catch (Exception ex)
         {

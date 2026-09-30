@@ -15,6 +15,9 @@ namespace SearchService.IntegrationTests;
 // The semantic side is filled from the events the keyword side already consumes, without ever waiting on the model:
 // the consumer only records what to embed, a worker makes the vectors. These tests hold that split, and what goes
 // (and does not go) into a vector.
+// The fake model keeps its switches (fail, delay, hook) in statics, so the classes that flip them must not run at the
+// same time as each other.
+[Collection(FakeEmbedderCollection.Name)]
 public class EmbeddingStagingTests : IClassFixture<SearchTestWebFactory>, IAsyncLifetime
 {
     private readonly Func<Task> _resetDatabase;

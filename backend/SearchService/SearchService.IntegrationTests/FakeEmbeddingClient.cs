@@ -73,3 +73,11 @@ public sealed class FakeEmbeddingClient : IEmbeddingClient
         return (int)(hash % Dimensions);
     }
 }
+
+public static class FakeEmbedderCollection
+{
+    public const string Name = "fake embedder";
+}
+
+[CollectionDefinition(FakeEmbedderCollection.Name)]
+public sealed class FakeEmbedderCollectionDefinition;
