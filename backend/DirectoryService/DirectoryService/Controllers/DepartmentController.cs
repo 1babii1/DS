@@ -44,6 +44,15 @@ public class DepartmentController : ControllerBase
         return await handler.Handle(command, cancellationToken);
     }
 
+    [HttpPatch("{departmentId:guid}/name")]
+    [RequireCanEdit]
+    [EnableRateLimiting("write")]
+    public async Task<EndpointResult<DepartmentId>> Rename(
+        [FromRoute] Guid departmentId,
+        [FromServices] RenameDepartmentHandler handler,
+        RenameDepartmentRequest request, CancellationToken cancellationToken) =>
+        await handler.Handle(new RenameDepartmentCommand(departmentId, request), cancellationToken);
+
     [HttpGet("department/{departmentId:guid}")]
     public async Task<EndpointResult<ReadDepartmentWithChildrenDto?>> GetDepartmentById(
         [FromRoute] Guid departmentId,

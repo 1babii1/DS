@@ -159,6 +159,7 @@ builder.Services.AddScoped<CreateDepartmentHandler>();
 builder.Services.AddScoped<UpdateDepartmentLocationsHandler>();
 
 builder.Services.AddScoped<UpdateParentDepartmentHandler>();
+builder.Services.AddScoped<RenameDepartmentHandler>();
 
 builder.Services.AddScoped<GetLocationByIdHandle>();
 
