@@ -12,6 +12,7 @@ import { directoryCatalogApi } from '@/entities/directory/api/catalog.api'
 import { DepartmentForm } from '@/features/department-create/ui/department-form'
 import { CatalogueSkeleton } from '@/features/catalogue-loading/ui/catalogue-skeleton'
 import { getHttpStatus } from '@/shared/api/http-error'
+import { useCanEdit } from '@/shared/auth/capabilities'
 import { AccessState } from '@/shared/ui/access-state'
 
 function flatten(items: ParentDepartment[]): { id: string; name: string; path: string }[] {
@@ -34,18 +35,19 @@ function DepartmentHierarchy({ departments }: { departments: ParentDepartment[] 
 }
 
 export default function DepartmentsPage() {
+	const canEdit = useCanEdit()
 	const [creating, setCreating] = useState(false)
 	const departments = useQuery({ queryKey: ['departments', 'roots'], queryFn: () => departmentsApi.getParentDepartments() })
-	const locations = useQuery({ queryKey: ['locations', 'form'], queryFn: () => directoryCatalogApi.locations({ isActive: true, size: 200 }), enabled: creating })
+	const locations = useQuery({ queryKey: ['locations', 'form'], queryFn: () => directoryCatalogApi.locations({ isActive: true, size: 200 }), enabled: canEdit && creating })
 	const accessStatus = getHttpStatus(departments.error)
 
 	return <div className='page'>
-		<header className='page-heading'><div><p className='eyebrow'>Directory service</p><h1>Organization</h1></div><div className='page-heading__actions'><p className='page-heading__description'>The department hierarchy is read from the directory service through the authenticated application boundary.</p><button className='primary-action' onClick={() => setCreating(true)} type='button'><Plus aria-hidden='true' size={16} />New department</button></div></header>
-		{creating && locations.data && departments.data ? <DepartmentForm departments={flatten(departments.data)} locations={locations.data.items} onClose={() => setCreating(false)} /> : null}
-		{creating && locations.isPending ? <section className='empty-state'><h2>Loading locations</h2><p>Retrieving active locations for this department.</p></section> : null}
+		<header className='page-heading'><div><p className='eyebrow'>Directory service</p><h1>Organization</h1></div><div className='page-heading__actions'><p className='page-heading__description'>The department hierarchy is read from the directory service through the authenticated application boundary.</p>{canEdit ? <button className='primary-action' onClick={() => setCreating(true)} type='button'><Plus aria-hidden='true' size={16} />New department</button> : null}</div></header>
+		{canEdit && creating && locations.data && departments.data ? <DepartmentForm departments={flatten(departments.data)} locations={locations.data.items} onClose={() => setCreating(false)} /> : null}
+		{canEdit && creating && locations.isPending ? <section className='empty-state'><h2>Loading locations</h2><p>Retrieving active locations for this department.</p></section> : null}
 		{departments.isPending ? <CatalogueSkeleton kind='organization' /> : null}
 		{accessStatus === 401 || accessStatus === 403 ? <AccessState resource='the organization' status={accessStatus} /> : null}
 		{departments.error && !accessStatus ? <section className='empty-state' role='alert'><h2>Organization data is unavailable</h2><p>Check that the local platform is running, then try again.</p><button className='retry-button' onClick={() => departments.refetch()} type='button'><RefreshCw aria-hidden='true' size={16} />Retry request</button></section> : null}
-		{departments.data?.length === 0 ? <section className='empty-state'><div className='empty-state__icon'><Building2 aria-hidden='true' size={21} /></div><h2>Start the organization</h2><p>Create the first department and connect it to an operating location.</p><button className='primary-action empty-state__action' onClick={() => setCreating(true)} type='button'><Plus aria-hidden='true' size={16} />Create first department</button></section> : null}{departments.data?.length ? <><DepartmentHierarchy departments={departments.data} /><div className='directory-section-heading'><GitBranch aria-hidden='true' size={17} /><span>Department records</span></div><div className='department-grid'>{departments.data.map(department => <DepartmentCard department={department} key={department.id} />)}</div></> : null}
+		{departments.data?.length === 0 ? <section className='empty-state'><div className='empty-state__icon'><Building2 aria-hidden='true' size={21} /></div><h2>Start the organization</h2><p>Create the first department and connect it to an operating location.</p>{canEdit ? <button className='primary-action empty-state__action' onClick={() => setCreating(true)} type='button'><Plus aria-hidden='true' size={16} />Create first department</button> : null}</section> : null}{departments.data?.length ? <><DepartmentHierarchy departments={departments.data} /><div className='directory-section-heading'><GitBranch aria-hidden='true' size={17} /><span>Department records</span></div><div className='department-grid'>{departments.data.map(department => <DepartmentCard department={department} key={department.id} />)}</div></> : null}
 	</div>
 }
