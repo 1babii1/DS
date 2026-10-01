@@ -427,9 +427,9 @@ What is verified, and what is not, said plainly rather than glossed over:
 - **The browser pages (assistant, org history) are covered by lint, type checks, a production build and unit tests of
   their logic, not by an automated browser test.** The same is true of the frontend generally.
 - The observability stack (Tempo/Loki/Prometheus/Grafana) is wired and working but optional by design
-  (`--profile obs`) — traces and metrics exist, dashboards are minimal. Whether a bearer token passed in a query string
-  is recorded in trace attributes was not established (nginx's access log masks it; the request log records only the
-  path).
+  (`--profile obs`) — traces and metrics exist, dashboards are minimal. A bearer token passed in a query string is not
+  recorded in trace attributes: the incoming-request span redacts every query value, and a test pins that (it fails
+  if redaction is switched off). nginx's access log masks it and the request log records only the path.
 
 I'd rather a portfolio README say "here's what's actually missing and why" than read like
 marketing copy for a project nobody's going to production with.

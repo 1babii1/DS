@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using OpenTelemetry.Instrumentation.AspNetCore;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -59,6 +60,18 @@ public static class ObservabilityExtensions
         });
     }
 
+    /// <summary>What the incoming-request spans record. Public so a test can run it through the real instrumentation.</summary>
+    public static void ConfigureAspNetCore(AspNetCoreTraceInstrumentationOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        // Health probes fire every few seconds - without this filter they
+        // flood Tempo with noise and bury the traces that actually matter.
+        options.Filter = httpContext =>
+            !httpContext.Request.Path.StartsWithSegments("/health");
+        options.RecordException = true;
+    }
+
     /// <summary>Traces and metrics. Exported via OTLP; endpoint from <c>OTEL_EXPORTER_OTLP_ENDPOINT</c>.</summary>
     public static IServiceCollection AddObservability(
         this IServiceCollection services,
@@ -77,14 +90,7 @@ public static class ObservabilityExtensions
         services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService(serviceName))
             .WithTracing(tracing => tracing
-                .AddAspNetCoreInstrumentation(options =>
-                {
-                    // Health probes fire every few seconds - without this filter they
-                    // flood Tempo with noise and bury the traces that actually matter.
-                    options.Filter = httpContext =>
-                        !httpContext.Request.Path.StartsWithSegments("/health");
-                    options.RecordException = true;
-                })
+                .AddAspNetCoreInstrumentation(ConfigureAspNetCore)
                 .AddHttpClientInstrumentation(options => options.RecordException = true)
                 .AddSource(serviceName)
                 .AddOtlpExporter())
