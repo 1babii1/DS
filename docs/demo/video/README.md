@@ -9,6 +9,13 @@ traceable to the full test run and k6 run recorded in the README and
 [`docs/benchmarks/baseline.md`](../../benchmarks/baseline.md). It does not fabricate an
 authenticated assistant conversation or a time-machine result.
 
+![Engineering view: browser session, Next.js BFF, and services](../assets/engineering.png)
+
+The history frame intentionally shows the signed-out state. It demonstrates the protected
+route rather than inventing a historical organization without the prepared recording data.
+
+![Organization history's protected route](../assets/history.png)
+
 ## Render it again
 
 1. Start the frontend from the showcase branch with the local vault runtime.
