@@ -53,7 +53,7 @@ Three things worth your time, in this order, each with its evidence next to it:
 Run it yourself with `scripts/demo.sh up` (see [Running it](#running-it)); a 40-second captioned overview is
 [`docs/demo/video/portfolio-overview.mp4`](docs/demo/video/portfolio-overview.mp4), and the complete interactive
 walkthrough is scripted in [`docs/demo/storyboard.md`](docs/demo/storyboard.md). The reasoning behind every decision is in
-[`docs/adr/`](docs/adr/): 20 short records of the actual trade-offs, written the way I'd defend them in a design review,
+[`docs/adr/`](docs/adr/): 21 short records of the actual trade-offs, written the way I'd defend them in a design review,
 not backfilled to sound tidy. What is not done is listed plainly in [Honest status](#honest-status).
 
 ## Proof, not claims

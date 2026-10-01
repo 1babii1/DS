@@ -2,6 +2,7 @@ import "server-only";
 
 import { authDatabase, withTransaction } from "./database";
 import { authConfiguration } from "./config";
+import { revokeRefreshToken } from "./revoke-refresh-token";
 
 type AccountRow = {
   access_token: string | null;
@@ -93,11 +94,33 @@ export async function refreshAccessToken(userId: string): Promise<string> {
   return getAccessToken(userId, true);
 }
 
+// Sign-out. The stored tokens are cleared first, which is the guarantee: the BFF can no longer use them. Then the
+// refresh token is revoked at the issuer, so a copy taken from the database is dead as well. That second step is best
+// effort and its failure does not fail the sign-out. The access token cannot be revoked here and stays valid at the
+// resource services until it expires (a few minutes); ADR 0021. Safe to repeat: with nothing stored there is nothing
+// to revoke.
 export async function revokeCurrentProviderAccount(userId: string): Promise<void> {
-  await authDatabase.query(
-    `UPDATE accounts
+  const cleared = await authDatabase.query<{ refresh_token: string | null }>(
+    `WITH previous AS (
+       SELECT id, refresh_token FROM accounts WHERE "userId" = $1 AND provider = $2 FOR UPDATE
+     )
+     UPDATE accounts
      SET access_token = NULL, refresh_token = NULL, expires_at = NULL
-     WHERE "userId" = $1 AND provider = $2`,
+     FROM previous
+     WHERE accounts.id = previous.id
+     RETURNING previous.refresh_token`,
     [userId, providerId],
   );
+
+  const refreshToken = cleared.rows[0]?.refresh_token;
+  if (refreshToken) {
+    await revokeRefreshToken(
+      {
+        issuer: authConfiguration.issuer,
+        clientId: authConfiguration.clientId,
+        clientSecret: authConfiguration.clientSecret,
+      },
+      refreshToken,
+    );
+  }
 }
