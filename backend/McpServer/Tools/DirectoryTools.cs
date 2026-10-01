@@ -47,6 +47,13 @@ public sealed class DirectoryTools(DirectoryApiClient directory, EmployeeApiClie
         Run(() => employees.ListByDepartmentAsync(
             departmentId, ClampPage(page), Math.Clamp(size, 1, PagedResponse<EmployeeDetails>.MaxSize), cancellationToken));
 
+    [McpServerTool(Name = "list_positions_by_department")]
+    [Description("Lists the active positions a department has (id and name). Use it to find the id of a position, for example before proposing a hire or a transfer; never guess a position id, and never reuse one from another department.")]
+    public Task<IReadOnlyList<PositionInfo>> ListPositionsByDepartment(
+        [Description("Department id")] Guid departmentId,
+        CancellationToken cancellationToken = default) =>
+        Run(() => directory.ActivePositionsOfAsync(departmentId, cancellationToken));
+
     // Far beyond any real page count, but small enough that the services' (page - 1) * size cannot overflow.
     private static int ClampPage(int page) => Math.Clamp(page, 1, 100_000);
 

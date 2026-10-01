@@ -73,6 +73,46 @@ public class ToolBehaviorTests
         Assert.Equal("Your session is not valid for this service.", ex.Message);
     }
 
+    // ---- positions of a department ----------------------------------------------------------
+
+    [Fact]
+    public async Task Positions_of_a_department_are_asked_for_by_that_department_as_the_caller_and_come_back_as_id_and_name()
+    {
+        var developer = Guid.NewGuid();
+        var designer = Guid.NewGuid();
+        var stub = new StubService(_ => Json(
+            $$"""{"items":[{"id":"{{developer}}","name":"Developer"},{"id":"{{designer}}","name":"Designer"}],"page":1,"size":200,"total":2}"""));
+
+        var result = await Tools(stub).ListPositionsByDepartment(Dept);
+
+        var sent = Assert.Single(stub.Requests);
+        Assert.Equal(CallerToken, sent.Headers.Authorization!.ToString());
+        Assert.Contains($"departmentId={Dept}", sent.RequestUri!.Query);
+        Assert.Contains("isActive=true", sent.RequestUri.Query);
+        Assert.Equal([(developer, "Developer"), (designer, "Designer")], result.Select(p => (p.Id, p.Name)));
+    }
+
+    [Fact]
+    public async Task Positions_of_a_department_with_no_caller_token_send_nothing()
+    {
+        var stub = new StubService(_ => Json("""{"items":[],"page":1,"size":200,"total":0}"""));
+
+        var ex = await Assert.ThrowsAsync<McpException>(() => Tools(stub, incomingAuthorization: null).ListPositionsByDepartment(Dept));
+
+        Assert.Empty(stub.Requests);
+        Assert.Equal("Your session is not valid for this service.", ex.Message);
+    }
+
+    [Fact]
+    public async Task Positions_of_a_department_surface_a_fixed_message_on_failure()
+    {
+        var stub = new StubService(_ => Json("""{"secret":"SECRET-DETAIL"}""", HttpStatusCode.Forbidden));
+
+        var ex = await Assert.ThrowsAsync<McpException>(() => Tools(stub).ListPositionsByDepartment(Dept));
+
+        Assert.Equal("You are not allowed to do this.", ex.Message);
+    }
+
     // ---- what a failure exposes -------------------------------------------------------------
 
     [Theory]
