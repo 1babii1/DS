@@ -10,7 +10,9 @@ using Microsoft.Extensions.Hosting;
 using Npgsql;
 using Respawn;
 using SearchService.Infrastructure.Elasticsearch;
+using Pgvector.EntityFrameworkCore;
 using SearchService.Infrastructure.Postgres;
+using SearchService.Infrastructure.Postgres.Embeddings;
 using SearchService.Web;
 using Testcontainers.Elasticsearch;
 using Testcontainers.PostgreSql;
@@ -19,7 +21,7 @@ namespace SearchService.IntegrationTests;
 
 public class SearchTestWebFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder("postgres:16")
+    private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder("pgvector/pgvector:pg18")
         .WithDatabase("search_service_db")
         .WithPassword("postgres")
         .WithUsername("postgres")
@@ -43,6 +45,13 @@ public class SearchTestWebFactory : WebApplicationFactory<Program>, IAsyncLifeti
 
         _dbConnection = new NpgsqlConnection(_dbContainer.GetConnectionString());
         await _dbConnection.OpenAsync();
+
+        // EnsureCreated does not emit CREATE EXTENSION; in Docker docker/postgres/init-databases.sql does.
+        await using (var createExtension = _dbConnection.CreateCommand())
+        {
+            createExtension.CommandText = "CREATE EXTENSION IF NOT EXISTS vector;";
+            await createExtension.ExecuteNonQueryAsync();
+        }
 
         await using var scope = Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<SearchDbContext>();
@@ -77,7 +86,12 @@ public class SearchTestWebFactory : WebApplicationFactory<Program>, IAsyncLifeti
 
         services.RemoveAll<DbContextOptions<SearchDbContext>>();
         services.RemoveAll<SearchDbContext>();
-        services.AddDbContext<SearchDbContext>(options => options.UseNpgsql(_dbContainer.GetConnectionString()));
+        services.AddDbContext<SearchDbContext>(
+            options => options.UseNpgsql(_dbContainer.GetConnectionString(), o => o.UseVector()));
+
+        // No Ollama in the test environment: embeddings come from words, deterministically.
+        services.RemoveAll<IEmbeddingClient>();
+        services.AddSingleton<IEmbeddingClient, FakeEmbeddingClient>();
 
         services.RemoveAll<ElasticsearchClient>();
         var settings = new ElasticsearchClientSettings(new Uri(_elasticsearchContainer.GetConnectionString()))

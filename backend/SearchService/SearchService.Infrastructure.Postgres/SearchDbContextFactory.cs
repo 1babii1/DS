@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Pgvector.EntityFrameworkCore;
 
 namespace SearchService.Infrastructure.Postgres;
 
@@ -9,7 +10,9 @@ public class SearchDbContextFactory : IDesignTimeDbContextFactory<SearchDbContex
     public SearchDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<SearchDbContext>();
-        optionsBuilder.UseNpgsql("Server=localhost;Port=5432;Database=platform;User Id=postgres;Password=postgres");
+        optionsBuilder.UseNpgsql(
+            "Server=localhost;Port=5432;Database=platform;User Id=postgres;Password=postgres",
+            o => o.UseVector());
 
         return new SearchDbContext(optionsBuilder.Options);
     }

@@ -13,6 +13,11 @@ public record DepartmentDeletedEvent(Guid DepartmentId)
     public const string MessageType = "DepartmentDeleted";
 }
 
+public record DepartmentRenamedEvent(Guid DepartmentId, string Name, string Identifier)
+{
+    public const string MessageType = "DepartmentRenamed";
+}
+
 public record PositionCreatedEvent(Guid PositionId, string Name, string? Description, Guid[] DepartmentIds)
 {
     public const string MessageType = "PositionCreated";

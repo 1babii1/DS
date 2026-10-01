@@ -141,6 +141,15 @@ builder.Services.AddHttpClient<IEmbeddingClient, OllamaEmbeddingClient>((sp, cli
         });
     });
 builder.Services.AddHostedService<DepartmentEmbeddingWorker>();
+
+builder.Services.Configure<DepartmentRenamedEmbeddingConsumerOptions>(options =>
+{
+    options.BootstrapServers = builder.Configuration["Kafka:BootstrapServers"]
+        ?? throw new InvalidOperationException("Configuration 'Kafka:BootstrapServers' is not set.");
+    options.Security = KafkaSecurityOptions.FromConfiguration(builder.Configuration);
+    options.Topics = ["directory.events"];
+});
+builder.Services.AddHostedService<DepartmentRenamedEmbeddingConsumer>();
 builder.Services.AddScoped<IDepartmentSemanticSearch, DepartmentSemanticSearchService>();
 builder.Services.AddScoped<SearchDepartmentsSemanticHandler>();
 
@@ -159,6 +168,7 @@ builder.Services.AddScoped<CreateDepartmentHandler>();
 builder.Services.AddScoped<UpdateDepartmentLocationsHandler>();
 
 builder.Services.AddScoped<UpdateParentDepartmentHandler>();
+builder.Services.AddScoped<RenameDepartmentHandler>();
 
 builder.Services.AddScoped<GetLocationByIdHandle>();
 

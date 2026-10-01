@@ -74,6 +74,22 @@ time it *received* a message, not when the event *happened*, so the event's own 
 of a scripted history, exactly at an event and just before it; the frontend `/history` page and the assistant's
 `get_org_snapshot` tool sit on it. Limits are in the ADR (history starts when the log did; no "head of department").
 
+**Search quality, measured:** [`docs/adr/0018-hybrid-search-measured.md`](docs/adr/0018-hybrid-search-measured.md) —
+keyword, semantic and hybrid (Reciprocal Rank Fusion) search compared on 43 labelled queries over a synthetic
+organization, with the real embedding model, through the real event pipeline. Reproduce with
+`SEARCH_EVAL=1 dotnet test backend/SearchService/SearchService.IntegrationTests --filter "Category=Eval"`.
+
+| mode | recall@1 | recall@3 | recall@5 | MRR |
+|---|---|---|---|---|
+| keyword | 0.30 | 0.30 | 0.30 | 0.30 |
+| semantic | 0.69 | 0.79 | 0.85 | 0.79 |
+| hybrid | 0.69 | 0.79 | 0.85 | 0.79 |
+
+Read honestly: semantic and hybrid beat keyword on anything that is not a shared word (descriptions 0.04 to 0.65 MRR,
+typos 0 to 0.85) and tie with it on shared words. **Hybrid did not beat semantic alone**; it tied. It was worse (0.70)
+until a keyword defect (every "and" matched every name containing one) was found in the misses and fixed, a fix made
+after seeing the first run, so the table is optimistic for hybrid. Small set: direction, not rates.
+
 **A load test that broke the platform on purpose and watched it recover:**
 [`load-tests/k6/README.md`](load-tests/k6/README.md) documents three real, pre-existing
 bugs this same load test surfaced before it ever produced a clean number — a validation

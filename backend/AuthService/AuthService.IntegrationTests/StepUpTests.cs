@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
@@ -39,6 +40,22 @@ public class StepUpTests : IClassFixture<AuthTestWebFactory>, IAsyncLifetime
 
         Assert.False(status!.TwoFactorEnabled);
         Assert.Null(status.ElevatedUntil);
+    }
+
+    [Fact]
+    public async Task Step_up_endpoints_reject_an_unauthenticated_caller()
+    {
+        using var client = _factory.CreateClient();
+
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await client.GetAsync("/auth/step-up/status")).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await client.PostAsync("/auth/step-up/request-email-code", content: null)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await client.PostAsJsonAsync("/auth/step-up/verify", new StepUpVerifyRequest("000000"))).StatusCode);
     }
 
     [Fact]
@@ -101,13 +118,19 @@ public class StepUpTests : IClassFixture<AuthTestWebFactory>, IAsyncLifetime
         Assert.False(DecodeJwtPayload(accessTokenBeforeStepUp).TryGetProperty(
             StepUpClaims.ElevatedUntilClaim, out _));
 
-        await client.PostAsync("/auth/step-up/request-email-code", content: null);
+        // The BFF holds this bearer token server-side. It must be able to complete step-up
+        // without forwarding the browser's issuer cookie to another origin.
+        using var stepUpClient = _factory.CreateClient();
+        stepUpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessTokenBeforeStepUp);
+
+        var requestCodeResponse = await stepUpClient.PostAsync("/auth/step-up/request-email-code", content: null);
+        Assert.Equal(HttpStatusCode.NoContent, requestCodeResponse.StatusCode);
         var emailedCode = _factory.EmailSender.StepUpCodes.Last(c => c.ToEmail == email).Code;
 
-        var verifyResponse = await client.PostAsJsonAsync("/auth/step-up/verify", new StepUpVerifyRequest(emailedCode));
+        var verifyResponse = await stepUpClient.PostAsJsonAsync("/auth/step-up/verify", new StepUpVerifyRequest(emailedCode));
         Assert.Equal(HttpStatusCode.NoContent, verifyResponse.StatusCode);
 
-        var status = await client.GetFromJsonAsync<StepUpStatusResponse>("/auth/step-up/status");
+        var status = await stepUpClient.GetFromJsonAsync<StepUpStatusResponse>("/auth/step-up/status");
         Assert.NotNull(status!.ElevatedUntil);
         Assert.True(status.ElevatedUntil > DateTime.UtcNow);
 

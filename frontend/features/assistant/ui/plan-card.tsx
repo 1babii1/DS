@@ -5,6 +5,8 @@ import {
 	assistantPlanKeys
 } from '@/features/assistant/lib/plan-card-queries'
 import { describeProposalExpiry } from '@/features/assistant/lib/plan-card-state'
+import { nextPlanAction } from '@/features/assistant/lib/step-up-state'
+import { StepUpDialog } from '@/features/assistant/ui/step-up-dialog'
 import { axiosInstance } from '@/shared/api/axiosInstance'
 import { Button } from '@/shared/ui/button'
 import {
@@ -26,6 +28,7 @@ import {
 	UserRoundCheck,
 	UsersRound
 } from 'lucide-react'
+import { useState } from 'react'
 
 type PlanCardStep = {
 	kind: 'HireEmployee' | 'TransferEmployee' | 'GrantCurrency'
@@ -51,6 +54,7 @@ type StepResult = {
 	detail: string | null
 }
 type Report = { completed: boolean; steps: StepResult[] }
+type StepUpStatus = { twoFactorEnabled: boolean; elevatedUntil: string | null }
 
 const kindLabel: Record<PlanCardStep['kind'], string> = {
 	HireEmployee: 'Hire',
@@ -77,6 +81,7 @@ function answerOf(error: unknown, fallback: string): string {
 // Every visible action detail comes from the signed-plan preview. The model reply stays untrusted display text.
 export function PlanCard({ token }: { token: string }) {
 	const queryClient = useQueryClient()
+	const [stepUpOpen, setStepUpOpen] = useState(false)
 	const preview = useQuery({
 		queryKey: assistantPlanKeys.preview(token),
 		queryFn: async () =>
@@ -100,6 +105,18 @@ export function PlanCard({ token }: { token: string }) {
 				)
 			)
 		}
+	})
+	const stepUpStatus = useQuery({
+		queryKey: ['step-up-status'],
+		queryFn: async () => {
+			const response = await fetch('/api/step-up/status')
+			if (!response.ok)
+				throw new Error('Re-verification status is unavailable.')
+			return response.json() as Promise<StepUpStatus>
+		},
+		enabled: Boolean(preview.data?.needsReverification),
+		retry: false,
+		staleTime: 15_000
 	})
 
 	if (preview.isPending)
@@ -133,6 +150,10 @@ export function PlanCard({ token }: { token: string }) {
 	const card = preview.data
 	const report = confirm.data
 	const expiry = describeProposalExpiry(card.expiresAt)
+	const action = nextPlanAction(
+		card.needsReverification,
+		stepUpStatus.data?.elevatedUntil ?? null
+	)
 
 	return (
 		<Card className='proposal-card'>
@@ -211,8 +232,9 @@ export function PlanCard({ token }: { token: string }) {
 				{card.needsReverification && !report ? (
 					<p className='proposal-card__reverify'>
 						<BadgeCheck aria-hidden='true' size={16} />
-						Handing out currency needs a recent re-verification of
-						your sign-in. The server remains the final check.
+						{action === 'reverify'
+							? 'Handing out currency needs a recent re-verification of your sign-in.'
+							: 'Your recent re-verification is active. The server remains the final check.'}
 					</p>
 				) : null}
 				{confirm.isError ? (
@@ -277,21 +299,39 @@ export function PlanCard({ token }: { token: string }) {
 					</span>
 				</div>
 				<Button
-					disabled={
-						confirm.isPending || Boolean(report) || expiry.expired
+						disabled={
+						confirm.isPending ||
+						Boolean(report) ||
+						expiry.expired ||
+						stepUpStatus.isPending
 					}
-					onClick={() => confirm.mutate()}
+					onClick={() =>
+						action === 'reverify'
+							? setStepUpOpen(true)
+							: confirm.mutate()
+					}
 					type='button'
 				>
-					{confirm.isPending
-						? 'Applying…'
+					{stepUpStatus.isPending
+						? 'Checking…'
+						: confirm.isPending
+							? 'Applying…'
 						: report
 							? 'Done'
 							: expiry.expired
 								? 'Expired'
-								: 'Approve and apply'}
+								: action === 'reverify'
+									? 'Re-verify to approve'
+									: 'Approve and apply'}
 				</Button>
 			</CardFooter>
+			<StepUpDialog
+				onOpenChange={setStepUpOpen}
+				onVerified={() =>
+					queryClient.invalidateQueries({ queryKey: ['step-up-status'] })
+				}
+				open={stepUpOpen}
+			/>
 		</Card>
 	)
 }

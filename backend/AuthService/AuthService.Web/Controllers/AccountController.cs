@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using OpenIddict.Validation.AspNetCore;
 using Shared;
 using Shared.EndpointResults;
 
@@ -27,6 +28,8 @@ public class AccountController(
     : ControllerBase
 {
     private const string CookieScheme = "Identity.Application";
+    private const string StepUpAuthenticationSchemes =
+        CookieScheme + "," + OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme;
 
     private string? UserAgent => Request.Headers.UserAgent.ToString() is { Length: > 0 } value ? value : null;
 
@@ -227,7 +230,7 @@ public class AccountController(
     }
 
     [HttpGet("step-up/status")]
-    [Authorize(AuthenticationSchemes = CookieScheme)]
+    [Authorize(AuthenticationSchemes = StepUpAuthenticationSchemes)]
     public async Task<IResult> StepUpStatus()
     {
         var user = await userManager.GetUserAsync(User) ?? throw new InvalidOperationException("Signed-in user not found.");
@@ -236,7 +239,7 @@ public class AccountController(
     }
 
     [HttpPost("step-up/request-email-code")]
-    [Authorize(AuthenticationSchemes = CookieScheme)]
+    [Authorize(AuthenticationSchemes = StepUpAuthenticationSchemes)]
     [EnableRateLimiting("auth")]
     public async Task<IResult> RequestStepUpEmailCode(CancellationToken cancellationToken)
     {
@@ -253,7 +256,7 @@ public class AccountController(
     }
 
     [HttpPost("step-up/verify")]
-    [Authorize(AuthenticationSchemes = CookieScheme)]
+    [Authorize(AuthenticationSchemes = StepUpAuthenticationSchemes)]
     [EnableRateLimiting("auth")]
     public async Task<IResult> VerifyStepUp([FromBody] StepUpVerifyRequest request, CancellationToken cancellationToken)
     {

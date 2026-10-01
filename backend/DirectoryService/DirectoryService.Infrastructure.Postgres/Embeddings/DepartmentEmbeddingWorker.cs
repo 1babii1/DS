@@ -6,10 +6,10 @@ using Microsoft.Extensions.Options;
 
 namespace DirectoryService.Infrastructure.Postgres.Embeddings;
 
-// Best-effort background indexer: embeds active departments that don't have one yet.
-// Not wired to the outbox - a missed or delayed embedding just means the department
-// is temporarily absent from semantic search, not a correctness issue for the rest
-// of the system, so a simple poll loop is enough (no re-embedding on name edits yet).
+// Best-effort background indexer: embeds active departments that don't have one yet. A missed or delayed
+// embedding just means the department is temporarily absent from semantic search, not a correctness issue for the
+// rest of the system, so a simple poll loop is enough. A rename does not embed anything itself: the consumer of
+// DepartmentRenamed (DepartmentRenamedEmbeddingConsumer) drops the stale embedding and this loop makes the new one.
 public sealed class DepartmentEmbeddingWorker(
     IServiceScopeFactory scopeFactory,
     IOptions<EmbeddingsOptions> options,
@@ -41,7 +41,7 @@ public sealed class DepartmentEmbeddingWorker(
         }
     }
 
-    private async Task EmbedPendingDepartmentsAsync(CancellationToken cancellationToken)
+    public async Task EmbedPendingDepartmentsAsync(CancellationToken cancellationToken)
     {
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DirectoryServiceDbContext>();

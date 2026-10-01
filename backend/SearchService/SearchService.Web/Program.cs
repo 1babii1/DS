@@ -1,7 +1,9 @@
 using Shared.Ops;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using SearchService.Infrastructure.Elasticsearch;
+using Microsoft.Extensions.Options;
 using SearchService.Infrastructure.Postgres;
+using SearchService.Infrastructure.Postgres.Embeddings;
 using SearchService.Web.Consumers;
 using Serilog;
 using Shared.Cors;
@@ -35,6 +37,17 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddSearchPostgresInfrastructure(builder.Configuration);
 builder.Services.AddSearchElasticsearchInfrastructure(builder.Configuration);
+
+// The semantic side: vectors are made in the background from the text the consumer stages, by the same model
+// DirectoryService uses. A missing model only delays semantic results; keyword search and consumption do not depend on it.
+builder.Services.AddOptions<EmbeddingsOptions>().Bind(builder.Configuration.GetSection(EmbeddingsOptions.SectionName));
+builder.Services.AddHttpClient<IEmbeddingClient, OllamaEmbeddingClient>((sp, client) =>
+{
+    var options = sp.GetRequiredService<IOptions<EmbeddingsOptions>>().Value;
+    client.BaseAddress = new Uri(options.OllamaBaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
+builder.Services.AddHostedService<DocumentEmbeddingWorker>();
 
 builder.Services.Configure<DomainEventsConsumerOptions>(options =>
 {
