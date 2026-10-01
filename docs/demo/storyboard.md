@@ -42,8 +42,8 @@ re-verification (step-up) before it can be applied.
 - Backed by tests: unknown or wrong-kind ids are refused and plans read in names (`AgentResolutionTests`); the preview
   holds no ids and not the token, the model cannot confirm (`AgentEndpointTests`, `AgentToolsTests`); step-up for money
   (ADR 0016); the grant limits and the daily quota enforced by the ledger (`GrantCurrencyTests`).
-- Rehearse first: the exact wording that makes the model find the position id by reading (it has no tool that lists a
-  department's positions; it can only use ids it has seen on an employee). If it cannot, pick a person from the same
+- Rehearse first: check that the model finds the position id with `list_positions_by_department` (added after the eval, so
+  the eval never saw it). If it cannot, pick a person from the same
   department as a developer and move them to a department that already has a developer.
 
 ## Scene 2: prompt injection, measured (1:15-2:15)

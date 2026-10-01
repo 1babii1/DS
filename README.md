@@ -412,8 +412,9 @@ What is verified, and what is not, said plainly rather than glossed over:
   audience-bound hub ticket is specified (issue #101) and not built.
 - **The assistant can still be talked into proposing.** The measurement says what is guaranteed (readable, bounded,
   applied only on a click) and what is not (a planted instruction can still produce a valid bounded card). The eval is
-  3 runs of 9 tasks against one local model: direction, not rates. The assistant has no tool that lists a department's
-  positions, so it can only use position ids it has seen on an employee.
+  3 runs of 9 tasks against one local model: direction, not rates. The assistant now has a tool that lists a department's
+  positions (`list_positions_by_department`), added after that measurement, so the eval was run without it and has not
+  been re-run with it.
 - **Hybrid search tied semantic search; it did not beat it**, on 43 labelled queries over a synthetic organization. A
   keyword defect found in the first run was fixed after seeing it, so the table is optimistic for hybrid. A department is
   embedded in one place, SearchService; the MCP search tool reads it ([ADR 0020](docs/adr/0020-one-embedding-per-department.md)),
