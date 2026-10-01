@@ -74,6 +74,8 @@ emitter into a real database, twice, removed cleanly, and read back at the dates
 (caller's token, escaped date, validation before sending, bounds, fixed failure messages, DI registration); the page's
 date and tree logic.
 
-Not verified: the `/history` page in a browser; the endpoint through nginx with a real token; the seed script run
-against the Docker stack's database (it needs the new AuditService image for the `occurred-at` header to matter, and it
-loads by SQL so it does not); behaviour on a log of real size.
+Also run for real: the seed script against the Docker stack's own database (0 rows, 28 after loading, 28 after loading
+again, 0 after removing), and the whole stack rebuilt from this code with all services healthy.
+
+Not verified: the `/history` page in a browser; the endpoint through nginx with a real token; behaviour on a log of
+real size.
