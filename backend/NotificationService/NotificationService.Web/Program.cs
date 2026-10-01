@@ -1,9 +1,10 @@
 using Shared.Ops;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
 using NotificationService.Infrastructure.Postgres;
 using NotificationService.Web;
 using NotificationService.Web.Consumers;
+using NotificationService.Web.HubTickets;
 using Serilog;
 using Shared.Cors;
 using Shared.HealthChecks;
@@ -42,32 +43,38 @@ builder.Services.AddSignalR()
 
 builder.Services.AddFrameworkCors(builder.Configuration);
 
-builder.Services.AddPlatformJwtAuthentication(
-    builder.Configuration,
-    builder.Environment,
-    options =>
+// REST endpoints authenticate with the OAuth bearer token from the Authorization header, and only that. The hub has
+// its own scheme (HubTicketAuthenticationHandler): a browser WebSocket cannot set a header, and the browser must not
+// hold the OAuth token, so the hub accepts a short-lived ticket from the access_token query parameter instead. Neither
+// credential works on the other's endpoints (ADR 0022).
+builder.Services.AddPlatformJwtAuthentication(builder.Configuration, builder.Environment);
+builder.Services.AddAuthentication()
+    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, HubTicketAuthenticationHandler>(
+        HubTicketDefaults.Scheme, _ => { });
+
+builder.Services.AddOptions<HubTicketOptions>().Bind(builder.Configuration.GetSection(HubTicketOptions.SectionName));
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton(sp =>
+{
+    // Same rule as the agent's plan key and AuthService's at-rest key: required in Production, never silently weak.
+    // Elsewhere an ephemeral key keeps development working, at the price that tickets do not survive a restart or
+    // work across instances (they only live a minute, so a restart costs a reconnect).
+    var options = sp.GetRequiredService<IOptions<HubTicketOptions>>().Value;
+    if (string.IsNullOrWhiteSpace(options.SigningKeyBase64))
     {
-        // SignalR's browser transport can't set an Authorization header on the WebSocket
-        // upgrade handshake itself, so the JS client instead passes the token as a query
-        // string parameter - a standard, documented ASP.NET Core SignalR pattern, not a
-        // workaround. Scoped to the hub path only: REST calls still authenticate via the
-        // normal Authorization header.
-        options.Events = new JwtBearerEvents
+        if (builder.Environment.IsProduction())
         {
-            OnMessageReceived = context =>
-            {
-                var accessToken = context.Request.Query["access_token"];
-                var path = context.HttpContext.Request.Path;
+            throw new InvalidOperationException(
+                "HubTickets:SigningKeyBase64 must be set in Production (32+ random bytes, base64: openssl rand -base64 32).");
+        }
 
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hub"))
-                {
-                    context.Token = accessToken;
-                }
+        sp.GetRequiredService<ILogger<HubTicketService>>().LogWarning(
+            "HubTickets:SigningKeyBase64 is not set: using an ephemeral key. Hub tickets will not work across instances.");
+        options = new HubTicketOptions { SigningKeyBase64 = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)) };
+    }
 
-                return Task.CompletedTask;
-            },
-        };
-    });
+    return new HubTicketService(Options.Create(options), sp.GetRequiredService<TimeProvider>());
+});
 
 builder.Services.AddAuthorization();
 

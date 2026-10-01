@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NotificationService.Infrastructure.Postgres;
+using NotificationService.Web.HubTickets;
 using Shared;
 
 namespace NotificationService.Web.Controllers;
@@ -12,13 +13,15 @@ public record NotificationDto(
 
 public record UnreadCountDto(int Count);
 
+public record HubTicketDto(string Ticket, DateTimeOffset ExpiresAt);
+
 // Recipient is always the caller's own "sub" claim, never a route/query parameter - same
 // principle as every other read endpoint in this codebase (RewardsController.GetOwnWallet,
 // EmployeeController.Hire's actor). Nobody can list or mark read anyone else's notifications.
 [ApiController]
 [Route("api/notifications")]
 [Authorize]
-public class NotificationsController(NotificationDbContext dbContext) : ControllerBase
+public class NotificationsController(NotificationDbContext dbContext, HubTicketService hubTickets) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PagedResponse<NotificationDto>>> List(
@@ -50,6 +53,15 @@ public class NotificationsController(NotificationDbContext dbContext) : Controll
             .ToListAsync(cancellationToken);
 
         return new PagedResponse<NotificationDto>(items, currentPage, size, total);
+    }
+
+    // The BFF calls this as the signed-in person (their OAuth token, server to server) and gives the browser only the
+    // ticket, which opens the hub and nothing else. Always for the caller's own account, never a parameter.
+    [HttpPost("hub-ticket")]
+    public ActionResult<HubTicketDto> IssueHubTicket()
+    {
+        var ticket = hubTickets.Issue(CurrentAccountId());
+        return new HubTicketDto(ticket.Value, ticket.ExpiresAt);
     }
 
     [HttpGet("unread-count")]
