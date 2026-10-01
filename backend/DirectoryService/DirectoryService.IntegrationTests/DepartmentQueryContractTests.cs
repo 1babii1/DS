@@ -75,47 +75,6 @@ public class DepartmentQueryContractTests : IClassFixture<DirectoryTestWEbFactor
     }
 
     [Fact]
-    public async Task Search_with_an_empty_query_returns_400_with_envelope()
-    {
-        // ASP.NET Core's own implicit-required-parameter binding already rejects a
-        // missing/empty non-nullable [FromQuery] string with 400 through the
-        // existing AddEnvelopeModelStateValidation() pipeline - this asserts that
-        // pre-existing, already-correct behaviour stays correct, it is not itself
-        // proof of the handler-level bug (see the limit-out-of-range test below for
-        // that: a value that passes model binding but fails FluentValidation).
-        using var client = _factory.CreateClient();
-
-        var response = await client.GetAsync("/api/departments/search?query=&limit=10");
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-
-        var envelope = await response.Content.ReadFromJsonAsync<Envelope>();
-        Assert.NotNull(envelope);
-        Assert.True(envelope!.IsError);
-        Assert.Equal(ErrorType.VALIDATION, envelope.Error!.Type);
-    }
-
-    [Fact]
-    public async Task Search_with_a_limit_above_fifty_returns_400_with_envelope()
-    {
-        // limit=999 is a syntactically valid int - it passes ASP.NET Core's own
-        // model binding and reaches SearchDepartmentsSemanticValidator's
-        // InclusiveBetween(1, 50) rule, which is exactly the FluentValidation-level
-        // failure the handler previously turned into a bare null (204), not this
-        // endpoint's already-correct required-field binding behaviour above.
-        using var client = _factory.CreateClient();
-
-        var response = await client.GetAsync("/api/departments/search?query=engineering&limit=999");
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-
-        var envelope = await response.Content.ReadFromJsonAsync<Envelope>();
-        Assert.NotNull(envelope);
-        Assert.True(envelope!.IsError);
-        Assert.Equal(ErrorType.VALIDATION, envelope.Error!.Type);
-    }
-
-    [Fact]
     public async Task GetChildrenLazy_with_a_zero_page_returns_400_with_envelope()
     {
         using var client = _factory.CreateClient();

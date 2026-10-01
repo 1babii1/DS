@@ -67,19 +67,6 @@ public class DepartmentController : ControllerBase
         CancellationToken cancellationToken) =>
         await handler.Handle(request, cancellationToken);
 
-    [HttpGet("search")]
-    [EnableRateLimiting("search")]
-    public async Task<EndpointResult<List<DepartmentSearchResultDto>>> SearchSemantic(
-        [FromQuery] string query,
-        [FromQuery] int limit,
-        [FromServices] SearchDepartmentsSemanticHandler handler,
-        CancellationToken cancellationToken)
-    {
-        var effectiveLimit = limit <= 0 ? 10 : limit;
-        var request = new SearchDepartmentsSemanticRequest(query, effectiveLimit);
-        return await handler.Handle(request, cancellationToken);
-    }
-
     [HttpGet("top-positions")]
     public async Task<ActionResult<List<ReadDepartmentsTopDto>?>> GetDepartmentsTopForPositions(
         [FromServices] GetDepartmentsTopByPositionsHandler handler,

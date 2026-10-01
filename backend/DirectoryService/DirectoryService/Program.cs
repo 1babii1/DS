@@ -10,12 +10,10 @@ using DirectoryService.Application.Location.Commands;
 using DirectoryService.Application.Location.Queries;
 using DirectoryService.Application.Position;
 using DirectoryService.Application.Position.Queries;
-using DirectoryService.Application.Search;
 using DirectoryService.Grpc;
 using DirectoryService.Infrastructure.Postgres;
 using DirectoryService.Infrastructure.Postgres.Backgrounds;
 using DirectoryService.Infrastructure.Postgres.Database;
-using DirectoryService.Infrastructure.Postgres.Embeddings;
 using DirectoryService.Infrastructure.Postgres.Repositories.Departments;
 using DirectoryService.Infrastructure.Postgres.Repositories.Locations;
 using DirectoryService.Infrastructure.Postgres.Repositories.Positions;
@@ -110,49 +108,6 @@ builder.Services.AddKafkaHealthCheck(
         ?? throw new InvalidOperationException("Configuration 'Kafka:BootstrapServers' is not set."),
     KafkaSecurityOptions.FromConfiguration(builder.Configuration));
 
-builder.Services.AddOptions<EmbeddingsOptions>()
-    .Bind(builder.Configuration.GetSection(EmbeddingsOptions.SectionName));
-builder.Services.AddHttpClient<IEmbeddingClient, OllamaEmbeddingClient>((sp, client) =>
-{
-    var options = sp.GetRequiredService<IOptions<EmbeddingsOptions>>().Value;
-    client.BaseAddress = new Uri(options.OllamaBaseUrl);
-    client.Timeout = TimeSpan.FromSeconds(30);
-})
-
-    // DepartmentEmbeddingWorker's own catch already treats any failure here (including a
-    // tripped breaker) as "retry on the next poll pass" - so adding retry/circuit-breaking
-    // only makes a brief Ollama restart transparent instead of skipping straight to the
-    // next poll interval, without changing what happens when it stays down.
-    .AddResilienceHandler("ollama-embeddings", builder =>
-    {
-        builder.AddRetry(new()
-        {
-            MaxRetryAttempts = 2,
-            Delay = TimeSpan.FromMilliseconds(500),
-            BackoffType = DelayBackoffType.Exponential,
-        });
-
-        builder.AddCircuitBreaker(new()
-        {
-            FailureRatio = 0.5,
-            SamplingDuration = TimeSpan.FromSeconds(30),
-            MinimumThroughput = 5,
-            BreakDuration = TimeSpan.FromSeconds(15),
-        });
-    });
-builder.Services.AddHostedService<DepartmentEmbeddingWorker>();
-
-builder.Services.Configure<DepartmentRenamedEmbeddingConsumerOptions>(options =>
-{
-    options.BootstrapServers = builder.Configuration["Kafka:BootstrapServers"]
-        ?? throw new InvalidOperationException("Configuration 'Kafka:BootstrapServers' is not set.");
-    options.Security = KafkaSecurityOptions.FromConfiguration(builder.Configuration);
-    options.Topics = ["directory.events"];
-});
-builder.Services.AddHostedService<DepartmentRenamedEmbeddingConsumer>();
-builder.Services.AddScoped<IDepartmentSemanticSearch, DepartmentSemanticSearchService>();
-builder.Services.AddScoped<SearchDepartmentsSemanticHandler>();
-
 builder.Services.AddScoped<ILocationsRepository, EfCoreLocationsRepository>();
 
 builder.Services.AddScoped<IPositionRepository, EfCorePositionRepository>();
@@ -205,21 +160,10 @@ builder.Services.AddHybridCache(options => options.DefaultEntryOptions = new Hyb
 
 builder.Services.AddDatabaseHealthCheck<DirectoryServiceDbContext>();
 
-// Semantic search does an Ollama round trip plus a vector-distance query on every
-// call - an authenticated caller in a tight loop (a buggy client, a compromised
-// token) can still drive real load per request, unlike a plain indexed read.
-// 30/min per IP is generous for real usage, tight enough to blunt a loop.
-// Bound to configuration, not hardcoded - same reasoning as AuthService's "auth"
-// policy: a future test suite that exercises /api/departments/search through real
-// HTTP needs to be able to raise this, since TestServer never populates
-// RemoteIpAddress and every call would otherwise share one partition.
-var searchRateLimit = builder.Configuration.GetValue("RateLimiting:Search:PermitLimit", 30);
-var searchRateLimitWindow = builder.Configuration.GetValue("RateLimiting:Search:WindowSeconds", 60);
-
 // Every Create/Update/Delete on Department/Location/Position was previously
 // unthrottled - CanEdit already keeps out unauthenticated callers, but a
 // compromised or simply buggy admin/editor token could still hammer writes with
-// nothing to blunt it. Same IP-partitioned fixed window as "search" and
+// nothing to blunt it. Same IP-partitioned fixed window as
 // AuthService's "auth" policy, config-driven for the same reason: TestServer
 // never populates RemoteIpAddress, so a real test suite needs to raise this.
 var writeRateLimit = builder.Configuration.GetValue("RateLimiting:Write:PermitLimit", 30);
@@ -232,15 +176,6 @@ builder.Services.AddProxyForwardedHeaders(builder.Configuration);
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-
-    options.AddPolicy("search", httpContext => RateLimitPartition.GetFixedWindowLimiter(
-        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        factory: _ => new FixedWindowRateLimiterOptions
-        {
-            PermitLimit = searchRateLimit,
-            Window = TimeSpan.FromSeconds(searchRateLimitWindow),
-            QueueLimit = 0,
-        }));
 
     options.AddPolicy("write", httpContext => RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",

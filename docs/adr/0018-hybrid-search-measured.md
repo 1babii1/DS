@@ -83,7 +83,8 @@ returned Payments, Supply Chain and Payroll before Accounts Payable): the model,
   tie held on a larger set, `semantic` with a keyword fallback would be simpler.
 - **Two embeddings of a department now exist** (Directory's, used by McpServer's `search_departments`, and
   SearchService's). Both follow a rename. Retiring one, most naturally by pointing `search_departments` at this endpoint,
-  is a separate decision this ADR does not take.
+  is a separate decision this ADR does not take. *(Taken in [0020](0020-one-embedding-per-department.md): Directory's copy
+  is gone and the tool reads SearchService.)*
 - An employee document's subtitle carries the department name as it was when the employee was indexed; a department
   rename does not rewrite it, so an employee's embedding text keeps the old department name until their next event.
 - Every hybrid or semantic search now embeds the query: one model call per search, bounded by the 3 second budget.

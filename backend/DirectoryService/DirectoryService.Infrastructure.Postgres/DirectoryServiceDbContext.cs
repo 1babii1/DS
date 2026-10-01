@@ -4,15 +4,13 @@ using DirectoryService.Domain.DepartmentPositions;
 using DirectoryService.Domain.Departments;
 using DirectoryService.Domain.Locations;
 using DirectoryService.Domain.Positions;
-using DirectoryService.Infrastructure.Postgres.Embeddings;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Pgvector.EntityFrameworkCore;
-using Shared.Kafka;
 
 namespace DirectoryService.Infrastructure.Postgres;
 
-public class DirectoryServiceDbContext : DbContext, IReadDbContext, IHasDeadLetters
+public class DirectoryServiceDbContext : DbContext, IReadDbContext
 {
     private readonly string _connectionString = null!;
     private readonly ILoggerFactory? _loggerFactory;
@@ -35,8 +33,6 @@ public class DirectoryServiceDbContext : DbContext, IReadDbContext, IHasDeadLett
     {
     }
 
-    public DbSet<DeadLetterEntry> DeadLetters => Set<DeadLetterEntry>();
-
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.UseNpgsql(_connectionString, o => o.UseVector());
@@ -51,20 +47,6 @@ public class DirectoryServiceDbContext : DbContext, IReadDbContext, IHasDeadLett
     {
         modelBuilder.HasDefaultSchema("directory");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(DirectoryServiceDbContext).Assembly);
-
-        modelBuilder.Entity<DeadLetterEntry>(entity =>
-        {
-            entity.ToTable("dead_letters");
-            entity.HasKey(e => e.Id);
-
-            entity.Property(e => e.Topic).HasMaxLength(200).IsRequired();
-            entity.Property(e => e.MessageKey).IsRequired();
-            entity.Property(e => e.Payload).HasColumnType("jsonb").IsRequired();
-            entity.Property(e => e.Error).IsRequired();
-
-            entity.HasIndex(e => e.MessageId).IsUnique();
-            entity.HasIndex(e => e.FailedAt);
-        });
     }
 
     public DbSet<Location> Locations => Set<Location>();
@@ -76,8 +58,6 @@ public class DirectoryServiceDbContext : DbContext, IReadDbContext, IHasDeadLett
     public DbSet<DepartmentLocation> DepartmentLocations => Set<DepartmentLocation>();
 
     public DbSet<DepartmentPosition> DepartmentPositions => Set<DepartmentPosition>();
-
-    public DbSet<DepartmentEmbedding> DepartmentEmbeddings => Set<DepartmentEmbedding>();
 
     public IQueryable<Department> DepartmentsRead => Set<Department>().AsNoTracking();
 
