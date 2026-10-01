@@ -1,7 +1,9 @@
-﻿using AuditService.Infrastructure;
+﻿using AuditService.Domain;
+using AuditService.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Shared;
 using Shared.Security;
 
@@ -50,8 +52,75 @@ public record DeadLetterDto(
 [ApiController]
 [Route("api/audit")]
 [Authorize]
-public class AuditController(AuditDbContext dbContext) : ControllerBase
+public class AuditController(AuditDbContext dbContext, IOptions<OrgChartOptions>? orgChartOptions = null) : ControllerBase
 {
+    private readonly int _maxEvents = orgChartOptions?.Value.MaxEvents ?? OrgChartOptions.DefaultMaxEvents;
+
+    /// <summary>
+    /// The organization as it was at an instant, rebuilt from the log: the department tree with the names and parents
+    /// it had then and who worked in each, by name and position. Any signed-in user may read it (the same people are
+    /// in the employee directory); it holds no contact detail, and the raw log stays admin-only. A bare date means the
+    /// end of that UTC day, a time in the future is the present, and a log too large to replay is refused rather than
+    /// answered from part of it.
+    /// </summary>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    [HttpGet("org-chart")]
+    public async Task<ActionResult<OrgChartResponse>> OrgChart([FromQuery] string? at, CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var instant = ParseInstant(at, now);
+        if (instant is null)
+        {
+            return BadRequest(new { detail = "at must be a date (2026-03-05) or a time (2026-03-05T10:00:00Z) from the year 2000 on." });
+        }
+
+        var asOf = instant.Value > now ? now : instant.Value;
+
+        var relevant = dbContext.Entries.AsNoTracking().Where(e => OrgReplay.EventTypes.Contains(e.EventType));
+        var events = await relevant
+            .Where(e => e.OccurredAt <= asOf)
+            .OrderBy(e => e.OccurredAt)
+            .ThenBy(e => e.Id)
+            .Take(_maxEvents + 1)
+            .Select(e => new { e.EventType, e.Payload, e.OccurredAt })
+            .ToListAsync(cancellationToken);
+        if (events.Count > _maxEvents)
+        {
+            return UnprocessableEntity(new { detail = "The recorded history up to that time is too large to replay." });
+        }
+
+        var first = await relevant.MinAsync(e => (DateTime?)e.OccurredAt, cancellationToken);
+        var snapshot = OrgReplay.At(
+            asOf, events.Select((e, i) => new HistoricEvent(e.EventType, e.Payload, e.OccurredAt, i)));
+
+        return new OrgChartResponse(snapshot.At, first, snapshot.Departments, snapshot.Unplaced, snapshot.SkippedEvents);
+    }
+
+    private static DateTime? ParseInstant(string? at, DateTime now)
+    {
+        if (string.IsNullOrWhiteSpace(at))
+        {
+            return now;
+        }
+
+        var text = at.Trim();
+        var invariant = System.Globalization.CultureInfo.InvariantCulture;
+        var bareDate = text.Length == 10
+            && DateOnly.TryParseExact(text, "yyyy-MM-dd", invariant, System.Globalization.DateTimeStyles.None, out _);
+        if (!DateTime.TryParse(
+                text,
+                invariant,
+                System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal,
+                out var parsed)
+            || parsed.Year < 2000)
+        {
+            return null;
+        }
+
+        var utc = DateTime.SpecifyKind(parsed, DateTimeKind.Utc);
+        return bareDate ? utc.Date.AddDays(1).AddTicks(-1) : utc;
+    }
+
     /// <summary>
     /// Страница журнала, новые записи первыми. Размер страницы ограничен сверху
     /// PagedResponse.MaxSize: журнал растёт бесконечно, и запрос без потолка означал

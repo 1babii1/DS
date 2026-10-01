@@ -77,16 +77,7 @@ public class OutboxPublisher<TContext>(
             pending,
             async (message, ct) =>
             {
-                var kafkaMessage = new Message<string, string>
-                {
-                    Key = message.AggregateId,
-                    Value = message.Payload,
-                    Headers = new Headers
-                    {
-                        { "message-id", System.Text.Encoding.UTF8.GetBytes(message.Id.ToString()) },
-                        { "message-type", System.Text.Encoding.UTF8.GetBytes(message.Type) },
-                    },
-                };
+                var kafkaMessage = OutboxMessageHeaders.ToKafkaMessage(message);
 
                 await _producer!.ProduceAsync(_options.Topic, kafkaMessage, ct);
             },

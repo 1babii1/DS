@@ -66,6 +66,14 @@ a live k6 run against the full stack, including the two self-inflicted load-test
 took to get a number worth trusting (a request storm with no backoff, twice, against two
 different rate limiters) and how they were found and fixed.
 
+**An org time machine, from the log:** [`docs/adr/0019-org-time-machine-from-the-event-log.md`](docs/adr/0019-org-time-machine-from-the-event-log.md) —
+`GET /api/audit/org-chart?at=` rebuilds the department tree and who worked where on any past date by folding the
+recorded events, with no new storage. It also fixed a real defect on the way: the audit log stamped entries with the
+time it *received* a message, not when the event *happened*, so the event's own time now travels in a header.
+[`OrgReplayTests`](backend/AuditService/AuditService.IntegrationTests/OrgReplayTests.cs) checks the slice at every date
+of a scripted history, exactly at an event and just before it; the frontend `/history` page and the assistant's
+`get_org_snapshot` tool sit on it. Limits are in the ADR (history starts when the log did; no "head of department").
+
 **Search quality, measured:** [`docs/adr/0018-hybrid-search-measured.md`](docs/adr/0018-hybrid-search-measured.md) —
 keyword, semantic and hybrid (Reciprocal Rank Fusion) search compared on 43 labelled queries over a synthetic
 organization, with the real embedding model, through the real event pipeline. Reproduce with
