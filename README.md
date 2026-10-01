@@ -350,8 +350,10 @@ cd load-tests/k6
 docker run --rm --network host -v "$(pwd)":/scripts -w /scripts grafana/k6 run main.js
 ```
 
-Real numbers from the last run, plus two load-test bugs it took to get trustworthy ones, in
-[`docs/benchmarks/baseline.md`](docs/benchmarks/baseline.md).
+Real numbers, plus two load-test bugs it took to get trustworthy ones, in
+[`docs/benchmarks/baseline.md`](docs/benchmarks/baseline.md), including a before/after re-run on the final code (no
+regression: unthrottled read p95 4.2 vs 4.3 ms, 0% failed in both; one run each, so the faster search and writes are not
+claimed as an improvement).
 
 ## Project layout
 
