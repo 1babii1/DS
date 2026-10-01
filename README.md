@@ -417,7 +417,8 @@ What is verified, and what is not, said plainly rather than glossed over:
 - **Hybrid search tied semantic search; it did not beat it**, on 43 labelled queries over a synthetic organization. A
   keyword defect found in the first run was fixed after seeing it, so the table is optimistic for hybrid. A department is
   embedded in one place, SearchService; the MCP search tool reads it ([ADR 0020](docs/adr/0020-one-embedding-per-department.md)),
-  so it now depends on that service and has not been measured end to end. An employee's search text keeps the old department name after a department rename until their next event.
+  so it now depends on that service and has not been measured end to end. Employee and position documents are rebuilt
+  when their department is renamed; documents indexed before that existed keep the old name until their next event.
   Search covers five entity kinds; position and location updates and deletions do not exist as events yet.
 - **The org history starts when the audit log did**, entries stored before the event's own time travelled with the
   message keep their receive time, and the domain has no "head of department", so "who led it in March" cannot be

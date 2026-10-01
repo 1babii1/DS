@@ -28,6 +28,7 @@ public class SearchIndexClient
         var exists = await _client.Indices.ExistsAsync(_indexName, cancellationToken);
         if (exists.Exists)
         {
+            await EnsureRelationFieldsMappedAsync(cancellationToken);
             return;
         }
 
@@ -50,7 +51,10 @@ public class SearchIndexClient
                     .Text(f => f.Subtitle!)
                     .Text(f => f.SearchText)
                     .Boolean(f => f.IsActive)
-                    .Date(f => f.OccurredAt))),
+                    .Date(f => f.OccurredAt)
+                    .Keyword(f => f.DepartmentIds!)
+                    .Keyword(f => f.PositionId!)
+                    .Text(f => f.Description!))),
             cancellationToken);
 
         if (!response.IsValidResponse)
@@ -67,6 +71,50 @@ public class SearchIndexClient
 
             throw new InvalidOperationException($"Elasticsearch index creation failed: {response.DebugInformation}");
         }
+    }
+
+    // An index created before the relation fields existed lacks their mapping; adding fields is additive and
+    // idempotent, so it is safe to do on every start.
+    private async Task EnsureRelationFieldsMappedAsync(CancellationToken cancellationToken)
+    {
+        var response = await _client.Indices.PutMappingAsync<SearchDocument>(
+            m => m.Indices(_indexName).Properties(p => p
+                .Keyword(f => f.DepartmentIds!)
+                .Keyword(f => f.PositionId!)
+                .Text(f => f.Description!)),
+            cancellationToken);
+        if (!response.IsValidResponse)
+        {
+            throw new InvalidOperationException($"Elasticsearch mapping update failed: {response.DebugInformation}");
+        }
+    }
+
+    // Every employee and position document that mentions the department. Reads through a refresh first, because a
+    // document indexed a moment ago is not yet visible to search. Bounded by the index's result window: a department
+    // with more than that fails loudly (and is retried or dead-lettered) rather than being rewritten in part.
+    public async Task<IReadOnlyList<SearchDocument>> FindByDepartmentAsync(Guid departmentId, CancellationToken cancellationToken)
+    {
+        const int window = 10_000;
+        await RefreshAsync(cancellationToken);
+
+        var response = await _client.SearchAsync<SearchDocument>(
+            s => s
+                .Indices(_indexName)
+                .Size(window)
+                .Query(q => q.Term(t => t.Field("departmentIds").Value(departmentId.ToString()))),
+            cancellationToken);
+        if (!response.IsValidResponse)
+        {
+            throw new InvalidOperationException($"Elasticsearch search failed: {response.DebugInformation}");
+        }
+
+        if (response.Total > window)
+        {
+            throw new InvalidOperationException(
+                $"Department {departmentId} is referenced by {response.Total} documents, more than the {window} one query can return");
+        }
+
+        return response.Documents.ToList();
     }
 
     // Indexing with an explicit, deterministic Id is an upsert - see SearchDocument.Id's
