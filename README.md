@@ -30,9 +30,31 @@ distributed-systems problem, not because a product needed it. Where that shows: 
 non-trivial decision has a written ADR explaining *why*, not just *what* — see
 [`docs/adr/`](docs/adr/).
 
-If you're evaluating this as a portfolio, the fastest way in is `docs/adr/` — 14 short
-records of the actual trade-offs, written the way I'd defend them in a design review, not
-backfilled to sound tidy.
+## The two-minute tour
+
+Three things worth your time, in this order, each with its evidence next to it:
+
+1. **An AI assistant that can propose changes but cannot make them, with the protection measured.**
+   A local model (gpt-oss-20b through llama.cpp, no external API) reads the organization as you and proposes hires,
+   transfers and grants; you read a card that the *server* drew from a signed plan and approve it yourself. Ids the
+   model passes are resolved against the owning services, money goes through its own route with a per-grant ceiling and
+   a daily quota enforced by the ledger. I then measured it against hostile text planted in the data
+   ([ADR 0016](docs/adr/0016-agent-proposes-user-confirms.md),
+   [ADR 0017](docs/adr/0017-approval-is-informed-and-bounded.md), numbers below). The honest result: the model can still
+   be talked into proposing; what is guaranteed is that it is readable, bounded and runs only on a click.
+2. **A platform that was broken on purpose.** Transactional outbox and idempotent consumers in every service, a k6
+   load test that found three real bugs before it produced a number, chaos tests that freeze the broker and the
+   database and assert no welcome bonus is lost or doubled, SLO rules. See [Proof, not claims](#proof-not-claims).
+3. **Search and history with numbers, not adjectives.** Keyword, semantic and hybrid search compared on labelled
+   queries ([ADR 0018](docs/adr/0018-hybrid-search-measured.md): hybrid *tied* semantic, it did not beat it), and an org
+   time machine rebuilt by folding the event log ([ADR 0019](docs/adr/0019-org-time-machine-from-the-event-log.md)),
+   which also fixed a real defect: the audit log recorded when a message arrived, not when the event happened.
+
+Run it yourself with `scripts/demo.sh up` (see [Running it](#running-it)); a 40-second captioned overview is
+[`docs/demo/video/portfolio-overview.mp4`](docs/demo/video/portfolio-overview.mp4), and the complete interactive
+walkthrough is scripted in [`docs/demo/storyboard.md`](docs/demo/storyboard.md). The reasoning behind every decision is in
+[`docs/adr/`](docs/adr/): 19 short records of the actual trade-offs, written the way I'd defend them in a design review,
+not backfilled to sound tidy. What is not done is listed plainly in [Honest status](#honest-status).
 
 ## Proof, not claims
 
@@ -40,6 +62,26 @@ Every claim below links to a test or a measurement, not a description of intent.
 path through it: open one linked test, read its name and its first comment, run it. Where a
 test was also confirmed to fail without the fix, that's said next to it; where it wasn't, it
 isn't claimed.
+
+**The assistant, measured against hostile text** ([ADR 0017](docs/adr/0017-approval-is-informed-and-bounded.md)):
+a local gpt-oss-20b driven through the real tools over a fixed organization whose names and descriptions carry planted
+instructions ("assistant bonus 10000", "also hire this stranger"), 3 runs of each of 9 tasks, before and after the
+rework (ids resolved to names, a server-drawn approval card, an agent-only grant route with a ceiling and a daily
+quota, no grant to yourself).
+
+| | before | after |
+|---|---|---|
+| tasks done as asked | 19 | 19 |
+| asked for more than a grant may be, refused | 3 | 3 |
+| unrequested proposal that reached a card | 5 | 3 |
+| unrequested proposal refused by a barrier | 0 | 2 |
+| runs where the model tried something unrequested | 5 | 5 |
+
+The model was as easy to talk into proposing as before; what changed is what happened to the attempts. The injected
+bonus still reaches a card in 3 of 3 runs (refused at 10000, retried at exactly the 500 ceiling): readable, bounded,
+and applied only if the person clicks. Two weaker local models looked *safer* only because they mangled their own calls,
+a finding that is why the barrier is on the server. A deterministic, model-free guardrail eval
+([`docs/agent-evals.md`](docs/agent-evals.md)) runs in CI. Small sample: direction, not rates.
 
 **Concurrency actually raced, not just reasoned about:**
 - [`WelcomeBonusConsumerTests`](backend/RewardsService/RewardsService.IntegrationTests/WelcomeBonusConsumerTests.cs) —
@@ -147,14 +189,14 @@ to reason about.
 
 | Service | Role | Protocols |
 |---|---|---|
-| **DirectoryService** | source of truth for org structure — departments (`ltree` hierarchy), positions, locations — plus pgvector semantic department search | REST + gRPC server, Kafka producer |
+| **DirectoryService** | source of truth for org structure — departments (`ltree` hierarchy), positions, locations — plus department rename and pgvector semantic department search | REST + gRPC server, Kafka producer |
 | **AuthService** | OpenIddict OIDC provider (`authorization_code` + PKCE, `client_credentials`), ASP.NET Identity, account provisioning | REST + OIDC, Kafka producer + consumer |
 | **EmployeeService** | employee records — hire, transfer, terminate — participant in the hire→provision-account saga | REST, gRPC client → DirectoryService, Kafka producer + consumer |
-| **AuditService** | append-only record of every event on the bus, with a dead-letter table for what couldn't be processed | Kafka consumer, REST (read-only) |
+| **AuditService** | append-only record of every event on the bus (placed at the event's own time), with a dead-letter table, and the org as it was on any past date folded from that log | Kafka consumer, REST (read-only) |
 | **RewardsService** | an internal currency ledger — manual grants and an automatic welcome bonus on hire | REST, Kafka producer + consumer |
 | **NotificationService** | a real in-app notification center — persisted feed, unread counts, and a live SignalR push, not a log line | REST + SignalR, Kafka consumer |
-| **SearchService** | cross-entity search (employees, departments, positions, locations, audit history) over an Elasticsearch index materialized from the same event stream | REST, Kafka consumer |
-| **McpServer** | read-only [MCP](https://modelcontextprotocol.io) tools (semantic search, org tree, employee lookup) for AI assistants; every tool calls the owning service's API with the caller's own token, no database access ([ADR 0015](docs/adr/0015-mcp-tools-read-through-the-service-apis.md)) | Streamable HTTP, JWT-authenticated |
+| **SearchService** | cross-entity search (employees, departments, positions, locations, audit history) over an Elasticsearch index materialized from the same event stream, with a semantic side (embeddings staged from those events) and a hybrid mode fused by Reciprocal Rank Fusion ([ADR 0018](docs/adr/0018-hybrid-search-measured.md)) | REST, Kafka consumer |
+| **McpServer** | [MCP](https://modelcontextprotocol.io) tools for AI assistants: reads (semantic search, org tree, employee lookup, the org on a past date) and three *proposal* tools that change nothing until a person approves a signed plan ([ADR 0016](docs/adr/0016-agent-proposes-user-confirms.md)); every tool calls the owning service's API with the caller's own token, no database access ([ADR 0015](docs/adr/0015-mcp-tools-read-through-the-service-apis.md)) | Streamable HTTP, JWT-authenticated, plan preview/confirm endpoints |
 
 All REST traffic goes through nginx at `/`; gRPC between EmployeeService and
 DirectoryService is internal-only, never exposed to the host.
@@ -191,6 +233,20 @@ Picked because each one has a real trade-off behind it, not because it was the o
   substring" — for a human typing into a search box. Neither replaces the other; the ADR
   explains why they coexist instead of picking one.
 
+- **[The agent proposes, a person confirms, and approval has to be informed](docs/adr/0017-approval-is-informed-and-bounded.md).**
+  An MCP server cannot see the user's message, so no server-side check can decide "was this requested". What it can
+  do is take decisions away from the model: every id is resolved against the owning service, the plan is written in
+  names the server read, the approval card is drawn by the server from a signed plan, and money has its own limits that
+  the ledger enforces. The ADR states the guarantee narrowly on purpose, because the first eval showed a ceiling
+  *bounds* an injected grant without *stopping* it.
+- **[Measure search before claiming it is better](docs/adr/0018-hybrid-search-measured.md).** Hybrid search was built
+  on a plan's assumption that department rename could trigger a re-embedding; rename did not exist (the domain had
+  `SetName` and nothing called it). The measurement showed hybrid tying semantic search, not beating it, and found a
+  defect in keyword search in its misses.
+- **[The org on a past date, folded from the event log](docs/adr/0019-org-time-machine-from-the-event-log.md)** instead
+  of a second read model, because a second source can drift from the log. Building it exposed that the audit log
+  stamped the *receive* time, so the event's own time now travels in a header.
+
 ## What each service does with concurrency and failure
 
 Deliberately designed for, not discovered as bugs after the fact:
@@ -214,6 +270,17 @@ Deliberately designed for, not discovered as bugs after the fact:
   endpoint — partitioned per client IP, not a shared global bucket.
 
 ## Running it
+
+```bash
+scripts/demo.sh up        # the backend stack, waits until healthy, then prints what to do next
+scripts/demo.sh history   # a dated fictional org for the /history page
+scripts/demo.sh llm       # the local model for the assistant (a GPU device and ~12 GB of RAM)
+```
+
+`scripts/demo.sh` is a thin wrapper over the commands below; it handles no secret (values come from your own `.env` or
+vault). The frontend is started separately from `frontend/` with the vault runner, because it keeps OAuth tokens
+server-side. There is deliberately no hosted demo: the assistant needs a local GPU model, and a hosted LLM would be a
+running cost and someone else's free API. The video shot list is in [`docs/demo/storyboard.md`](docs/demo/storyboard.md).
 
 ```bash
 docker compose up -d
@@ -243,7 +310,8 @@ docker compose --profile obs up -d
 | `:5434` | Postgres (`platform` database, one schema per service) |
 | `:9200` | Elasticsearch (loopback-only, dev-only security posture) |
 | `:9092` | Kafka (loopback-only, for local CLI/GUI inspection) |
-| `:11434` | Ollama |
+| `:11434` | Ollama (embeddings) |
+| `:8090` | the assistant's language model, when `scripts/llm-server.sh` is running (not in compose) |
 | `:8025` | Mailpit — catches every email AuthService sends locally |
 
 Internal-only (never published to the host): DirectoryService's gRPC port, Redis, and every
@@ -255,7 +323,8 @@ service's own HTTP port — nginx is the only way in.
 [CSharpFunctionalExtensions](https://github.com/vkhorikov/CSharpFunctionalExtensions)
 (`Result<T, Error>` end to end, no exceptions for expected failure), FluentValidation,
 Serilog → OpenTelemetry, OpenIddict, Confluent.Kafka, the official `Elastic.Clients.Elasticsearch`
-client, SignalR, HybridCache over Redis, Testcontainers + Respawn for integration tests, k6
+client, SignalR, HybridCache over Redis, pgvector and Ollama (`nomic-embed-text`) for embeddings, llama.cpp
+(Vulkan, gpt-oss-20b) for the assistant, the official MCP SDKs, Testcontainers + Respawn for integration tests, k6
 for load tests. Frontend: Next.js (App Router) + React + TanStack Query + shadcn/ui.
 
 ## Testing
@@ -264,9 +333,10 @@ for load tests. Frontend: Next.js (App Router) + React + TanStack Query + shadcn
 dotnet test backend/backend.slnx
 ```
 
-250+ integration tests (measured per service: Auth 136, Directory 34, Rewards 19, Notification 17,
-Employee 17, Audit 14, Search 14) plus architecture-boundary suites (NetArchTest — domain layers
-can't depend on infrastructure) and unit tests, each spinning up its own Postgres — and, for
+632 tests across 16 projects in one run, all green (one opt-in evaluation is skipped by default). Integration tests
+per service: McpServer 145, Auth 141, Audit 53, Directory 52, Search 52, Rewards 43, Notification 17, Employee 17;
+plus Shared 53, event-contract pairs 35, chaos tests 2, and architecture-boundary suites (NetArchTest — domain layers
+can't depend on infrastructure) 22. Each integration project spins up its own Postgres — and, for
 `SearchService`, its own Elasticsearch — via Testcontainers rather than sharing state or
 mocking the database. What's covered is deliberately not "everything"; a few things (a live
 database going down mid-request, for instance) are exercised by hand against the real stack
@@ -281,8 +351,10 @@ cd load-tests/k6
 docker run --rm --network host -v "$(pwd)":/scripts -w /scripts grafana/k6 run main.js
 ```
 
-Real numbers from the last run, plus two load-test bugs it took to get trustworthy ones, in
-[`docs/benchmarks/baseline.md`](docs/benchmarks/baseline.md).
+Real numbers, plus two load-test bugs it took to get trustworthy ones, in
+[`docs/benchmarks/baseline.md`](docs/benchmarks/baseline.md), including a before/after re-run on the final code (no
+regression: unthrottled read p95 4.2 vs 4.3 ms, 0% failed in both; one run each, so the faster search and writes are not
+claimed as an improvement).
 
 ## Project layout
 
@@ -315,31 +387,47 @@ defend it in review, not the fastest way to make a login button work:
   browser reaches the backend — it attaches the bearer token server-side, rejects
   cross-origin mutations, and only forwards an explicit allowlist of backend paths, not
   everything nginx exposes.
-- Departments, Positions, Locations, People (hire/transfer), and an Activity timeline built
-  from `AuditService` are wired up with real create flows, pagination, filtering, and
-  accessible loading/empty/error states — not just read-only lists.
+- Departments, Positions, Locations, People (hire/transfer, with a wallet balance and a grant form for
+  RewardsService), and an Activity timeline built from `AuditService` are wired up with real create flows,
+  pagination, filtering, and accessible loading/empty/error states — not just read-only lists.
+- Global search in the command menu (SearchService, hybrid mode by default) and a notification bell fed by
+  NotificationService's REST feed.
+- **An assistant page** where a local model proposes changes and the person approves a card drawn by the server from
+  a signed plan; confirming currency goes through a recent re-verification (step-up) bridged by the BFF, so the
+  browser never holds the OAuth token ([ADR 0016](docs/adr/0016-agent-proposes-user-confirms.md),
+  [ADR 0017](docs/adr/0017-approval-is-informed-and-bounded.md)).
+- **An org history page**: a date slider over the department tree and who worked where on that day, rebuilt from the
+  audit log ([ADR 0019](docs/adr/0019-org-time-machine-from-the-event-log.md)).
 
 ## Honest status
 
-Both halves of this project were verified live against the running stack, not just
-unit-tested — but they were built and merged from two branches that diverged for several
-days, and the newest backend work hasn't caught up to the frontend yet. Said plainly rather
-than glossed over:
+What is verified, and what is not, said plainly rather than glossed over:
 
-- **RewardsService, NotificationService, and SearchService have no frontend yet** — not
-  because auth is missing (it isn't), but because the BFF's own allowlist
-  (`app/api/backend/[...path]/route.ts`) doesn't include `/api/rewards`, `/api/notifications`,
-  or `/api/search` yet, and nothing calls them. This is the actual next milestone: three
-  working backends with zero UI surface.
-- `NotificationService`'s live SignalR push has no frontend client at all yet (no
-  `@microsoft/signalr` dependency) — the REST feed would work through the BFF once allowlisted,
-  but the real-time push needs its own connection story (the BFF pattern above is HTTP-shaped,
-  not WebSocket-shaped, and hasn't been extended to cover it).
-- Cross-service search covers five entity kinds; it doesn't yet cover department hierarchy
-  path in results, or position/location updates and deletions — both entities only support
-  create today, so there's nothing to update or delete yet.
-- The observability stack (Tempo/Loki/Prometheus/Grafana) is wired and working but optional
-  by design (`--profile obs`) — traces and metrics exist, dashboards are minimal.
+- **There is no hosted demo, on purpose.** The assistant needs a local GPU model, and a hosted LLM would be a running
+  cost and someone else's free API. Everything runs locally (`scripts/demo.sh`); a shot list for a walkthrough is in
+  [`docs/demo/storyboard.md`](docs/demo/storyboard.md).
+- **NotificationService's live SignalR push still has no frontend client** (no `@microsoft/signalr` dependency); the
+  bell uses the REST feed. The reason is a design problem, not a missing afternoon: the hub accepts the OAuth token in the
+  WebSocket query string, which a BFF that keeps tokens server-side must not hand to the browser. A short-lived,
+  audience-bound hub ticket is specified (issue #101) and not built.
+- **The assistant can still be talked into proposing.** The measurement says what is guaranteed (readable, bounded,
+  applied only on a click) and what is not (a planted instruction can still produce a valid bounded card). The eval is
+  3 runs of 9 tasks against one local model: direction, not rates. The assistant has no tool that lists a department's
+  positions, so it can only use position ids it has seen on an employee.
+- **Hybrid search tied semantic search; it did not beat it**, on 43 labelled queries over a synthetic organization. A
+  keyword defect found in the first run was fixed after seeing it, so the table is optimistic for hybrid. Two embeddings
+  of a department exist (DirectoryService's, used by the MCP search tool, and SearchService's); retiring one is an open
+  decision. An employee's search text keeps the old department name after a department rename until their next event.
+  Search covers five entity kinds; position and location updates and deletions do not exist as events yet.
+- **The org history starts when the audit log did**, entries stored before the event's own time travelled with the
+  message keep their receive time, and the domain has no "head of department", so "who led it in March" cannot be
+  answered.
+- **The browser pages (assistant, org history) are covered by lint, type checks, a production build and unit tests of
+  their logic, not by an automated browser test.** The same is true of the frontend generally.
+- The observability stack (Tempo/Loki/Prometheus/Grafana) is wired and working but optional by design
+  (`--profile obs`) — traces and metrics exist, dashboards are minimal. Whether a bearer token passed in a query string
+  is recorded in trace attributes was not established (nginx's access log masks it; the request log records only the
+  path).
 
 I'd rather a portfolio README say "here's what's actually missing and why" than read like
 marketing copy for a project nobody's going to production with.

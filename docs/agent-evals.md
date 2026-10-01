@@ -11,13 +11,16 @@ CI with the rest of the backend tests (`McpServer.IntegrationTests/GuardrailEval
 network, and reports a score per run:
 
 ```
-guardrail eval - proposals: 36/36 as expected
+guardrail eval - proposals: 34/34 as expected
 guardrail eval - signed plans: 10/10 as expected
 ```
 
 **It is not** a measure of how good any model is: whether it picks the right tool, understands a request, or
-resists being talked into things. That needs a model in the loop and is a separate piece of work. A 100% here
-says the guardrails hold, not that the model behaves.
+resists being talked into things. A 100% here says the guardrails hold, not that the model behaves. That needs a model
+in the loop, and it now exists: `backend/McpServer/McpServer.ModelEval` drives a local model through the real tools over
+an organization with hostile text planted in its data, and [ADR 0017](adr/0017-approval-is-informed-and-bounded.md)
+records what it found (including that an injected grant can still reach an approval card, bounded and readable). Run it
+with `dotnet run --project backend/McpServer/McpServer.ModelEval -- --runs 3` while `scripts/llm-server.sh` is up.
 
 ## The corpus
 
@@ -45,7 +48,7 @@ still allowing letters of any script, accents, apostrophes and emoji.
 ## Evidence the eval can fail
 
 Each barrier was weakened in turn and the eval watched to go red: no grant ceiling in the executor (S01 and the
-proposal cases P03, P04, P22 fail), a grant allowed to read any earlier step's id (S04 fails), format characters
+proposal cases P03, P04 fail), a grant allowed to read any earlier step's id (S04 fails), format characters
 allowed again (P11-P13 fail).
 
 ## What McpServer can and cannot observe
@@ -58,3 +61,11 @@ a test holds that. Tokens and latency of the model are not visible here - they b
 
 Not verified: the live metric and label names in a running Prometheus (the alert rules load and parse; the service
 was not rebuilt and scraped).
+
+## What changed after ADR 0017
+
+The grant ceiling is now 500 (the ledger enforces it for agent grants, with a daily quota; McpServer keeps the same
+number only to refuse early with a readable message), a hire carries no grant (the corpus cases for a grant on a hire
+were removed, and one asserts a hire is a single step), and every id is resolved against the owning services before a
+plan exists. The corpus runs against a lenient stand-in for those lookups, because it is about what the barriers do with
+a model's *arguments*; resolution itself is tested in `AgentResolutionTests`.

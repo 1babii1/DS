@@ -95,3 +95,33 @@ nginx, including the outbox insert on each one - not a cached read, not a mock.
       account-lookup projection catching up.
 - Re-run this after any infrastructure change and diff the table - a baseline that's never
   compared against a second measurement is a number, not evidence of anything changing.
+
+## Re-run on the final code (before / after)
+
+The same `main.js`, same machine, same scenarios, against the stack rebuilt from the final code (after the assistant,
+hybrid search, rename, the org time machine and the outbox's `occurred-at` header were added). One run each, `docker
+compose up -d` after a rebuild of every image: this is a comparison of two measurements, not a benchmark with a variance
+estimate.
+
+| Scenario | p50 before / after | p90 before / after | p95 before / after | Failed |
+|---|---|---|---|---|
+| `read_roots_traffic` (15 VUs, 30s, unthrottled) | 2.2 / 1.7 ms | 3.4 / 3.5 ms | **4.2 / 4.3 ms** | 0% / 0% |
+| `read_search_traffic` (semantic, rate-limit-paced) | 29.2 / 16.7 ms | 37.4 / 17.6 ms | **39.9 / 18.6 ms** | 0% / 0% |
+| `write_traffic` (full hire chain, rate-limit-paced) | 7.3 / 6.5 ms | 15.1 / 10.7 ms | **17.1 / 11.7 ms** | 0% / 0% |
+
+481/481 checks passed and 0% `http_req_failed` across 490 requests, as in the baseline.
+
+Reading it honestly:
+
+- **Nothing regressed.** The unthrottled read, the only scenario that measures capacity rather than a limiter, is the
+  same within noise (p95 4.2 vs 4.3 ms), and the write chain, which now also writes the outbox row with the extra header,
+  did not get slower.
+- **Search and writes are faster, and I do not know why.** Both sit lower than the baseline, plausibly because this run
+  hit a freshly restarted, warm stack, but one run each cannot separate that from a real change, so it is not claimed as
+  an improvement.
+- **A first attempt at this run failed on purpose-built behaviour:** `/auth/login` is limited to 5 per minute per IP, and
+  a second run started inside the window got `429` on its three smoke logins. It was waited out and rerun once; the table
+  is that run. This is the same limiter the baseline already documents.
+- The stack was rebuilt from the final code before this run, which also exposed a local-database defect unrelated to
+  performance: NotificationService's migration history was empty although its tables existed (the same desync seen earlier
+  in RewardsService), so its migration job failed until the already-applied `InitialCreate` was recorded.
