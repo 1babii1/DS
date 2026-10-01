@@ -3,12 +3,17 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell, CheckCheck, LoaderCircle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { notificationsApi } from '@/entities/notifications/api/notifications.api'
 import type { Notification } from '@/entities/notifications/types/notification.types'
 import { getHttpStatus } from '@/shared/api/http-error'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/shared/ui/sheet'
+
+import { hubConnection, startNotificationPush } from '../lib/live-push'
+
+// Where the browser reaches the notification hub (through the gateway). Unset: no live push, the polled feed alone.
+const hubUrl = process.env.NEXT_PUBLIC_NOTIFICATION_HUB_URL
 
 function relativeTime(value: string) {
 	const difference = Date.now() - new Date(value).getTime()
@@ -35,6 +40,16 @@ export function NotificationBell({ enabled }: { enabled: boolean }) {
 		queryClient.invalidateQueries({ queryKey: ['notifications'] }),
 		queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] })
 	])
+	// Live push: a pushed notification only tells the page to refetch, so the list and the count stay the server's.
+	// The polled count above remains as the fallback while the connection is down.
+	useEffect(() => {
+		if (!enabled || !hubUrl) return
+		return startNotificationPush({
+			connection: hubConnection(hubUrl, notificationsApi.hubTicket),
+			onNotification: () => void refresh()
+		})
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [enabled])
 	const markRead = useMutation({ mutationFn: notificationsApi.markRead, onSuccess: refresh })
 	const markAllRead = useMutation({ mutationFn: notificationsApi.markAllRead, onSuccess: refresh })
 	const count = unreadCount.data?.count ?? 0

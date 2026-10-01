@@ -53,7 +53,7 @@ Three things worth your time, in this order, each with its evidence next to it:
 Run it yourself with `scripts/demo.sh up` (see [Running it](#running-it)); a 40-second captioned overview is
 [`docs/demo/video/portfolio-overview.mp4`](docs/demo/video/portfolio-overview.mp4), and the complete interactive
 walkthrough is scripted in [`docs/demo/storyboard.md`](docs/demo/storyboard.md). The reasoning behind every decision is in
-[`docs/adr/`](docs/adr/): 21 short records of the actual trade-offs, written the way I'd defend them in a design review,
+[`docs/adr/`](docs/adr/): 22 short records of the actual trade-offs, written the way I'd defend them in a design review,
 not backfilled to sound tidy. What is not done is listed plainly in [Honest status](#honest-status).
 
 ## Proof, not claims
@@ -406,10 +406,11 @@ What is verified, and what is not, said plainly rather than glossed over:
 - **There is no hosted demo, on purpose.** The assistant needs a local GPU model, and a hosted LLM would be a running
   cost and someone else's free API. Everything runs locally (`scripts/demo.sh`); a shot list for a walkthrough is in
   [`docs/demo/storyboard.md`](docs/demo/storyboard.md).
-- **NotificationService's live SignalR push still has no frontend client** (no `@microsoft/signalr` dependency); the
-  bell uses the REST feed. The reason is a design problem, not a missing afternoon: the hub accepts the OAuth token in the
-  WebSocket query string, which a BFF that keeps tokens server-side must not hand to the browser. A short-lived,
-  audience-bound hub ticket is specified (issue #101) and not built.
+- **Live notification push is built but has not been run end to end.** The browser opens the SignalR hub with a
+  60-second ticket the BFF fetches for it, never the OAuth token ([ADR 0022](docs/adr/0022-hub-tickets.md)); the bell
+  refetches when a push arrives and keeps polling as a fallback. The ticket service, the hub handshake and the unit
+  logic of the client are tested; a real browser connecting through nginx and receiving a push was not run (it needs a
+  signed-in session). A ticket cannot be revoked inside its minute, and several instances need the same signing key.
 - **The assistant can still be talked into proposing.** The measurement says what is guaranteed (readable, bounded,
   applied only on a click) and what is not (a planted instruction can still produce a valid bounded card). The eval is
   3 runs of 9 tasks against one local model: direction, not rates. The assistant now has a tool that lists a department's
