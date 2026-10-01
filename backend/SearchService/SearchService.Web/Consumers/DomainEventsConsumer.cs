@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using SearchService.Domain;
 using SearchService.Infrastructure.Elasticsearch;
 using SearchService.Infrastructure.Postgres;
+using SearchService.Infrastructure.Postgres.Embeddings;
 using Shared.Kafka;
 
 namespace SearchService.Web.Consumers;
@@ -66,6 +67,9 @@ public class DomainEventsConsumer(
             case DepartmentCreatedEvent.MessageType:
                 await HandleDepartmentCreated(result.Message.Value, occurredAt, cancellationToken);
                 break;
+            case DepartmentRenamedEvent.MessageType:
+                await HandleDepartmentRenamed(result.Message.Value, occurredAt, cancellationToken);
+                break;
             case DepartmentDeletedEvent.MessageType:
                 await HandleDepartmentDeleted(result.Message.Value, cancellationToken);
                 break;
@@ -87,12 +91,52 @@ public class DomainEventsConsumer(
         }
     }
 
+    // Every entity write goes to the keyword index and, next to it, is staged for the semantic one. Audit documents are
+    // not entities and are not embedded. Staging records the text only; the vector is made later by a worker, so this
+    // never waits on the embedding model.
+    private async Task IndexEntityAsync(SearchDocument document, CancellationToken cancellationToken)
+    {
+        await indexClient.UpsertAsync(document, cancellationToken);
+
+        using var scope = ScopeFactory.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<EmbeddingStaging>().StageAsync(document, cancellationToken);
+    }
+
+    private async Task DeleteEntityAsync(string documentId, CancellationToken cancellationToken)
+    {
+        await indexClient.DeleteAsync(documentId, cancellationToken);
+
+        using var scope = ScopeFactory.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<EmbeddingStaging>().RemoveAsync(documentId, cancellationToken);
+    }
+
     private Task HandleDepartmentCreated(string payload, DateTime occurredAt, CancellationToken cancellationToken)
     {
         var @event = JsonSerializer.Deserialize<DepartmentCreatedEvent>(payload)
             ?? throw new InvalidOperationException($"Could not deserialize {DepartmentCreatedEvent.MessageType} payload");
 
-        return indexClient.UpsertAsync(
+        return IndexEntityAsync(
+            new SearchDocument(
+                SearchDocument.EntityId(SearchKind.Department, @event.DepartmentId),
+                SearchKind.Department,
+                @event.DepartmentId,
+                @event.Name,
+                @event.Identifier,
+                $"{@event.Name} {@event.Identifier}",
+                true,
+                occurredAt),
+            cancellationToken);
+    }
+
+    // The event carries the whole set of fields the document is built from, so the document is rebuilt and
+    // overwritten (the same idempotent full re-index as on creation). Only active departments can be renamed at the
+    // source, so the document stays active.
+    private Task HandleDepartmentRenamed(string payload, DateTime occurredAt, CancellationToken cancellationToken)
+    {
+        var @event = JsonSerializer.Deserialize<DepartmentRenamedEvent>(payload)
+            ?? throw new InvalidOperationException($"Could not deserialize {DepartmentRenamedEvent.MessageType} payload");
+
+        return IndexEntityAsync(
             new SearchDocument(
                 SearchDocument.EntityId(SearchKind.Department, @event.DepartmentId),
                 SearchKind.Department,
@@ -110,7 +154,7 @@ public class DomainEventsConsumer(
         var @event = JsonSerializer.Deserialize<DepartmentDeletedEvent>(payload)
             ?? throw new InvalidOperationException($"Could not deserialize {DepartmentDeletedEvent.MessageType} payload");
 
-        return indexClient.DeleteAsync(SearchDocument.EntityId(SearchKind.Department, @event.DepartmentId), cancellationToken);
+        return DeleteEntityAsync(SearchDocument.EntityId(SearchKind.Department, @event.DepartmentId), cancellationToken);
     }
 
     private async Task HandlePositionCreated(string payload, DateTime occurredAt, CancellationToken cancellationToken)
@@ -131,7 +175,7 @@ public class DomainEventsConsumer(
 
         var subtitle = departmentNames.Count > 0 ? string.Join(", ", departmentNames) : @event.Description;
 
-        await indexClient.UpsertAsync(
+        await IndexEntityAsync(
             new SearchDocument(
                 SearchDocument.EntityId(SearchKind.Position, @event.PositionId),
                 SearchKind.Position,
@@ -151,7 +195,7 @@ public class DomainEventsConsumer(
 
         var subtitle = $"{@event.City}, {@event.Country} ({@event.Timezone})";
 
-        return indexClient.UpsertAsync(
+        return IndexEntityAsync(
             new SearchDocument(
                 SearchDocument.EntityId(SearchKind.Location, @event.LocationId),
                 SearchKind.Location,
@@ -210,7 +254,7 @@ public class DomainEventsConsumer(
 
         // Kept searchable, not removed - "active status" is required display metadata per
         // the issue, not a reason to hide the record.
-        await indexClient.UpsertAsync(existing with { IsActive = false, OccurredAt = occurredAt }, cancellationToken);
+        await IndexEntityAsync(existing with { IsActive = false, OccurredAt = occurredAt }, cancellationToken);
     }
 
     private async Task UpsertEmployeeAsync(
@@ -221,7 +265,7 @@ public class DomainEventsConsumer(
 
         var subtitle = $"{position?.Title} · {department?.Title}".Trim(' ', '·');
 
-        await indexClient.UpsertAsync(
+        await IndexEntityAsync(
             new SearchDocument(
                 SearchDocument.EntityId(SearchKind.Employee, employeeId),
                 SearchKind.Employee,
