@@ -10,15 +10,15 @@ namespace McpServer.Tools;
 // BearerForwardingHandler) - not from that service's database. What each service allows,
 // filters and pages is decided in one place, its own, and applies here without a second copy.
 [McpServerToolType]
-public sealed class DirectoryTools(DirectoryApiClient directory, EmployeeApiClient employees)
+public sealed class DirectoryTools(DirectoryApiClient directory, EmployeeApiClient employees, SearchApiClient search)
 {
     [McpServerTool(Name = "search_departments")]
-    [Description("Semantic search for departments by meaning (e.g. \"teams working on payments\"), not exact text match. Returns id, name, identifier and a similarity score (0-1, higher is closer).")]
+    [Description("Search for departments by meaning and by name (e.g. \"teams working on payments\"). Returns id, name, identifier and a relative score, higher is a closer match; the score only orders this answer and is not comparable between searches.")]
     public Task<IReadOnlyList<DepartmentSearchResult>> SearchDepartments(
         [Description("Free-text description of what you're looking for")] string query,
-        [Description("Max results to return (1-50)")] int limit = 10,
+        [Description("Max results to return (1-20)")] int limit = 10,
         CancellationToken cancellationToken = default) =>
-        Run(() => directory.SearchAsync(query, Math.Clamp(limit, 1, 50), cancellationToken));
+        Run(() => search.SearchDepartmentsAsync(query, Math.Clamp(limit, 1, SearchApiClient.MaxLimit), cancellationToken));
 
     [McpServerTool(Name = "get_department_tree")]
     [Description("Returns a department and all of its active descendants, shallowest first (hasMore is true if the subtree was too large and got cut). Pass no id to list top-level (root) departments instead, one page at a time: hasMore then means another page probably exists.")]

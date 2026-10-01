@@ -43,7 +43,7 @@ public class ToolBehaviorTests
             BaseAddress = new Uri("http://service.test/"),
         };
 
-        return new DirectoryTools(new DirectoryApiClient(Client()), new EmployeeApiClient(Client()));
+        return new DirectoryTools(new DirectoryApiClient(Client()), new EmployeeApiClient(Client()), new SearchApiClient(Client()));
     }
 
     private static readonly Guid Dept = Guid.NewGuid();
@@ -229,16 +229,23 @@ public class ToolBehaviorTests
     }
 
     [Fact]
-    public async Task Search_escapes_the_query_and_clamps_the_limit()
+    public async Task Search_asks_SearchService_for_departments_only_escapes_the_query_and_clamps_the_limit()
     {
-        var stub = new StubService(_ => Json("""{"result":[{"id":"00000000-0000-0000-0000-000000000001","name":"Payments","identifier":"pay","score":0.87}],"isError":false}"""));
+        var id = Guid.NewGuid();
+        var stub = new StubService(_ => Json(
+            $$"""{"result":{"query":"x","results":[{"kind":"department","id":"{{id}}","title":"Payments","subtitle":"pay","matchedFields":["title"],"rank":0.87}],"mode":"hybrid"},"isError":false}"""));
 
         var results = await Tools(stub).SearchDepartments("teams & payments?", limit: 500);
 
-        var url = Assert.Single(stub.Requests).RequestUri!.PathAndQuery;
-        Assert.Contains("query=teams%20%26%20payments%3F", url);
-        Assert.Contains("limit=50", url);
-        Assert.Equal(0.87, Assert.Single(results).Score);
+        var sent = Assert.Single(stub.Requests);
+        Assert.Equal("/api/search", sent.RequestUri!.AbsolutePath);
+        Assert.Equal(CallerToken, sent.Headers.Authorization!.ToString());
+        var url = sent.RequestUri.PathAndQuery;
+        Assert.Contains("q=teams%20%26%20payments%3F", url);
+        Assert.Contains("types=department", url);
+        Assert.Contains("limit=20", url);
+        var hit = Assert.Single(results);
+        Assert.Equal((id, "Payments", "pay", 0.87), (hit.Id, hit.Name, hit.Identifier, hit.Score));
     }
 
     // ---- no database ------------------------------------------------------------------------
