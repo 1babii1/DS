@@ -81,11 +81,16 @@ public sealed class World : HttpMessageHandler
 
         object? body = path switch
         {
-            "api/departments/search" => Envelope(new[]
+            "api/search" => Envelope(new
             {
-                new { id = Payments, name = DepartmentName(Payments), identifier = "payments", score = 0.91 },
-                new { id = Design, name = DepartmentName(Design), identifier = "design", score = 0.32 },
-            }.Where(d => Matches(query["query"], d.name, d.identifier))),
+                query = query["q"],
+                results = new[]
+                {
+                    new { kind = "department", id = Payments, title = DepartmentName(Payments), subtitle = "payments", matchedFields = new[] { "title" }, rank = 0.91 },
+                    new { kind = "department", id = Design, title = DepartmentName(Design), subtitle = "design", matchedFields = new[] { "title" }, rank = 0.32 },
+                }.Where(d => Matches(query["q"], d.title, d.subtitle)),
+                mode = "hybrid",
+            }),
             "api/departments/roots" => Envelope(new[] { Hierarchy(Engineering, null, "engineering", 0), Hierarchy(Design, null, "design", 0) }),
             "api/positions" => PositionsFor(query["departmentId"]),
             "api/employees" => new { items = PaymentsStaff().Select(e => e.Body), page = 1, size = 20, total = 3 },

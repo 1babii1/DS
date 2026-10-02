@@ -10,7 +10,6 @@ services:
       # 5179 (gRPC) is service-to-service only and stays on the compose network.
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
-      - Embeddings__OllamaBaseUrl=http://ollama:11434
       - ConnectionStrings__DirectoryServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=directory,public
       - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:-changeme-redis}
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
@@ -30,8 +29,6 @@ services:
         condition: service_completed_successfully
       kafka:
         condition: service_healthy
-      ollama_pull:
-        condition: service_completed_successfully
 
   directory_service_migrations:
     container_name: directory_service_migrations

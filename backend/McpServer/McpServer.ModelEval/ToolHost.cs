@@ -46,7 +46,7 @@ public sealed class ToolHost
             TimeProvider.System,
             new AgentTelemetry(),
             new PlanLookup(directoryApi, employeeApi));
-        var directory = new DirectoryTools(directoryApi, employeeApi);
+        var directory = new DirectoryTools(directoryApi, employeeApi, new SearchApiClient(Client()));
 
         foreach (var target in new object[] { agent, directory })
         {

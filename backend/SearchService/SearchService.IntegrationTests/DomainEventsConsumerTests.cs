@@ -89,6 +89,54 @@ public class DomainEventsConsumerTests : IClassFixture<SearchTestWebFactory>, IA
         Assert.DoesNotContain(byOldName, h => h.SourceId == departmentId && h.Title == "Payments");
     }
 
+    // The employee and position documents carry the department's name in their own subtitle, so a rename has to reach
+    // them too. Seeded against a department that already has several people and a position, plus bystanders in
+    // another department that must not change.
+    [Fact]
+    public async Task DepartmentRenamed_rewrites_the_name_on_the_employees_and_positions_of_that_department_only()
+    {
+        var department = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        var engineer = Guid.NewGuid();
+        var chen = Guid.NewGuid();
+        var lee = Guid.NewGuid();
+        var bystander = Guid.NewGuid();
+
+        Send("directory.events", department, "DepartmentCreated",
+            $$"""{"DepartmentId":"{{department}}","Name":"Payments","Identifier":"payments","ParentDepartmentId":null}""");
+        Send("directory.events", other, "DepartmentCreated",
+            $$"""{"DepartmentId":"{{other}}","Name":"Legal","Identifier":"legal","ParentDepartmentId":null}""");
+        Send("directory.events", engineer, "PositionCreated",
+            $$"""{"PositionId":"{{engineer}}","Name":"Engineer","Description":null,"DepartmentIds":["{{department}}"]}""");
+        Hire(chen, "Maria Chen", "maria@example.com", department, engineer);
+        Hire(lee, "Sam Lee", "sam@example.com", department, engineer);
+        Hire(bystander, "Ana Ruiz", "ana@example.com", other, engineer);
+
+        Send("directory.events", department, "DepartmentRenamed",
+            $$"""{"DepartmentId":"{{department}}","Name":"Treasury operations","Identifier":"payments"}""");
+
+        Assert.Equal("Engineer · Treasury operations", (await Doc(SearchKind.Employee, chen)).Subtitle);
+        Assert.Equal("Engineer · Treasury operations", (await Doc(SearchKind.Employee, lee)).Subtitle);
+        Assert.Equal("Engineer · Legal", (await Doc(SearchKind.Employee, bystander)).Subtitle);
+        var position = await Doc(SearchKind.Position, engineer);
+        Assert.Equal("Treasury operations", position.Subtitle);
+        Assert.DoesNotContain("Payments", position.SearchText);
+
+        // Everything else about the employee is kept, including the email the search text holds.
+        Assert.Equal("Maria Chen maria@example.com", (await Doc(SearchKind.Employee, chen)).SearchText);
+    }
+
+    private void Send(string topic, Guid key, string type, string payload) =>
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(
+            BuildResult(Guid.NewGuid(), topic, key.ToString(), type, payload), CancellationToken.None));
+
+    private void Hire(Guid id, string name, string email, Guid department, Guid position) =>
+        Send("employee.events", id, "EmployeeHired",
+            $$"""{"EmployeeId":"{{id}}","FullName":"{{name}}","Email":"{{email}}","DepartmentId":"{{department}}","PositionId":"{{position}}"}""");
+
+    private async Task<SearchDocument> Doc(string kind, Guid id) =>
+        (await _indexClient.GetAsync(SearchDocument.EntityId(kind, id), CancellationToken.None))!;
+
     [Fact]
     public async Task EmployeeHired_resolves_department_and_position_names_into_the_subtitle()
     {

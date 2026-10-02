@@ -43,7 +43,7 @@ public class ToolBehaviorTests
             BaseAddress = new Uri("http://service.test/"),
         };
 
-        return new DirectoryTools(new DirectoryApiClient(Client()), new EmployeeApiClient(Client()));
+        return new DirectoryTools(new DirectoryApiClient(Client()), new EmployeeApiClient(Client()), new SearchApiClient(Client()));
     }
 
     private static readonly Guid Dept = Guid.NewGuid();
@@ -71,6 +71,46 @@ public class ToolBehaviorTests
 
         Assert.Empty(stub.Requests);
         Assert.Equal("Your session is not valid for this service.", ex.Message);
+    }
+
+    // ---- positions of a department ----------------------------------------------------------
+
+    [Fact]
+    public async Task Positions_of_a_department_are_asked_for_by_that_department_as_the_caller_and_come_back_as_id_and_name()
+    {
+        var developer = Guid.NewGuid();
+        var designer = Guid.NewGuid();
+        var stub = new StubService(_ => Json(
+            $$"""{"items":[{"id":"{{developer}}","name":"Developer"},{"id":"{{designer}}","name":"Designer"}],"page":1,"size":200,"total":2}"""));
+
+        var result = await Tools(stub).ListPositionsByDepartment(Dept);
+
+        var sent = Assert.Single(stub.Requests);
+        Assert.Equal(CallerToken, sent.Headers.Authorization!.ToString());
+        Assert.Contains($"departmentId={Dept}", sent.RequestUri!.Query);
+        Assert.Contains("isActive=true", sent.RequestUri.Query);
+        Assert.Equal([(developer, "Developer"), (designer, "Designer")], result.Select(p => (p.Id, p.Name)));
+    }
+
+    [Fact]
+    public async Task Positions_of_a_department_with_no_caller_token_send_nothing()
+    {
+        var stub = new StubService(_ => Json("""{"items":[],"page":1,"size":200,"total":0}"""));
+
+        var ex = await Assert.ThrowsAsync<McpException>(() => Tools(stub, incomingAuthorization: null).ListPositionsByDepartment(Dept));
+
+        Assert.Empty(stub.Requests);
+        Assert.Equal("Your session is not valid for this service.", ex.Message);
+    }
+
+    [Fact]
+    public async Task Positions_of_a_department_surface_a_fixed_message_on_failure()
+    {
+        var stub = new StubService(_ => Json("""{"secret":"SECRET-DETAIL"}""", HttpStatusCode.Forbidden));
+
+        var ex = await Assert.ThrowsAsync<McpException>(() => Tools(stub).ListPositionsByDepartment(Dept));
+
+        Assert.Equal("You are not allowed to do this.", ex.Message);
     }
 
     // ---- what a failure exposes -------------------------------------------------------------
@@ -229,16 +269,23 @@ public class ToolBehaviorTests
     }
 
     [Fact]
-    public async Task Search_escapes_the_query_and_clamps_the_limit()
+    public async Task Search_asks_SearchService_for_departments_only_escapes_the_query_and_clamps_the_limit()
     {
-        var stub = new StubService(_ => Json("""{"result":[{"id":"00000000-0000-0000-0000-000000000001","name":"Payments","identifier":"pay","score":0.87}],"isError":false}"""));
+        var id = Guid.NewGuid();
+        var stub = new StubService(_ => Json(
+            $$"""{"result":{"query":"x","results":[{"kind":"department","id":"{{id}}","title":"Payments","subtitle":"pay","matchedFields":["title"],"rank":0.87}],"mode":"hybrid"},"isError":false}"""));
 
         var results = await Tools(stub).SearchDepartments("teams & payments?", limit: 500);
 
-        var url = Assert.Single(stub.Requests).RequestUri!.PathAndQuery;
-        Assert.Contains("query=teams%20%26%20payments%3F", url);
-        Assert.Contains("limit=50", url);
-        Assert.Equal(0.87, Assert.Single(results).Score);
+        var sent = Assert.Single(stub.Requests);
+        Assert.Equal("/api/search", sent.RequestUri!.AbsolutePath);
+        Assert.Equal(CallerToken, sent.Headers.Authorization!.ToString());
+        var url = sent.RequestUri.PathAndQuery;
+        Assert.Contains("q=teams%20%26%20payments%3F", url);
+        Assert.Contains("types=department", url);
+        Assert.Contains("limit=20", url);
+        var hit = Assert.Single(results);
+        Assert.Equal((id, "Payments", "pay", 0.87), (hit.Id, hit.Name, hit.Identifier, hit.Score));
     }
 
     // ---- no database ------------------------------------------------------------------------

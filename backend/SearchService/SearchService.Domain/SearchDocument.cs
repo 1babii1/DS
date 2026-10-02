@@ -18,7 +18,12 @@ public record SearchDocument(
     string? Subtitle,
     string SearchText,
     bool IsActive,
-    DateTime OccurredAt)
+    DateTime OccurredAt,
+    // What an employee or position document was built from, so a rename can find and rebuild the documents that carry
+    // a department's name. Empty on documents indexed before these existed; those are refreshed by their next event.
+    Guid[]? DepartmentIds = null,
+    Guid? PositionId = null,
+    string? Description = null)
 {
     public static string EntityId(string kind, Guid sourceId) => $"{kind}:{sourceId}";
 }

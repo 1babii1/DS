@@ -84,7 +84,7 @@ public class ResilienceAndWiringTests
     {
         var stub = new CountingStub(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
         using var http = ClientWithRealPolicy(stub);
-        var tools = new DirectoryTools(new DirectoryApiClient(http), new EmployeeApiClient(http));
+        var tools = new DirectoryTools(new DirectoryApiClient(http), new EmployeeApiClient(http), new SearchApiClient(http));
 
         McpException? opened = null;
         for (var i = 0; i < 8 && opened is null; i++)

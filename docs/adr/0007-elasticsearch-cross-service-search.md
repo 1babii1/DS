@@ -44,6 +44,9 @@ search engine already does. Verified directly: an integration test asserts an ex
 ranks at or above a prefix match, which ranks above a plain substring match, against a real
 (Testcontainers) Elasticsearch instance.
 
+*(Update: the department embedding pipeline described here was retired by [0020](0020-one-embedding-per-department.md);
+`search_departments` now reads this service.)*
+
 This is a different, complementary technique from McpServer's existing pgvector semantic
 search over departments (`search_departments`, `DirectoryService`'s `DepartmentEmbedding` +
 Ollama) - that tool answers "what's conceptually similar," meant for an LLM client

@@ -131,12 +131,16 @@ public class DomainEventsConsumer(
     // The event carries the whole set of fields the document is built from, so the document is rebuilt and
     // overwritten (the same idempotent full re-index as on creation). Only active departments can be renamed at the
     // source, so the document stays active.
-    private Task HandleDepartmentRenamed(string payload, DateTime occurredAt, CancellationToken cancellationToken)
+    //
+    // Employee and position documents carry the department's name in their own text, so they are rebuilt from the
+    // documents they were made from. That reads current state rather than comparing old and new names, which makes it
+    // safe to repeat when the message is redelivered after a partial failure.
+    private async Task HandleDepartmentRenamed(string payload, DateTime occurredAt, CancellationToken cancellationToken)
     {
         var @event = JsonSerializer.Deserialize<DepartmentRenamedEvent>(payload)
             ?? throw new InvalidOperationException($"Could not deserialize {DepartmentRenamedEvent.MessageType} payload");
 
-        return IndexEntityAsync(
+        await IndexEntityAsync(
             new SearchDocument(
                 SearchDocument.EntityId(SearchKind.Department, @event.DepartmentId),
                 SearchKind.Department,
@@ -147,6 +151,44 @@ public class DomainEventsConsumer(
                 true,
                 occurredAt),
             cancellationToken);
+
+        foreach (var dependent in await indexClient.FindByDepartmentAsync(@event.DepartmentId, cancellationToken))
+        {
+            var rebuilt = dependent.Kind switch
+            {
+                SearchKind.Employee => await RebuildEmployeeAsync(dependent, occurredAt, cancellationToken),
+                SearchKind.Position => await RebuildPositionAsync(dependent, occurredAt, cancellationToken),
+                _ => null,
+            };
+            if (rebuilt is not null)
+            {
+                await IndexEntityAsync(rebuilt, cancellationToken);
+            }
+        }
+    }
+
+    private async Task<SearchDocument?> RebuildEmployeeAsync(SearchDocument existing, DateTime occurredAt, CancellationToken cancellationToken)
+    {
+        if (existing.DepartmentIds is not [var departmentId] || existing.PositionId is not { } positionId)
+        {
+            return null;
+        }
+
+        // SearchText for an employee doc is always "{fullName} {email}" - email is the last token.
+        var email = existing.SearchText.Split(' ').LastOrDefault() ?? string.Empty;
+        return await BuildEmployeeAsync(
+            existing.SourceId, existing.Title, email, departmentId, positionId, existing.IsActive, occurredAt, cancellationToken);
+    }
+
+    private async Task<SearchDocument?> RebuildPositionAsync(SearchDocument existing, DateTime occurredAt, CancellationToken cancellationToken)
+    {
+        if (existing.DepartmentIds is not { Length: > 0 } departmentIds)
+        {
+            return null;
+        }
+
+        return await BuildPositionAsync(
+            existing.SourceId, existing.Title, existing.Description, departmentIds, occurredAt, cancellationToken);
     }
 
     private Task HandleDepartmentDeleted(string payload, CancellationToken cancellationToken)
@@ -162,8 +204,17 @@ public class DomainEventsConsumer(
         var @event = JsonSerializer.Deserialize<PositionCreatedEvent>(payload)
             ?? throw new InvalidOperationException($"Could not deserialize {PositionCreatedEvent.MessageType} payload");
 
+        await IndexEntityAsync(
+            await BuildPositionAsync(
+                @event.PositionId, @event.Name, @event.Description, @event.DepartmentIds, occurredAt, cancellationToken),
+            cancellationToken);
+    }
+
+    private async Task<SearchDocument> BuildPositionAsync(
+        Guid positionId, string name, string? description, Guid[] departmentIds, DateTime occurredAt, CancellationToken cancellationToken)
+    {
         var departmentNames = new List<string>();
-        foreach (var departmentId in @event.DepartmentIds)
+        foreach (var departmentId in departmentIds)
         {
             var department = await indexClient.GetAsync(
                 SearchDocument.EntityId(SearchKind.Department, departmentId), cancellationToken);
@@ -173,19 +224,19 @@ public class DomainEventsConsumer(
             }
         }
 
-        var subtitle = departmentNames.Count > 0 ? string.Join(", ", departmentNames) : @event.Description;
+        var subtitle = departmentNames.Count > 0 ? string.Join(", ", departmentNames) : description;
 
-        await IndexEntityAsync(
-            new SearchDocument(
-                SearchDocument.EntityId(SearchKind.Position, @event.PositionId),
-                SearchKind.Position,
-                @event.PositionId,
-                @event.Name,
-                subtitle,
-                $"{@event.Name} {@event.Description} {string.Join(" ", departmentNames)}",
-                true,
-                occurredAt),
-            cancellationToken);
+        return new SearchDocument(
+            SearchDocument.EntityId(SearchKind.Position, positionId),
+            SearchKind.Position,
+            positionId,
+            name,
+            subtitle,
+            $"{name} {description} {string.Join(" ", departmentNames)}",
+            true,
+            occurredAt,
+            departmentIds,
+            Description: description);
     }
 
     private Task HandleLocationCreated(string payload, DateTime occurredAt, CancellationToken cancellationToken)
@@ -258,6 +309,12 @@ public class DomainEventsConsumer(
     }
 
     private async Task UpsertEmployeeAsync(
+        Guid employeeId, string fullName, string email, Guid departmentId, Guid positionId, bool isActive, DateTime occurredAt, CancellationToken cancellationToken) =>
+        await IndexEntityAsync(
+            await BuildEmployeeAsync(employeeId, fullName, email, departmentId, positionId, isActive, occurredAt, cancellationToken),
+            cancellationToken);
+
+    private async Task<SearchDocument> BuildEmployeeAsync(
         Guid employeeId, string fullName, string email, Guid departmentId, Guid positionId, bool isActive, DateTime occurredAt, CancellationToken cancellationToken)
     {
         var department = await indexClient.GetAsync(SearchDocument.EntityId(SearchKind.Department, departmentId), cancellationToken);
@@ -265,16 +322,16 @@ public class DomainEventsConsumer(
 
         var subtitle = $"{position?.Title} · {department?.Title}".Trim(' ', '·');
 
-        await IndexEntityAsync(
-            new SearchDocument(
-                SearchDocument.EntityId(SearchKind.Employee, employeeId),
-                SearchKind.Employee,
-                employeeId,
-                fullName,
-                subtitle,
-                $"{fullName} {email}",
-                isActive,
-                occurredAt),
-            cancellationToken);
+        return new SearchDocument(
+            SearchDocument.EntityId(SearchKind.Employee, employeeId),
+            SearchKind.Employee,
+            employeeId,
+            fullName,
+            subtitle,
+            $"{fullName} {email}",
+            isActive,
+            occurredAt,
+            [departmentId],
+            positionId);
     }
 }

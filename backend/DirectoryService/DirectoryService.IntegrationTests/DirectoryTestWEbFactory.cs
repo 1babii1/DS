@@ -16,7 +16,7 @@ namespace DirectoryService.IntegrationTests;
 public class DirectoryTestWEbFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     // Same image as docker-compose: the model uses ltree for hierarchy paths and
-    // vector for department embeddings, neither of which exists on a plain postgres image.
+    // vector (an early migration still creates the extension), neither of which exists on a plain postgres image.
     private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder("pgvector/pgvector:pg18")
         .WithDatabase("directory_service_db")
         .WithPassword("postgres")
@@ -102,10 +102,6 @@ public class DirectoryTestWEbFactory : WebApplicationFactory<Program>, IAsyncLif
             // случайный тест. Воркеры эмбеддингов и outbox к тому же непрерывно логируют
             // ошибки, потому что Ollama и Kafka в тестовом окружении не подняты.
             service.RemoveAll<IHostedService>();
-
-            // No Ollama in the test environment: embeddings come from words, deterministically.
-            service.RemoveAll<DirectoryService.Infrastructure.Postgres.Embeddings.IEmbeddingClient>();
-            service.AddSingleton<DirectoryService.Infrastructure.Postgres.Embeddings.IEmbeddingClient, FakeEmbeddingClient>();
 
             // Program.cs wires JWT Bearer against a real AuthService JWKS endpoint this
             // test host doesn't have. Query-contract tests need [Authorize] to actually

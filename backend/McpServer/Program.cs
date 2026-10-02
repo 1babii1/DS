@@ -20,6 +20,12 @@ builder.Services.AddHttpClient<DirectoryApiClient>(client =>
     .AddHttpMessageHandler<BearerForwardingHandler>()
     .AddResilienceHandler("directory-api", ServiceApiResilience.Configure);
 
+builder.Services.AddHttpClient<SearchApiClient>(client =>
+        client.BaseAddress = new Uri(builder.Configuration["Services:Search:BaseUrl"]
+            ?? throw new InvalidOperationException("Configuration 'Services:Search:BaseUrl' is not set.")))
+    .AddHttpMessageHandler<BearerForwardingHandler>()
+    .AddResilienceHandler("search-api", ServiceApiResilience.Configure);
+
 builder.Services.AddHttpClient<AuditApiClient>(client =>
         client.BaseAddress = new Uri(builder.Configuration["Services:Audit:BaseUrl"]
             ?? throw new InvalidOperationException("Configuration 'Services:Audit:BaseUrl' is not set.")))

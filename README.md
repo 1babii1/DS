@@ -53,7 +53,7 @@ Three things worth your time, in this order, each with its evidence next to it:
 Run it yourself with `scripts/demo.sh up` (see [Running it](#running-it)); a 40-second captioned overview is
 [`docs/demo/video/portfolio-overview.mp4`](docs/demo/video/portfolio-overview.mp4), and the complete interactive
 walkthrough is scripted in [`docs/demo/storyboard.md`](docs/demo/storyboard.md). The reasoning behind every decision is in
-[`docs/adr/`](docs/adr/): 19 short records of the actual trade-offs, written the way I'd defend them in a design review,
+[`docs/adr/`](docs/adr/): 21 short records of the actual trade-offs, written the way I'd defend them in a design review,
 not backfilled to sound tidy. What is not done is listed plainly in [Honest status](#honest-status).
 
 ## Proof, not claims
@@ -189,7 +189,7 @@ to reason about.
 
 | Service | Role | Protocols |
 |---|---|---|
-| **DirectoryService** | source of truth for org structure — departments (`ltree` hierarchy), positions, locations — plus department rename and pgvector semantic department search | REST + gRPC server, Kafka producer |
+| **DirectoryService** | source of truth for org structure — departments (`ltree` hierarchy), positions, locations — plus department rename | REST + gRPC server, Kafka producer |
 | **AuthService** | OpenIddict OIDC provider (`authorization_code` + PKCE, `client_credentials`), ASP.NET Identity, account provisioning | REST + OIDC, Kafka producer + consumer |
 | **EmployeeService** | employee records — hire, transfer, terminate — participant in the hire→provision-account saga | REST, gRPC client → DirectoryService, Kafka producer + consumer |
 | **AuditService** | append-only record of every event on the bus (placed at the event's own time), with a dead-letter table, and the org as it was on any past date folded from that log | Kafka consumer, REST (read-only) |
@@ -412,12 +412,14 @@ What is verified, and what is not, said plainly rather than glossed over:
   audience-bound hub ticket is specified (issue #101) and not built.
 - **The assistant can still be talked into proposing.** The measurement says what is guaranteed (readable, bounded,
   applied only on a click) and what is not (a planted instruction can still produce a valid bounded card). The eval is
-  3 runs of 9 tasks against one local model: direction, not rates. The assistant has no tool that lists a department's
-  positions, so it can only use position ids it has seen on an employee.
+  3 runs of 9 tasks against one local model: direction, not rates. The assistant now has a tool that lists a department's
+  positions (`list_positions_by_department`), added after that measurement, so the eval was run without it and has not
+  been re-run with it.
 - **Hybrid search tied semantic search; it did not beat it**, on 43 labelled queries over a synthetic organization. A
-  keyword defect found in the first run was fixed after seeing it, so the table is optimistic for hybrid. Two embeddings
-  of a department exist (DirectoryService's, used by the MCP search tool, and SearchService's); retiring one is an open
-  decision. An employee's search text keeps the old department name after a department rename until their next event.
+  keyword defect found in the first run was fixed after seeing it, so the table is optimistic for hybrid. A department is
+  embedded in one place, SearchService; the MCP search tool reads it ([ADR 0020](docs/adr/0020-one-embedding-per-department.md)),
+  so it now depends on that service and has not been measured end to end. Employee and position documents are rebuilt
+  when their department is renamed; documents indexed before that existed keep the old name until their next event.
   Search covers five entity kinds; position and location updates and deletions do not exist as events yet.
 - **The org history starts when the audit log did**, entries stored before the event's own time travelled with the
   message keep their receive time, and the domain has no "head of department", so "who led it in March" cannot be
@@ -425,9 +427,9 @@ What is verified, and what is not, said plainly rather than glossed over:
 - **The browser pages (assistant, org history) are covered by lint, type checks, a production build and unit tests of
   their logic, not by an automated browser test.** The same is true of the frontend generally.
 - The observability stack (Tempo/Loki/Prometheus/Grafana) is wired and working but optional by design
-  (`--profile obs`) — traces and metrics exist, dashboards are minimal. Whether a bearer token passed in a query string
-  is recorded in trace attributes was not established (nginx's access log masks it; the request log records only the
-  path).
+  (`--profile obs`) — traces and metrics exist, dashboards are minimal. A bearer token passed in a query string is not
+  recorded in trace attributes: the incoming-request span redacts every query value, and a test pins that (it fails
+  if redaction is switched off). nginx's access log masks it and the request log records only the path.
 
 I'd rather a portfolio README say "here's what's actually missing and why" than read like
 marketing copy for a project nobody's going to production with.

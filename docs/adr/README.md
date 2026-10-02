@@ -25,6 +25,8 @@ descriptions as each phase shipped, not backfilled generically.
 | [0016](0016-agent-proposes-user-confirms.md) | The agent proposes, the user confirms |
 | [0017](0017-approval-is-informed-and-bounded.md) | Approval is informed and bounded, not a promise about the model |
 | [0019](0019-org-time-machine-from-the-event-log.md) | The org on a past date, folded from the event log |
+| [0020](0020-one-embedding-per-department.md) | One embedding per department, in SearchService |
+| [0021](0021-sign-out-revokes-the-refresh-token.md) | Sign-out clears the BFF's tokens and revokes the refresh token at the issuer |
 
 Not yet written up, though each decision is already live in the codebase and explained
 in its own commit messages: gRPC for internal calls, local JWT validation via JWKS,

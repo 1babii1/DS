@@ -8,14 +8,6 @@ public sealed class DirectoryApiClient(HttpClient http)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    public async Task<IReadOnlyList<DepartmentSearchResult>> SearchAsync(
-        string query, int limit, CancellationToken ct)
-    {
-        var results = await GetEnvelopeAsync<List<SearchDto>>(
-            $"api/departments/search?query={Uri.EscapeDataString(query)}&limit={limit}", ct);
-        return (results ?? []).Select(r => new DepartmentSearchResult(r.Id, r.Name, r.Identifier, r.Score)).ToList();
-    }
-
     // The API returns a bare page with no total, and its default page size is 20. A full page is the
     // only hint there may be more, so HasMore can be a false positive when the last page is exactly
     // full; it is never a false negative.
@@ -102,8 +94,6 @@ public sealed class DirectoryApiClient(HttpClient http)
     }
 
     private sealed record Envelope<T>(T? Result, bool IsError);
-
-    private sealed record SearchDto(Guid Id, string Name, string Identifier, double Score);
 
     private sealed record HierarchyDto(Guid Id, Guid? ParentId, string Name, string Identifier, int Depth, bool IsActive);
 

@@ -194,6 +194,10 @@ public static class AuthenticationConfiguration
                 options
                     .SetAuthorizationEndpointUris("connect/authorize")
                     .SetTokenEndpointUris("connect/token")
+
+                    // Only the confidential web client is granted this (WebClientSeeder), so the BFF can end a
+                    // refresh token at sign-out; the browser-facing client has no permission for it.
+                    .SetRevocationEndpointUris("connect/revocation")
                     .SetUserInfoEndpointUris("connect/userinfo")
                     .SetEndSessionEndpointUris("connect/logout");
 
