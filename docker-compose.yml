@@ -555,11 +555,6 @@ services:
       - "127.0.0.1:1025:1025"
       - "127.0.0.1:8025:8025"
 
-  # Distributed tracing/metrics/log-correlation stack. Opt-in via
-  # `docker compose --profile obs up`: the main services already point at
-  # otel-collector unconditionally, but the OTel SDK degrades gracefully
-  # (retries quietly, never crashes the host) when it isn't running, so nothing
-  # here is required for the rest of the stack to work.
   # Schema registry for the event contracts (ADR 0023). Nothing depends on it at runtime; it is the arbiter that
   # scripts/check_schemas.py (and CI) ask whether a schema change is compatible. In memory: a restart forgets everything.
   schema_registry:
@@ -574,6 +569,11 @@ services:
     profiles: ["obs"]
     image: otel/opentelemetry-collector-contrib:latest
     command: ["--config", "/etc/otelcol/otel-collector-config.yaml"]
+  # Distributed tracing/metrics/log-correlation stack. Opt-in via
+  # `docker compose --profile obs up`: the main services already point at
+  # otel-collector unconditionally, but the OTel SDK degrades gracefully
+  # (retries quietly, never crashes the host) when it isn't running, so nothing
+  # here is required for the rest of the stack to work.
     volumes:
       - ./docker/otel-collector/otel-collector-config.yaml:/etc/otelcol/otel-collector-config.yaml:ro
     ports:
