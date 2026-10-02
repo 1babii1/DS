@@ -31,9 +31,9 @@ public class CurrencyGrantWriter(RewardsDbContext dbContext, IEventAvroEncoder? 
             RewardsEventTypes.CurrencyGranted,
             employeeId.ToString(),
             JsonSerializer.Serialize(@event));
-        if (avro is { IsConfigured: true })
+        if (avro is not null && avro.TryEncode(RewardsEventTypes.CurrencyGranted, @event, out var bytes))
         {
-            message.ExpectAvro(avro.TryEncode(RewardsEventTypes.CurrencyGranted, @event, out var bytes) ? bytes : null);
+            message.AttachAvro(bytes);
         }
 
         dbContext.OutboxMessages.Add(message);

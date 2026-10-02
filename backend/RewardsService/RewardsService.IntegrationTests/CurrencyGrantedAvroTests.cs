@@ -61,7 +61,6 @@ public class CurrencyGrantedAvroTests : IClassFixture<RewardsTestWebFactory>, IA
 
         var row = await OnlyOutboxRow();
         Assert.Null(row.AvroPayload);
-        Assert.True(row.AvroExpected);
         Assert.Contains("CurrencyGranted", row.Type);
     }
 

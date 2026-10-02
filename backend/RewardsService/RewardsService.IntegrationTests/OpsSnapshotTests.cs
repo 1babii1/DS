@@ -32,36 +32,6 @@ public class OpsSnapshotTests : IClassFixture<RewardsTestWebFactory>, IAsyncLife
     }
 
     [Fact]
-    public async Task Rows_owed_to_the_avro_topic_are_counted_apart_from_the_json_backlog()
-    {
-        var jsonOnly = OutboxMessage.Create("A", "1", "{}");
-        var owed = OutboxMessage.Create("B", "2", "{}");
-        owed.ExpectAvro(null);
-        owed.MarkProcessed();
-        var done = OutboxMessage.Create("C", "3", "{}");
-        done.ExpectAvro([1]);
-        done.MarkProcessed();
-        done.MarkAvroPublished();
-        var parkedOwed = OutboxMessage.Create("D", "4", "{}");
-        parkedOwed.ExpectAvro([1]);
-        parkedOwed.MarkProcessed();
-        parkedOwed.RecordFailure("x", maxAttempts: 1);
-
-        await using (var scope = _services.CreateAsyncScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<RewardsDbContext>();
-            db.Set<OutboxMessage>().AddRange(jsonOnly, owed, done, parkedOwed);
-            await db.SaveChangesAsync();
-        }
-
-        var snapshot = await Read();
-
-        Assert.Equal(1, snapshot.AvroPending);
-        Assert.Equal(1, snapshot.Pending);
-        Assert.Equal(1, snapshot.Parked);
-    }
-
-    [Fact]
     public async Task Parked_pending_and_dead_letters_are_counted_separately()
     {
         var processed = OutboxMessage.Create("A", "1", "{}");

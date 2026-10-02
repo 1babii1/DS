@@ -48,7 +48,6 @@ public class OutboxAvroTests : IClassFixture<DirectoryTestWEbFactory>, IAsyncLif
 
         var row = await OnlyRow();
         Assert.Equal(new byte[] { 0, 0, 0, 0, 7, 1, 2, 3 }, row.AvroPayload);
-        Assert.True(row.AvroExpected);
         Assert.Contains(id.ToString(), row.Payload);
         Assert.Equal(("DepartmentDeleted", new DepartmentDeletedEvent(id)), Assert.Single(encoder.Seen));
     }
@@ -62,9 +61,6 @@ public class OutboxAvroTests : IClassFixture<DirectoryTestWEbFactory>, IAsyncLif
 
         var row = await OnlyRow();
         Assert.Null(row.AvroPayload);
-
-        // Still owed to the Avro topic: the bytes are made from the JSON when it is published.
-        Assert.True(row.AvroExpected);
         Assert.Contains(id.ToString(), row.Payload);
     }
 
@@ -75,48 +71,6 @@ public class OutboxAvroTests : IClassFixture<DirectoryTestWEbFactory>, IAsyncLif
 
         var row = await OnlyRow();
         Assert.Null(row.AvroPayload);
-        Assert.False(row.AvroExpected);
-    }
-
-    // Which rows a publish cycle picks up, translated by EF and run by Postgres: the new columns must mean what the
-    // publisher thinks they mean, in particular that rows from before Avro existed are never owed to the Avro topic.
-    [Fact]
-    public async Task The_pending_query_picks_the_rows_still_owed_to_each_topic()
-    {
-        OutboxMessage Row(string type) => OutboxMessage.Create(type, "agg", "{}");
-        var fresh = Row("fresh");
-        var freshAvro = Row("freshAvro");
-        freshAvro.ExpectAvro([1]);
-        var legacyDone = Row("legacyDone");
-        legacyDone.MarkProcessed();
-        var avroOwed = Row("avroOwed");
-        avroOwed.ExpectAvro(null);
-        avroOwed.MarkProcessed();
-        var bothDone = Row("bothDone");
-        bothDone.ExpectAvro([1]);
-        bothDone.MarkProcessed();
-        bothDone.MarkAvroPublished();
-        var parked = Row("parked");
-        parked.RecordFailure("x", maxAttempts: 1);
-        var parkedAvroOwed = Row("parkedAvroOwed");
-        parkedAvroOwed.ExpectAvro([1]);
-        parkedAvroOwed.MarkProcessed();
-        parkedAvroOwed.RecordFailure("x", maxAttempts: 1);
-
-        await using (var scope = _services.CreateAsyncScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<DirectoryServiceDbContext>();
-            db.Set<OutboxMessage>().AddRange(fresh, freshAvro, legacyDone, avroOwed, bothDone, parked, parkedAvroOwed);
-            await db.SaveChangesAsync();
-        }
-
-        await using var read = _services.CreateAsyncScope();
-        var context = read.ServiceProvider.GetRequiredService<DirectoryServiceDbContext>();
-        var withoutAvro = await context.Set<OutboxMessage>().Where(OutboxRowPublisher.Pending(false)).Select(m => m.Type).OrderBy(t => t).ToListAsync();
-        var withAvro = await context.Set<OutboxMessage>().Where(OutboxRowPublisher.Pending(true)).Select(m => m.Type).OrderBy(t => t).ToListAsync();
-
-        Assert.Equal(["fresh", "freshAvro"], withoutAvro);
-        Assert.Equal(["avroOwed", "fresh", "freshAvro"], withAvro);
     }
 
     private async Task Enqueue(IEventAvroEncoder? encoder, DepartmentDeletedEvent payload)

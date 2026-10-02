@@ -50,7 +50,6 @@ public class OutboxAvroTests : IClassFixture<EmployeeTestWebFactory>, IAsyncLife
         await using var read = _services.CreateAsyncScope();
         var row = await read.ServiceProvider.GetRequiredService<EmployeeDbContext>().Set<OutboxMessage>().AsNoTracking().SingleAsync();
         Assert.Equal(ready ? new byte[] { 0, 0, 0, 0, 3, 8 } : null, row.AvroPayload);
-        Assert.True(row.AvroExpected);
         Assert.Contains("maria@example.com", row.Payload);
     }
 

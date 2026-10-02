@@ -10,9 +10,9 @@ services:
       # 5179 (gRPC) is service-to-service only and stays on the compose network.
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
-      # Opt-in (ADR 0023): set SCHEMA_REGISTRY_URL (e.g. http://schema_registry:8080/apis/ccompat/v7, with `--profile contracts`)
+      # Events are Avro (ADR 0023): the schema registry is required, the Kafka topics are the *.events.v2 ones.
       # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
-      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-}
+      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}
       - ConnectionStrings__DirectoryServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=directory,public
       - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:-changeme-redis}
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
@@ -60,10 +60,10 @@ services:
       - "5130:5130"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
-      - Kafka__Topics__0=employee.events${EVENT_TOPIC_SUFFIX:-}
-      # Opt-in (ADR 0023): set SCHEMA_REGISTRY_URL (e.g. http://schema_registry:8080/apis/ccompat/v7, with `--profile contracts`)
+      - Kafka__Topics__0=employee.events.v2
+      # Events are Avro (ADR 0023): the schema registry is required, the Kafka topics are the *.events.v2 ones.
       # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
-      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-}
+      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}
       - ASPNETCORE_URLS=http://*:5130
       - ConnectionStrings__AuthServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=auth,public
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
@@ -127,10 +127,10 @@ services:
       - "5131:5131"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
-      - Kafka__Topics__0=auth.events${EVENT_TOPIC_SUFFIX:-}
-      # Opt-in (ADR 0023): set SCHEMA_REGISTRY_URL (e.g. http://schema_registry:8080/apis/ccompat/v7, with `--profile contracts`)
+      - Kafka__Topics__0=auth.events.v2
+      # Events are Avro (ADR 0023): the schema registry is required, the Kafka topics are the *.events.v2 ones.
       # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
-      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-}
+      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}
       - ASPNETCORE_URLS=http://*:5131
       - ConnectionStrings__EmployeeServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=employee,public
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
@@ -182,10 +182,10 @@ services:
       - "5132:5132"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
-      # Opt-in (ADR 0023): with SCHEMA_REGISTRY_URL and EVENT_TOPIC_SUFFIX=.v2 both set, the audit log reads the Avro topics.
-      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-}
-      - Kafka__Topics__0=directory.events${EVENT_TOPIC_SUFFIX:-}
-      - Kafka__Topics__1=employee.events${EVENT_TOPIC_SUFFIX:-}
+      # Events are Avro (ADR 0023): the schema registry is required, the Kafka topics are the *.events.v2 ones.
+      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}
+      - Kafka__Topics__0=directory.events.v2
+      - Kafka__Topics__1=employee.events.v2
       - ASPNETCORE_URLS=http://*:5132
       - ConnectionStrings__AuditServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=audit,public
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
@@ -233,11 +233,11 @@ services:
       - "5134:5134"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
-      - Kafka__Topics__0=employee.events${EVENT_TOPIC_SUFFIX:-}
-      - Kafka__Topics__1=auth.events${EVENT_TOPIC_SUFFIX:-}
-      # Opt-in (ADR 0023): set SCHEMA_REGISTRY_URL (e.g. http://schema_registry:8080/apis/ccompat/v7, with `--profile contracts`)
+      - Kafka__Topics__0=employee.events.v2
+      - Kafka__Topics__1=auth.events.v2
+      # Events are Avro (ADR 0023): the schema registry is required, the Kafka topics are the *.events.v2 ones.
       # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
-      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-}
+      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}
       - ASPNETCORE_URLS=http://*:5134
       - ConnectionStrings__RewardsServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=rewards,public
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
@@ -285,12 +285,12 @@ services:
       - "5135:5135"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
-      # Opt-in (ADR 0023): SCHEMA_REGISTRY_URL and EVENT_TOPIC_SUFFIX=.v2 together make this service read the Avro topics.
-      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-}
-      - Kafka__Topics__0=directory.events${EVENT_TOPIC_SUFFIX:-}
-      - Kafka__Topics__1=employee.events${EVENT_TOPIC_SUFFIX:-}
-      - Kafka__Topics__2=auth.events${EVENT_TOPIC_SUFFIX:-}
-      - Kafka__Topics__3=rewards.events${EVENT_TOPIC_SUFFIX:-}
+      # Events are Avro (ADR 0023): the schema registry is required, the Kafka topics are the *.events.v2 ones.
+      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}
+      - Kafka__Topics__0=directory.events.v2
+      - Kafka__Topics__1=employee.events.v2
+      - Kafka__Topics__2=auth.events.v2
+      - Kafka__Topics__3=rewards.events.v2
       - ASPNETCORE_URLS=http://*:5135
       - ConnectionStrings__SearchServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=search,public
       - Elasticsearch__Uri=http://elasticsearch:9200
@@ -407,11 +407,11 @@ services:
       - "5133:5133"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
-      # Opt-in (ADR 0023): SCHEMA_REGISTRY_URL and EVENT_TOPIC_SUFFIX=.v2 together make this service read the Avro topics.
-      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-}
-      - Kafka__Topics__0=rewards.events${EVENT_TOPIC_SUFFIX:-}
-      - Kafka__Topics__1=auth.events${EVENT_TOPIC_SUFFIX:-}
-      - Kafka__Topics__2=employee.events${EVENT_TOPIC_SUFFIX:-}
+      # Events are Avro (ADR 0023): the schema registry is required, the Kafka topics are the *.events.v2 ones.
+      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}
+      - Kafka__Topics__0=rewards.events.v2
+      - Kafka__Topics__1=auth.events.v2
+      - Kafka__Topics__2=employee.events.v2
       - ASPNETCORE_URLS=http://*:5133
       - ConnectionStrings__NotificationServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=notification,public
       - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:-changeme-redis}
@@ -583,14 +583,41 @@ services:
       - "127.0.0.1:1025:1025"
       - "127.0.0.1:8025:8025"
 
-  # Schema registry for the event contracts (ADR 0023). Nothing depends on it at runtime; it is the arbiter that
-  # scripts/check_schemas.py (and CI) ask whether a schema change is compatible. In memory: a restart forgets everything.
+  # Schema registry for the event contracts (ADR 0023). Events travel as Avro and every message carries the id of its
+  # schema, so the registry has to remember: it stores in its own database (`registry`) on the shared Postgres, and an
+  # empty registry would make every message already in Kafka unreadable. registry_db_init creates the database once
+  # (init-databases.sql only runs on a fresh volume).
+  registry_db_init:
+    container_name: registry_db_init
+    restart: "no"
+    image: pgvector/pgvector:pg18
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        psql -h postgres -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='registry'" | grep -q 1
+        || psql -h postgres -U postgres -c "CREATE DATABASE registry"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   schema_registry:
     container_name: schema_registry
-    profiles: ["contracts"]
+    restart: always
     image: quay.io/apicurio/apicurio-registry:3.0.7
+    environment:
+      APICURIO_STORAGE_KIND: sql
+      APICURIO_STORAGE_SQL_KIND: postgresql
+      APICURIO_DATASOURCE_URL: jdbc:postgresql://postgres:5432/registry
+      APICURIO_DATASOURCE_USERNAME: postgres
+      APICURIO_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "127.0.0.1:8081:8080"
+    depends_on:
+      registry_db_init:
+        condition: service_completed_successfully
 
   # Distributed tracing/metrics/log-correlation stack. Opt-in via
   # `docker compose --profile obs up`: the main services already point at

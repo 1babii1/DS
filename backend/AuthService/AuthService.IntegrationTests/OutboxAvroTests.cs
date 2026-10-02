@@ -46,7 +46,6 @@ public class OutboxAvroTests : IClassFixture<AuthTestWebFactory>, IAsyncLifetime
         var row = await read.ServiceProvider.GetRequiredService<AuthDbContext>().Set<OutboxMessage>().AsNoTracking()
             .SingleAsync(m => m.Type == "AccountProvisioned");
         Assert.Equal(ready ? new byte[] { 0, 0, 0, 0, 5, 6 } : null, row.AvroPayload);
-        Assert.True(row.AvroExpected);
     }
 
     public Task InitializeAsync() => Task.CompletedTask;

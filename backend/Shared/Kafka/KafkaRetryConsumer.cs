@@ -254,7 +254,7 @@ public abstract class KafkaRetryConsumer<TDbContext> : BackgroundService
 
     /// <summary>
     /// The message as the handlers see it. JSON bytes become a string. An Avro message is decoded; when that cannot ever
-    /// succeed (not Avro after all, a corrupt body) <paramref name="undecodable"/> says why and the
+    /// succeed (not Avro after all, a corrupt body, a schema id the registry does not know: an answer, not an outage) <paramref name="undecodable"/> says why and the
     /// value is the raw bytes in base64, so the dead letter keeps them. Registry or network failures are not caught here:
     /// they are for the caller to wait out.
     /// </summary>
@@ -281,7 +281,8 @@ public abstract class KafkaRetryConsumer<TDbContext> : BackgroundService
                 // Which writer schema the event was written with, for a consumer that records it (AuditService).
                 headers.Add(AvroSchemaIdHeader, Encoding.UTF8.GetBytes(decoded.SchemaId.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             }
-            catch (Exception ex) when (ex is FormatException or global::Avro.AvroException or IndexOutOfRangeException or EndOfStreamException)
+            catch (Exception ex) when (ex is FormatException or global::Avro.AvroException or IndexOutOfRangeException or EndOfStreamException
+                or Confluent.SchemaRegistry.SchemaRegistryException { Status: System.Net.HttpStatusCode.NotFound })
             {
                 undecodable = ex;
                 value = "avro-undecodable:" + Convert.ToBase64String(bytes);
