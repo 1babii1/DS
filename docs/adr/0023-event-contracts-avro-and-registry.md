@@ -7,6 +7,8 @@ Builds on [0002](0002-outbox-pattern-for-integration-events.md) (outbox) and [00
 could only check by name and shape, at one moment in time.
 
 ## Context
+How to change an event day to day: [the runbook](../runbooks/event-schema-evolution.md).
+
 Twenty-two event types cross four Kafka topics as JSON. A consumer keeps its own local copy of each record, on purpose,
 so services deploy independently. What was missing was *time*: nothing said whether today's event could still be read by
 yesterday's consumer, or yesterday's stored event by tomorrow's code. The second matters here more than usual,
@@ -82,7 +84,8 @@ schema released on the base branch is registered in order, then the change's; it
 3. a schema outside the producer's folder, a file name that differs from the record name, or the wrong namespace.
 
 It also registers a deliberately breaking schema first and requires the registry to refuse it, so a gate that has stopped
-working fails the job instead of passing everything. A test in `EventContracts.Tests` keeps each schema equal to its C#
+working fails the job instead of passing everything. The services also set `BACKWARD_TRANSITIVE` on each subject themselves when they register, so the registry refuses an
+incompatible schema at runtime too, not only in CI. A test in `EventContracts.Tests` keeps each schema equal to its C#
 record: same fields, and "optional in C#" means a union with `null` and a default.
 
 ## Consequences
@@ -155,3 +158,9 @@ Not verified in step 5: a real hire end to end through every consumer (it needs 
 create an account and a bonus for a person who does not exist); stale messages from the in-memory registry era that were
 left on the dev topics (their ids may now point at other schemas: development data only); behaviour on a registry that
 loses its database.
+
+Step 6 (the claim itself): through the real registry, encoder and decoder, an event written under version 1 is read by a
+schema three versions later (the new fields take their defaults), an event written under version 3 is read by a consumer
+still on version 1 (only its declared fields come through), every version in a history is read by the latest reader, and a
+required field added to an event is refused by the registry with a conflict. The registry's refusal depends on the
+compatibility rule the service sets on each subject at registration; removing that line fails the test.

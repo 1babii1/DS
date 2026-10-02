@@ -77,6 +77,9 @@ public sealed class EventAvroEncoder(EventSchemaCatalog catalog, ISchemaRegistry
             }
 
             catalog.TryGet(eventType, out _, out var json);
+            // The registry itself refuses an incompatible schema from now on, whatever CI did or did not catch: the rule
+            // is set on the subject before anything is registered under it (idempotent).
+            await registry.UpdateCompatibilityAsync(Compatibility.BackwardTransitive, SubjectOf(eventType));
             var id = await registry.RegisterSchemaAsync(SubjectOf(eventType), new Confluent.SchemaRegistry.Schema(json, SchemaType.Avro));
             _ids[eventType] = id;
             logger.LogDebug("Schema for {EventType} is id {SchemaId} under {Subject}", eventType, id, SubjectOf(eventType));
