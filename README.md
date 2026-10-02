@@ -50,9 +50,8 @@ Three things worth your time, in this order, each with its evidence next to it:
    time machine rebuilt by folding the event log ([ADR 0019](docs/adr/0019-org-time-machine-from-the-event-log.md)),
    which also fixed a real defect: the audit log recorded when a message arrived, not when the event happened.
 
-Run it yourself with `scripts/demo.sh up` (see [Running it](#running-it)); a 40-second captioned overview is
-[`docs/demo/video/portfolio-overview.mp4`](docs/demo/video/portfolio-overview.mp4), and the complete interactive
-walkthrough is scripted in [`docs/demo/storyboard.md`](docs/demo/storyboard.md). The reasoning behind every decision is in
+Run it yourself with `scripts/demo.sh up` (see [Running it](#running-it)); a shot list for a walkthrough is in
+[`docs/demo/storyboard.md`](docs/demo/storyboard.md). The reasoning behind every decision is in
 [`docs/adr/`](docs/adr/): 23 short records of the actual trade-offs, written the way I'd defend them in a design review,
 not backfilled to sound tidy. What is not done is listed plainly in [Honest status](#honest-status).
 
