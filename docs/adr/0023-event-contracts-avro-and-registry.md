@@ -1,7 +1,7 @@
 # 23. Event contracts: Avro schemas, a registry as the compatibility arbiter, additive-only evolution
 
 ## Status
-Accepted. Implementation is in steps (see "Rollout"); this ADR records the decision and what each step has verified so far.
+Accepted and implemented (steps 1-5). This ADR records the decision and what has been verified.
 Builds on [0002](0002-outbox-pattern-for-integration-events.md) (outbox) and [0003](0003-choreography-saga-for-hire-employee.md)
 (choreography). Complements the contract that [`ConsumerContractTests`](../../backend/EventContracts.Tests/ConsumerContractTests.cs)
 could only check by name and shape, at one moment in time.
@@ -53,31 +53,27 @@ mis-fold last March.
   declared fields coming through.
 - **AuditService (step 4a):** decodes whole records, stores the JSON and the id of the schema it was written with
   (`entries.SchemaId`, null for JSON), and treats `directory.events.v2` and `directory.events` as one source.
-- **Switching a consumer to the Avro topics is configuration:** `EVENT_TOPIC_SUFFIX=.v2` together with
-  `SCHEMA_REGISTRY_URL`. A consumer that moves reads the Avro topic from the start; what it already consumed from the JSON
-  topic is skipped by message id.
-- **AuditService decodes and stores JSON plus the schema version**, so the log outlives the registry and `OrgReplay`
-  is unchanged. *(Later steps.)*
-- **Migration through new topics `*.events.v2`**, with dual publishing while consumers move, then the old topics and
-  the JSON column go. *(Step 3 is dual publishing; the rest is later.)*
-  - **Two sides, tracked apart.** A row is owed to the old topic until `ProcessedAt` and to the Avro topic until
-    `AvroPublishedAt`. The JSON side is marked done before the Avro side is tried, so a failure on one side never makes
-    the other repeat; a row owed only its Avro side comes back on the next poll for just that. Consumers still dedupe
-    by message id, so the unavoidable at-least-once duplicate is harmless.
-  - **Which rows are owed to Avro.** Only rows written while a registry was configured (`AvroExpected`). Rows written
-    before are never sent to the Avro topic, so switching it on does not replay history. A row written while the registry
-    was unreachable is owed too: its bytes are made from its stored JSON at publish time, by the same conversion as a
-    live event (a test requires identical bytes for all 23 events), and publishing waits for the registry rather than
-    skipping the row.
-  - **A registry outage delays Avro, never the JSON topics or the write.** The backlog is visible as
-    `outbox_avro_pending_messages`.
-  - It is off unless `SchemaRegistry:Url` is set (compose: `SCHEMA_REGISTRY_URL`, with `--profile contracts`).
-  - The headers (`message-id`, `message-type`, `occurred-at`) and the key are the same on both topics.
+- **Migration through new topics `*.events.v2`, then only those.** Step 3 published to both the JSON topic and the Avro
+  one, tracked apart per outbox row; step 4 moved the six consumers over; step 5 (this state) publishes **only** the Avro
+  topics and the consumers read only those. The old `*.events` topics are no longer written, read or provisioned and
+  expire on their own retention. The two bookkeeping columns of the dual phase were dropped again (one migration per
+  producer); the history of how it was done is in the commit log.
+  - **A row is sent as the bytes staged when it was written** or, if the registry was unreachable then, **made from its
+    stored JSON when it is published**, by the same conversion as a live event (a test requires identical bytes for all
+    23 events). The JSON `Payload` therefore stays in the outbox: it is the readable record of what was written and the
+    source for that case. (The first plan said to drop the JSON column; keeping it is what lets a registry outage delay
+    publishing without failing a hire or a grant.)
+  - **Without a registry the publisher refuses to start** ("SchemaRegistry:Url must be set"); there is no JSON fallback.
+  - **A registry that forgets is worse than none.** Every message carries a schema id; an empty registry makes everything
+    already in Kafka unreadable. So the registry stores in Postgres (its own `registry` database on the shared server,
+    created by a one-shot job because `init-databases.sql` only runs on a fresh volume) and a restart was checked to keep
+    the same 28 subjects and the same ids. It is part of the default stack now, not an opt-in profile.
+  - The headers (`message-id`, `message-type`, `occurred-at`) and the key are what they always were.
 - **Avro, not Protobuf or JSON Schema.** Avro's resolution of writer and reader schemas is the mechanism the replay
   needs; the registry ecosystem (including Debezium, roadmap item 9) speaks it natively. gRPC between services stays
   Protobuf: a synchronous contract with generated stubs, a different problem.
 
-## The gate (this step)
+## The gate
 `scripts/check_schemas.py`, run in CI as the job "Event schema compatibility": a throwaway registry is started, every
 schema released on the base branch is registered in order, then the change's; it fails on
 1. a schema the registry refuses (new field without default, changed type, ...);
@@ -91,9 +87,13 @@ record: same fields, and "optional in C#" means a union with `null` and a defaul
 
 ## Consequences
 - **Evolution is slower on purpose.** A rename is two releases. That is the price of a log that can always be re-read.
-- **The registry is not on the runtime path** in this step, so its failure does not stop a hire. When encoding moves
-  into the outbox (a later step) the *schema id* will be needed at write time; that step will state how a registry outage
-  is handled (cache of known ids; a producer can only publish schemas it has already registered).
+- **The registry is on the publishing path, not on the writing path.** A hire or a grant is committed without it (the
+  bytes are staged only when the schema ids are already known); publishing waits for it, so an outage delays events
+  and shows up as a growing pending count, and consumers wait on a message they cannot decode yet. It must be kept
+  (hence the Postgres storage) and backed up with the rest of the data: lose it and the history in Kafka stops being
+  readable, though the audit log, which stores JSON, is unaffected.
+- **A schema id the registry does not know** (the registry was rebuilt empty, a message from another environment) is
+  an answer, not an outage: that message is set aside in `dead_letters` with its bytes, and the consumer moves on.
 - **Deprecated fields accumulate.** Nothing removes them; a schema that has grown too long needs a deliberate, separate
   decision (a new event type), not an edit.
 - **Avro on a `decimal`:** amounts use the `decimal` logical type, precision 18, scale 2, matching `numeric(18,2)`.
@@ -122,7 +122,7 @@ A finding worth keeping: the Avro .NET writer applies logical types itself and e
 and now has a schema, owned by the shared code (`ds.ops`), embedded in every service's catalog, and a record of its own
 instead of an anonymous object.
 
-Step 3 (dual publishing): the per-row decision is a function of its transport and is unit-tested for both topics, the
+Step 3 (dual publishing, since retired by step 5): the per-row decision is a function of its transport and is unit-tested for both topics, the
 Avro side failing after the JSON side succeeded (the JSON is not sent again), a registry that is down, rows from before
 Avro (never sent to it), no registry or no Avro topic (JSON only), and a row done on both sides; the pending-rows query
 is run by Postgres over rows in every state; the bytes made from stored JSON equal the bytes made from the live event for
@@ -144,3 +144,14 @@ Not verified yet: a registry that restarts empty under running services (their c
 the Avro topics in each consumer with real domain events (only a harmless `EmployeeTerminated` was sent, not a hire),
 retiring the old topics (step 5). The registry is in-memory (a restart forgets it); CI starts a fresh one per run, so what
 the gate compares against is the base branch's files, not a persistent registry.
+
+Step 5 (Avro only): the publisher sends bytes staged at write time or made from the stored JSON, marks a row done only
+after the send, and a broker or registry failure leaves it pending (unit-tested); an unknown schema id is set aside while
+a registry that is down or erroring is waited out (mutation-checked). **Run live:** the registry rebuilt on Postgres, the
+whole stack rebuilt with only the Avro topics, an event inserted into Employee's outbox reached the audit log with its
+schema id, nothing was dead-lettered, and a restart of the registry kept all 28 subjects and the same ids.
+
+Not verified in step 5: a real hire end to end through every consumer (it needs a signed-in session, and a hire would
+create an account and a bonus for a person who does not exist); stale messages from the in-memory registry era that were
+left on the dev topics (their ids may now point at other schemas: development data only); behaviour on a registry that
+loses its database.

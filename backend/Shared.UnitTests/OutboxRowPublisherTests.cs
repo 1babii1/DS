@@ -3,15 +3,13 @@ using Shared.Outbox;
 
 namespace Shared.UnitTests;
 
-// While an event goes to two topics, what matters is which side is marked done after which outcome: a failure on one
-// side must never make the other side repeat, and nothing may be marked that was not sent.
+// Events go out as Avro only. What matters is that a row is marked done only after a successful send, whatever fails
+// before it, and that the bytes are the staged ones when there are any and are made from the stored JSON when not.
 public class OutboxRowPublisherTests
 {
-    private const string AvroTopic = "x.events.v2";
-
-    private sealed class FakeEncoder(bool configured = true) : IEventAvroEncoder
+    private sealed class FakeEncoder : IEventAvroEncoder
     {
-        public bool IsConfigured => configured;
+        public bool IsConfigured => true;
 
         public bool IsReady => true;
 
@@ -34,56 +32,48 @@ public class OutboxRowPublisherTests
 
     private sealed class Sends
     {
-        public int Json { get; private set; }
+        public List<byte[]> Sent { get; } = [];
 
-        public List<byte[]> Avro { get; } = [];
+        public bool Fail { get; set; }
 
-        public bool FailAvro { get; set; }
-
-        public Task SendJson(OutboxMessage m, CancellationToken ct)
+        public Task Send(OutboxMessage m, byte[] bytes, CancellationToken ct)
         {
-            Json++;
-            return Task.CompletedTask;
-        }
-
-        public Task SendAvro(OutboxMessage m, byte[] bytes, CancellationToken ct)
-        {
-            if (FailAvro)
+            if (Fail)
             {
                 throw new InvalidOperationException("broker said no");
             }
 
-            Avro.Add(bytes);
+            Sent.Add(bytes);
             return Task.CompletedTask;
         }
     }
 
-    private static OutboxMessage Row(bool expectAvro, byte[]? bytes = null)
+    private static OutboxMessage Row(byte[]? bytes = null)
     {
         var row = OutboxMessage.Create("EmployeeHired", "agg", "{\"EmployeeId\":\"x\"}");
-        if (expectAvro)
+        if (bytes is not null)
         {
-            row.ExpectAvro(bytes);
+            row.AttachAvro(bytes);
         }
 
         return row;
     }
 
-    private static Task Publish(OutboxMessage row, Sends sends, IEventAvroEncoder? encoder, string? topic = AvroTopic) =>
-        OutboxRowPublisher.PublishAsync(row, sends.SendJson, sends.SendAvro, encoder, topic, CancellationToken.None);
+    private static Task Publish(OutboxMessage row, Sends sends, FakeEncoder encoder) =>
+        OutboxRowPublisher.PublishAsync(row, sends.Send, encoder, CancellationToken.None);
 
     [Fact]
-    public async Task A_row_with_its_avro_bytes_goes_to_both_topics_and_both_sides_are_marked()
+    public async Task A_row_with_its_avro_bytes_sends_those_and_is_marked_done()
     {
         var sends = new Sends();
-        var row = Row(true, [1, 2, 3]);
+        var encoder = new FakeEncoder();
+        var row = Row([1, 2, 3]);
 
-        await Publish(row, sends, new FakeEncoder());
+        await Publish(row, sends, encoder);
 
-        Assert.Equal(1, sends.Json);
-        Assert.Equal(new byte[] { 1, 2, 3 }, Assert.Single(sends.Avro));
+        Assert.Equal(new byte[] { 1, 2, 3 }, Assert.Single(sends.Sent));
+        Assert.Equal(0, encoder.JsonEncodes);
         Assert.NotNull(row.ProcessedAt);
-        Assert.NotNull(row.AvroPublishedAt);
     }
 
     [Fact]
@@ -91,89 +81,43 @@ public class OutboxRowPublisherTests
     {
         var sends = new Sends();
         var encoder = new FakeEncoder();
-        var row = Row(true, bytes: null);
+        var row = Row();
 
         await Publish(row, sends, encoder);
 
         Assert.Equal(1, encoder.JsonEncodes);
-        Assert.Equal(new byte[] { 9, 9 }, Assert.Single(sends.Avro));
-        Assert.NotNull(row.AvroPublishedAt);
+        Assert.Equal(new byte[] { 9, 9 }, Assert.Single(sends.Sent));
+        Assert.NotNull(row.ProcessedAt);
     }
 
     [Fact]
-    public async Task When_the_avro_side_fails_the_json_side_stays_done_and_is_never_sent_again()
+    public async Task A_broker_failure_leaves_the_row_pending()
     {
-        var sends = new Sends { FailAvro = true };
-        var row = Row(true, [1]);
+        var sends = new Sends { Fail = true };
+        var row = Row([1]);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => Publish(row, sends, new FakeEncoder()));
 
-        Assert.NotNull(row.ProcessedAt);
-        Assert.Null(row.AvroPublishedAt);
+        Assert.Null(row.ProcessedAt);
+        Assert.Empty(sends.Sent);
 
-        sends.FailAvro = false;
+        sends.Fail = false;
         await Publish(row, sends, new FakeEncoder());
 
-        Assert.Equal(1, sends.Json);
-        Assert.Single(sends.Avro);
-        Assert.NotNull(row.AvroPublishedAt);
+        Assert.NotNull(row.ProcessedAt);
+        Assert.Single(sends.Sent);
     }
 
     [Fact]
-    public async Task A_registry_that_is_down_leaves_the_avro_side_undone_without_losing_the_json_side()
+    public async Task A_registry_that_is_down_sends_nothing_and_leaves_the_row_pending()
     {
         var sends = new Sends();
         var encoder = new FakeEncoder { Fail = true };
-        var row = Row(true, bytes: null);
+        var row = Row();
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => Publish(row, sends, encoder));
 
-        Assert.Equal(1, sends.Json);
-        Assert.Empty(sends.Avro);
-        Assert.NotNull(row.ProcessedAt);
-        Assert.Null(row.AvroPublishedAt);
-    }
-
-    [Fact]
-    public async Task A_row_written_before_avro_existed_is_never_sent_to_the_avro_topic()
-    {
-        var sends = new Sends();
-        var legacy = Row(false);
-        legacy.MarkProcessed();
-
-        await Publish(legacy, sends, new FakeEncoder());
-
-        Assert.Equal(0, sends.Json);
-        Assert.Empty(sends.Avro);
-        Assert.Null(legacy.AvroPublishedAt);
-    }
-
-    [Theory]
-    [InlineData(false, AvroTopic)]
-    [InlineData(true, null)]
-    public async Task Without_a_registry_or_an_avro_topic_only_the_json_topic_is_used(bool configured, string? topic)
-    {
-        var sends = new Sends();
-        var row = Row(true, [1]);
-
-        await Publish(row, sends, new FakeEncoder(configured), topic);
-
-        Assert.Equal(1, sends.Json);
-        Assert.Empty(sends.Avro);
-        Assert.NotNull(row.ProcessedAt);
-        Assert.Null(row.AvroPublishedAt);
-    }
-
-    [Fact]
-    public async Task A_row_that_is_done_on_both_sides_sends_nothing()
-    {
-        var sends = new Sends();
-        var row = Row(true, [1]);
-        await Publish(row, sends, new FakeEncoder());
-
-        await Publish(row, sends, new FakeEncoder());
-
-        Assert.Equal(1, sends.Json);
-        Assert.Single(sends.Avro);
+        Assert.Empty(sends.Sent);
+        Assert.Null(row.ProcessedAt);
     }
 }

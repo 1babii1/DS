@@ -46,7 +46,9 @@ public class DomainEventsConsumer(
             return;
         }
 
-        var sourceService = result.Topic.Replace(".events", string.Empty, StringComparison.Ordinal);
+        // "directory.events.v2" and "directory.events" are the same source.
+        var sourceService = result.Topic.Replace(".v2", string.Empty, StringComparison.Ordinal)
+            .Replace(".events", string.Empty, StringComparison.Ordinal);
         var occurredAt = DateTime.UtcNow;
 
         // Every message is searchable as an audit-kind hit, regardless of whether it also

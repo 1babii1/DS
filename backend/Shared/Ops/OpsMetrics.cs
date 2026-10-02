@@ -8,9 +8,7 @@ using Shared.Outbox;
 
 namespace Shared.Ops;
 
-// AvroPending: rows owed to the Avro topic (ADR 0023) and not yet published there, parked ones excluded. Zero when no
-// registry is configured, since no row is then owed. Separate from Pending, which is the JSON topic's backlog.
-public record OpsSnapshot(int Parked, int Pending, double OldestPendingAgeSeconds, int? DeadLetters, int AvroPending = 0);
+public record OpsSnapshot(int Parked, int Pending, double OldestPendingAgeSeconds, int? DeadLetters);
 
 // Reads the numbers the alerts are built on. Separate from the reporter so it is tested
 // against a real database without a metrics pipeline.
@@ -20,7 +18,6 @@ public static class OpsSnapshotReader
     {
         var parked = 0;
         var pending = 0;
-        var avroPending = 0;
         DateTime? oldest = null;
 
         // Consumer-only services (Audit, Notification, Search) have no outbox table at all.
@@ -34,14 +31,13 @@ public static class OpsSnapshotReader
             pending = await pendingQuery.CountAsync(ct);
             parked = await outbox.CountAsync(m => m.ParkedAt != null, ct);
             oldest = await pendingQuery.MinAsync(m => (DateTime?)m.OccurredAt, ct);
-            avroPending = await outbox.CountAsync(m => m.AvroExpected && m.AvroPublishedAt == null && m.ParkedAt == null, ct);
         }
 
         int? deadLetters = db is IHasDeadLetters withDeadLetters
             ? await withDeadLetters.DeadLetters.CountAsync(ct)
             : null;
 
-        return new OpsSnapshot(parked, pending, oldest is null ? 0 : (nowUtc - oldest.Value).TotalSeconds, deadLetters, avroPending);
+        return new OpsSnapshot(parked, pending, oldest is null ? 0 : (nowUtc - oldest.Value).TotalSeconds, deadLetters);
     }
 }
 
@@ -70,8 +66,6 @@ public sealed class OpsMetricsReporter<TContext>(
         // Prometheus exporter risk appending it again, silently breaking the alert that reads it.
         _meter.CreateObservableGauge("outbox_oldest_pending_age_seconds", () => _latest.OldestPendingAgeSeconds,
             description: "Age in seconds of the oldest unpublished, unparked outbox message");
-        _meter.CreateObservableGauge("outbox_avro_pending_messages", () => _latest.AvroPending,
-            description: "Outbox messages owed to the Avro topic and not yet published there (a registry that is down shows here)");
         _meter.CreateObservableGauge("dead_letters", () => _latest.DeadLetters ?? 0,
             description: "Consumed messages that exhausted retries and were parked in dead_letters");
 

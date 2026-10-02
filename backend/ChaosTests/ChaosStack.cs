@@ -24,7 +24,15 @@ public sealed class ChaosStack : IAsyncLifetime
         .WithUsername("postgres")
         .Build();
 
+    // Events are Avro (ADR 0023), so the publisher and the consumer need a registry; it is never frozen here.
+    private readonly IContainer _registry = new ContainerBuilder("quay.io/apicurio/apicurio-registry:3.0.7")
+        .WithPortBinding(8080, true)
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(r => r.ForPath("/apis/registry/v3/system/info").ForPort(8080)))
+        .Build();
+
     private IContainer? _kafka;
+
+    public string RegistryUrl => $"http://{_registry.Hostname}:{_registry.GetMappedPublicPort(8080)}/apis/ccompat/v7";
 
     public string BootstrapServers { get; private set; } = null!;
 
@@ -33,6 +41,7 @@ public sealed class ChaosStack : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
+        await _registry.StartAsync();
 
         // The host port is chosen first and used for both sides of the mapping, because the
         // broker advertises its own address back to clients: a random mapped port would be
@@ -87,6 +96,7 @@ public sealed class ChaosStack : IAsyncLifetime
 
         await Docker("unpause", _postgres.Id, ignoreFailure: true);
         await _postgres.DisposeAsync();
+        await _registry.DisposeAsync();
     }
 
     private static int FreePort()

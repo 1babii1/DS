@@ -103,7 +103,7 @@ builder.Services.AddScoped<ITransactionManager, TransactionManager>();
 
 builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
 builder.Services.AddEventAvroEncoder(builder.Configuration, "directory.events.v2", typeof(DirectoryService.Application.IntegrationEvents.DepartmentCreatedEvent).Assembly);
-builder.Services.AddOutboxPublisher<DirectoryServiceDbContext>(builder.Configuration, "directory.events", "directory.events.v2");
+builder.Services.AddOutboxPublisher<DirectoryServiceDbContext>(builder.Configuration, "directory.events.v2");
 
 builder.Services.AddKafkaHealthCheck(
     builder.Configuration["Kafka:BootstrapServers"]

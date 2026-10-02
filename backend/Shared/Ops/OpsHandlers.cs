@@ -71,9 +71,9 @@ public static class OpsHandlers
         // topic) shows who put this message back, in the same transaction as the redrive itself.
         var redriven = new OutboxMessageRedrivenEvent(message.Id, message.Type, actor);
         var record = OutboxMessage.Create(RedrivenEventType, message.AggregateId, JsonSerializer.Serialize(redriven));
-        if (avro is { IsConfigured: true })
+        if (avro is not null && avro.TryEncode(RedrivenEventType, redriven, out var bytes))
         {
-            record.ExpectAvro(avro.TryEncode(RedrivenEventType, redriven, out var bytes) ? bytes : null);
+            record.AttachAvro(bytes);
         }
 
         db.Set<OutboxMessage>().Add(record);

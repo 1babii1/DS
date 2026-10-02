@@ -6,6 +6,8 @@ using Microsoft.Extensions.Options;
 using RewardsService.Domain;
 using RewardsService.Infrastructure;
 using RewardsService.Infrastructure.Consumers;
+using Confluent.SchemaRegistry;
+using Shared.Avro;
 using Shared.Outbox;
 
 namespace ChaosTests;
@@ -204,6 +206,12 @@ public class WelcomeBonusUnderFaultTests : IClassFixture<ChaosStack>
         {
             var scopes = stack.Services.GetRequiredService<IServiceScopeFactory>();
 
+            // The events here are the ones the Rewards service consumes, so its own reader schemas describe them.
+            var schemas = new EventSchemaCatalog(typeof(WelcomeBonusConsumer).Assembly);
+            var registry = new CachedSchemaRegistryClient(new SchemaRegistryConfig { Url = stack.RegistryUrl });
+            var encoder = new EventAvroEncoder(schemas, registry, topic, NullLogger<EventAvroEncoder>.Instance);
+            await encoder.WarmUpAsync(CancellationToken.None);
+
             var publisher = new OutboxPublisher<RewardsDbContext>(
                 scopes,
                 Options.Create(new OutboxPublisherOptions
@@ -212,7 +220,8 @@ public class WelcomeBonusUnderFaultTests : IClassFixture<ChaosStack>
                     Topic = topic,
                     PollInterval = TimeSpan.FromMilliseconds(200),
                 }),
-                NullLogger<OutboxPublisher<RewardsDbContext>>.Instance);
+                NullLogger<OutboxPublisher<RewardsDbContext>>.Instance,
+                encoder);
 
             var consumer = new WelcomeBonusConsumer(
                 scopes,
@@ -222,7 +231,8 @@ public class WelcomeBonusUnderFaultTests : IClassFixture<ChaosStack>
                     Topics = [topic],
                     GroupId = $"chaos-{Guid.NewGuid():N}",
                 }),
-                NullLogger<WelcomeBonusConsumer>.Instance);
+                NullLogger<WelcomeBonusConsumer>.Instance,
+                new AvroValueDecoder(registry, schemas));
 
             await publisher.StartAsync(CancellationToken.None);
             var pipeline = new Pipeline(publisher, consumer);

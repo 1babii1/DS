@@ -18,15 +18,9 @@ public class OutboxMessage
     public string Payload { get; private set; } = null!;
 
     // The same event in the Confluent Avro wire format (ADR 0023), staged in the same transaction as the JSON when the
-    // schema registry was reachable. Null otherwise; the JSON payload is always there during the migration.
+    // schema registry was reachable. Null otherwise: the publisher then makes it from the JSON, which stays as the
+    // readable record of what was written and the source for that case.
     public byte[]? AvroPayload { get; private set; }
-
-    // True when this row is meant to reach the Avro topic as well (set when the row is written and an encoder is
-    // configured), whether or not the bytes could be made then. Rows written before that never are, so they are not
-    // sent twice by accident when the Avro topic is switched on.
-    public bool AvroExpected { get; private set; }
-
-    public DateTime? AvroPublishedAt { get; private set; }
 
     public DateTime OccurredAt { get; private set; }
 
@@ -60,19 +54,9 @@ public class OutboxMessage
         OccurredAt = DateTime.UtcNow,
     };
 
-    // Called by a writer whose encoder is configured: the row is owed to the Avro topic; the bytes are there when the
-    // schema ids were known at write time, and are made from the JSON at publish time when they were not.
-    public void ExpectAvro(byte[]? avro)
-    {
-        AvroExpected = true;
-        AvroPayload = avro;
-    }
+    public void AttachAvro(byte[] avro) => AvroPayload = avro;
 
-    // The first time wins: the dual publisher marks the JSON side done before it tries the Avro side, and the batch
-    // marks the row again when both are through.
-    public void MarkProcessed() => ProcessedAt ??= DateTime.UtcNow;
-
-    public void MarkAvroPublished() => AvroPublishedAt ??= DateTime.UtcNow;
+    public void MarkProcessed() => ProcessedAt = DateTime.UtcNow;
 
     public void RecordFailure(string error, int maxAttempts)
     {

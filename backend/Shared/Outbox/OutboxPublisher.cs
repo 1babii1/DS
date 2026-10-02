@@ -19,14 +19,20 @@ public class OutboxPublisher<TContext>(
     where TContext : DbContext
 {
     private readonly OutboxPublisherOptions _options = options.Value;
-    private IProducer<string, string>? _producer;
-    private IProducer<string, byte[]>? _avroProducer;
+    private IProducer<string, byte[]>? _producer;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Events go out only as Avro (ADR 0023): without a registry there is nothing this publisher can send.
+        if (avro is not { IsConfigured: true })
+        {
+            throw new InvalidOperationException(
+                "SchemaRegistry:Url must be set: events are published as Avro and need a schema registry.");
+        }
+
         await KafkaTopicProvisioner.WaitForTopicsAsync(
             _options.BootstrapServers, _options.Security, logger, stoppingToken,
-            AvroOn ? [_options.Topic, _options.AvroTopic!] : [_options.Topic]);
+            _options.Topic);
 
         if (stoppingToken.IsCancellationRequested)
         {
@@ -35,11 +41,7 @@ public class OutboxPublisher<TContext>(
 
         var producerConfig = new ProducerConfig { BootstrapServers = _options.BootstrapServers };
         _options.Security.ApplyTo(producerConfig);
-        _producer = new ProducerBuilder<string, string>(producerConfig).Build();
-        if (AvroOn)
-        {
-            _avroProducer = new ProducerBuilder<string, byte[]>(producerConfig).Build();
-        }
+        _producer = new ProducerBuilder<string, byte[]>(producerConfig).Build();
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -71,7 +73,7 @@ public class OutboxPublisher<TContext>(
         var dbContext = scope.ServiceProvider.GetRequiredService<TContext>();
 
         var pending = await dbContext.Set<OutboxMessage>()
-            .Where(OutboxRowPublisher.Pending(AvroOn))
+            .Where(m => m.ProcessedAt == null && m.ParkedAt == null)
             .OrderBy(m => m.OccurredAt)
             .Take(_options.BatchSize)
             .ToListAsync(cancellationToken);
@@ -85,10 +87,8 @@ public class OutboxPublisher<TContext>(
             pending,
             (message, ct) => OutboxRowPublisher.PublishAsync(
                 message,
-                (m, token) => _producer!.ProduceAsync(_options.Topic, OutboxMessageHeaders.ToKafkaMessage(m), token),
-                (m, bytes, token) => _avroProducer!.ProduceAsync(_options.AvroTopic, OutboxMessageHeaders.ToAvroKafkaMessage(m, bytes), token),
-                avro,
-                _options.AvroTopic,
+                (m, bytes, token) => _producer!.ProduceAsync(_options.Topic, OutboxMessageHeaders.ToAvroKafkaMessage(m, bytes), token),
+                avro!,
                 ct),
             _options.MaxAttempts,
             logger,
@@ -104,13 +104,9 @@ public class OutboxPublisher<TContext>(
             "Published {Succeeded}/{Total} outbox message(s) to {Topic}", result.Succeeded, pending.Count, _options.Topic);
     }
 
-    // Avro goes out only when a registry is configured and an Avro topic is named.
-    private bool AvroOn => _options.AvroTopic is not null && avro is { IsConfigured: true };
-
     public override void Dispose()
     {
         _producer?.Dispose();
-        _avroProducer?.Dispose();
         base.Dispose();
     }
 }

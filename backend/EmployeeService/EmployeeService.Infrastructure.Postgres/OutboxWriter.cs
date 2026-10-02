@@ -10,9 +10,9 @@ public class OutboxWriter(EmployeeDbContext dbContext, IEventAvroEncoder? avro =
     public void Enqueue(string type, string aggregateId, object payload)
     {
         var message = OutboxMessage.Create(type, aggregateId, JsonSerializer.Serialize(payload));
-        if (avro is { IsConfigured: true })
+        if (avro is not null && avro.TryEncode(type, payload, out var bytes))
         {
-            message.ExpectAvro(avro.TryEncode(type, payload, out var bytes) ? bytes : null);
+            message.AttachAvro(bytes);
         }
 
         dbContext.Set<OutboxMessage>().Add(message);

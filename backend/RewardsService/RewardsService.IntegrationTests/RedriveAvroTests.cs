@@ -65,7 +65,6 @@ public class RedriveAvroTests : IClassFixture<RewardsTestWebFactory>, IAsyncLife
         await using var verify = _services.CreateAsyncScope();
         var audit = await verify.ServiceProvider.GetRequiredService<RewardsDbContext>().Set<OutboxMessage>()
             .SingleAsync(m => m.Type == "OutboxMessageRedriven");
-        Assert.True(audit.AvroExpected);
         Assert.Equal(new byte[] { 4, 2 }, audit.AvroPayload);
         Assert.Contains("admin-42", audit.Payload);
     }

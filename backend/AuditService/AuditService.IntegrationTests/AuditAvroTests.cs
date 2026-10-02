@@ -95,6 +95,30 @@ public class AuditAvroTests : IClassFixture<AuditTestWebFactory>, IAsyncLifetime
     }
 
     [Fact]
+    public void A_schema_id_the_registry_does_not_know_is_set_aside_not_waited_for()
+    {
+        var unknown = new Confluent.SchemaRegistry.SchemaRegistryException("Schema not found", System.Net.HttpStatusCode.NotFound, 40403);
+        var sut = Consumer(new StubDecoder("{}", 1, unknown));
+
+        sut.AsText(Raw(Guid.NewGuid(), "employee.events.v2", "EmployeeHired", [0, 0, 0, 9, 9, 1]), out var undecodable);
+
+        Assert.Same(unknown, undecodable);
+    }
+
+    [Fact]
+    public void A_registry_that_cannot_be_reached_is_not_mistaken_for_an_unknown_schema()
+    {
+        var raw = Raw(Guid.NewGuid(), "employee.events.v2", "EmployeeHired", [0, 0, 0, 0, 1]);
+
+        Assert.Throws<HttpRequestException>(
+            () => Consumer(new StubDecoder("{}", 1, new HttpRequestException("connection refused"))).AsText(raw, out _));
+
+        // The registry answering with a server error is an outage too, not a verdict on the message.
+        Assert.Throws<Confluent.SchemaRegistry.SchemaRegistryException>(
+            () => Consumer(new StubDecoder("{}", 1, new Confluent.SchemaRegistry.SchemaRegistryException("busy", System.Net.HttpStatusCode.ServiceUnavailable, 50300))).AsText(raw, out _));
+    }
+
+    [Fact]
     public void An_avro_message_with_no_decoder_configured_is_an_error_to_wait_out_not_poison()
     {
         var sut = Consumer(decoder: null);
