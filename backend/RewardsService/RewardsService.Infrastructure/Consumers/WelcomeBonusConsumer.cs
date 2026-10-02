@@ -16,8 +16,9 @@ namespace RewardsService.Infrastructure.Consumers;
 public class WelcomeBonusConsumer(
     IServiceScopeFactory scopeFactory,
     IOptions<WelcomeBonusConsumerOptions> options,
-    ILogger<WelcomeBonusConsumer> logger)
-    : KafkaRetryConsumer<RewardsDbContext>(scopeFactory, options.Value, logger)
+    ILogger<WelcomeBonusConsumer> logger,
+    Shared.Avro.IEventAvroDecoder? avro = null)
+    : KafkaRetryConsumer<RewardsDbContext>(scopeFactory, options.Value, logger, avro)
 {
     private readonly WelcomeBonusConsumerOptions _options = options.Value;
 

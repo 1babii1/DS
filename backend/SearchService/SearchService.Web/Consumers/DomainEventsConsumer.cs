@@ -23,8 +23,9 @@ public class DomainEventsConsumer(
     IServiceScopeFactory scopeFactory,
     SearchIndexClient indexClient,
     IOptions<DomainEventsConsumerOptions> options,
-    ILogger<DomainEventsConsumer> logger)
-    : KafkaRetryConsumer<SearchDbContext>(scopeFactory, options.Value, logger)
+    ILogger<DomainEventsConsumer> logger,
+    Shared.Avro.IEventAvroDecoder? avro = null)
+    : KafkaRetryConsumer<SearchDbContext>(scopeFactory, options.Value, logger, avro)
 {
     protected override string MessageKind => "search";
 

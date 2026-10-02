@@ -1,3 +1,4 @@
+using Shared.Avro;
 using Shared.Ops;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using SearchService.Infrastructure.Elasticsearch;
@@ -58,6 +59,7 @@ builder.Services.Configure<DomainEventsConsumerOptions>(options =>
         ?? throw new InvalidOperationException("Configuration 'Kafka:Topics' is not set.");
     options.GroupId = builder.Configuration["Kafka:GroupId"] ?? "search-service";
 });
+builder.Services.AddEventAvroDecoder(builder.Configuration, typeof(SearchService.Web.Consumers.DomainEventsConsumer).Assembly);
 builder.Services.AddHostedService<DomainEventsConsumer>();
 
 builder.Services.AddDatabaseHealthCheck<SearchDbContext>();

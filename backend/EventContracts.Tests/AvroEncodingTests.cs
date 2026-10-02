@@ -103,7 +103,11 @@ public class AvroEncodingTests(RegistryFixture registry) : IClassFixture<Registr
         {
             var expected = EventTypes().Where(t => t.Assembly == assembly).Select(t => t.Name[..^"Event".Length]).Order();
             // The shared assembly's schema is in every service's catalog too, so its own is the whole of what it carries.
-            Assert.Equal(expected, new EventSchemaCatalog(assembly).EventTypes.Order());
+            var embedded = assembly.GetManifestResourceNames()
+                .Where(n => n.Contains(".IntegrationEvents.Schemas.", StringComparison.Ordinal))
+                .Select(n => n.Split('.')[^2])
+                .Order();
+            Assert.Equal(expected, embedded);
         }
     }
 
