@@ -30,6 +30,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0022](0022-hub-tickets.md) | A short-lived ticket opens the notification hub; the OAuth token never reaches the browser |
 | [0023](0023-event-contracts-avro-and-registry.md) | Event contracts: Avro schemas, a registry as the compatibility arbiter, additive-only evolution |
 | [0024](0024-connection-pooling.md) | A connection pooler in front of Postgres |
+| [0025](0025-read-replica-and-read-your-writes.md) | A read replica, and reading your own writes from it |
 
 Not yet written up, though each decision is already live in the codebase and explained
 in its own commit messages: gRPC for internal calls, local JWT validation via JWKS,
