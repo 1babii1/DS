@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using AuditService.Infrastructure;
 using Confluent.Kafka;
 using Microsoft.EntityFrameworkCore;
@@ -140,6 +140,23 @@ public class AuditConsumerTests : IClassFixture<AuditTestWebFactory>, IAsyncLife
 
         var count = await ExecuteInDb(db => db.DeadLetters.CountAsync(d => d.MessageId == messageId));
         Assert.Equal(1, count);
+    }
+
+    // The Any() check before the insert is only a fast path; what makes a concurrent redelivery harmless is the primary key on
+    // recorded_messages (ADR 0027, ADR 0028). Sixteen consumers racing on one message must leave exactly one entry.
+    [Fact]
+    public async Task The_same_message_delivered_concurrently_leaves_exactly_one_entry()
+    {
+        var messageId = Guid.NewGuid();
+        var payload = """{"DepartmentId":"3f2c1c1e-0000-4000-8000-000000000001"}""";
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 16).Select(_ => Task.Run(() =>
+            _sut.HandleWithRetryAndDeadLetter(
+                BuildResult(messageId, "directory.events", "dep-1", "DepartmentCreated", payload), CancellationToken.None))));
+
+        Assert.All(results, Assert.True);
+        Assert.Equal(1, await ExecuteInDb(db => db.Entries.CountAsync(e => e.MessageId == messageId)));
+        Assert.Equal(1, await ExecuteInDb(db => db.RecordedMessages.CountAsync(m => m.MessageId == messageId)));
     }
 
     public Task InitializeAsync() => Task.CompletedTask;
