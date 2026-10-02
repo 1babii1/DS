@@ -34,8 +34,21 @@ mis-fold last March.
   schemas, retrying until the registry answers, and until it has, `TryEncode` says no and the row carries only the JSON.
   So a registry outage never fails a hire or a grant; it only delays Avro. The publishing step encodes such rows from
   their JSON when it publishes. It is off unless `SchemaRegistry:Url` is configured. *(Step 2; publishing is step 3.)*
-- **Consumers own a reader schema** beside their local record copy; CI checks it against the producer's latest. *(Later
-  steps.)*
+- **Consumers own a reader schema** beside their local record copy; CI checks it against the producer's latest. *(Reader
+  schemas and the CI check arrive with the first consumer that has one; AuditService reads whole records and has none.)*
+- **One mechanism in the shared consumer base.** `KafkaRetryConsumer` now reads the message value as bytes. A value that
+  starts with a zero byte is Avro in the Confluent wire format (JSON never does) and is decoded through the registry into
+  the same JSON the handlers have always received (logical types back to Guid text, ISO times, numbers), so a consumer can
+  read a JSON topic and an Avro topic with no code of its own, and its record copies and handling do not change. With a
+  reader schema for the event, Avro's resolution applies (undeclared fields dropped, missing ones defaulted); without
+  one the writer's whole record is returned. A message that can never be decoded (corrupt, not Avro) goes to
+  `dead_letters` with its bytes in base64; one that cannot be decoded *yet* (the registry is unreachable, no decoder
+  configured) makes the consumer stall on it and ask again, as it already does for a database that is down.
+- **AuditService (step 4a):** decodes whole records, stores the JSON and the id of the schema it was written with
+  (`entries.SchemaId`, null for JSON), and treats `directory.events.v2` and `directory.events` as one source.
+- **Switching a consumer to the Avro topics is configuration:** `EVENT_TOPIC_SUFFIX=.v2` together with
+  `SCHEMA_REGISTRY_URL`. A consumer that moves reads the Avro topic from the start; what it already consumed from the JSON
+  topic is skipped by message id.
 - **AuditService decodes and stores JSON plus the schema version**, so the log outlives the registry and `OrgReplay`
   is unchanged. *(Later steps.)*
 - **Migration through new topics `*.events.v2`**, with dual publishing while consumers move, then the old topics and

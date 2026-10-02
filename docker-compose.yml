@@ -180,6 +180,10 @@ services:
       - "5132:5132"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
+      # Opt-in (ADR 0023): with SCHEMA_REGISTRY_URL and EVENT_TOPIC_SUFFIX=.v2 both set, the audit log reads the Avro topics.
+      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-}
+      - Kafka__Topics__0=directory.events${EVENT_TOPIC_SUFFIX:-}
+      - Kafka__Topics__1=employee.events${EVENT_TOPIC_SUFFIX:-}
       - ASPNETCORE_URLS=http://*:5132
       - ConnectionStrings__AuditServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=audit,public
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}

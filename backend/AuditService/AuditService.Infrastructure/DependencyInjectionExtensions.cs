@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Shared.Avro;
 using Shared.HealthChecks;
 using Shared.Outbox;
 
@@ -30,6 +31,8 @@ public static class DependencyInjectionExtensions
             options.GroupId = configuration["Kafka:GroupId"] ?? "audit-service";
         });
 
+        // Whole records, in the writer's shape: the audit log keeps every field. Active only with a registry configured.
+        services.AddEventAvroDecoder(configuration);
         services.AddHostedService<AuditConsumer>();
         services.AddKafkaHealthCheck(bootstrapServers, security);
 

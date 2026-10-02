@@ -31,7 +31,7 @@ public sealed class RegistryFixture : IAsyncLifetime
 
 public class AvroEncodingTests(RegistryFixture registry) : IClassFixture<RegistryFixture>
 {
-    private static readonly Assembly[] Producers =
+    internal static readonly Assembly[] Producers =
     [
         typeof(EmployeeService.Application.IntegrationEvents.EmployeeHiredEvent).Assembly,
         typeof(AuthService.Application.IntegrationEvents.AccountProvisionedEvent).Assembly,
@@ -42,7 +42,7 @@ public class AvroEncodingTests(RegistryFixture registry) : IClassFixture<Registr
 
     private static readonly NullabilityInfoContext Nullability = new();
 
-    private static IEnumerable<Type> EventTypes() => Producers
+    internal static IEnumerable<Type> EventTypes() => Producers
         .SelectMany(a => a.GetExportedTypes())
         .Where(t => t.Name.EndsWith("Event", StringComparison.Ordinal)
             && t.Namespace is { } ns && ns.EndsWith(".IntegrationEvents", StringComparison.Ordinal)
@@ -163,7 +163,7 @@ public class AvroEncodingTests(RegistryFixture registry) : IClassFixture<Registr
         Assert.Equal(decimal.Parse(expected, System.Globalization.CultureInfo.InvariantCulture), NormalizeDecoded(record["Amount"]));
     }
 
-    private static object Sample(Type eventType, bool fillOptionals)
+    internal static object Sample(Type eventType, bool fillOptionals)
     {
         var constructor = eventType.GetConstructors().Single();
         var args = constructor.GetParameters().Select(p => SampleValue(p.ParameterType, p.Name!, IsOptional(p), fillOptionals)).ToArray();
@@ -221,7 +221,7 @@ public class AvroEncodingTests(RegistryFixture registry) : IClassFixture<Registr
     }
 
     // What the producer meant, in a form comparable with what comes back off the wire.
-    private static object? Normalize(object? value) => value switch
+    internal static object? Normalize(object? value) => value switch
     {
         null => null,
         Guid g => g.ToString("D"),

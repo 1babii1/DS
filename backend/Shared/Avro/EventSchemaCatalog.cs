@@ -26,6 +26,19 @@ public sealed class EventSchemaCatalog
         }
     }
 
+    /// <summary>A catalog from schema texts, for tests and for callers that hold schemas in memory.</summary>
+    public static EventSchemaCatalog FromJson(params string[] schemas)
+    {
+        var catalog = new EventSchemaCatalog();
+        foreach (var json in schemas)
+        {
+            var schema = (RecordSchema)Schema.Parse(json);
+            catalog._byEventType[schema.Name] = (schema, json);
+        }
+
+        return catalog;
+    }
+
     public IReadOnlyCollection<string> EventTypes => _byEventType.Keys;
 
     public bool TryGet(string eventType, out RecordSchema schema, out string json)
