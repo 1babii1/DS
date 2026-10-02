@@ -1,4 +1,4 @@
-﻿namespace Shared.Outbox;
+namespace Shared.Outbox;
 
 // Written in the same DB transaction as the domain change it describes - this is what
 // makes the "publish an event" step atomic with the write it accompanies (the classic
@@ -55,6 +55,22 @@ public class OutboxMessage
     };
 
     public void AttachAvro(byte[] avro) => AvroPayload = avro;
+
+    /// <summary>
+    /// Stages the event in Avro on this row when an encoder is available. When the outbox is read by CDC (ADR 0030) the row is
+    /// delivered by the database's own log the moment it commits, so it is marked processed here: there is no publisher to do it.
+    /// </summary>
+    public void StageAvro(Shared.Avro.IEventAvroEncoder? avro, string eventType, object payload)
+    {
+        if (avro is not null && avro.TryEncode(eventType, payload, out var bytes))
+        {
+            AttachAvro(bytes);
+            if (avro.DeliveredByCdc)
+            {
+                MarkProcessed();
+            }
+        }
+    }
 
     public void MarkProcessed() => ProcessedAt = DateTime.UtcNow;
 

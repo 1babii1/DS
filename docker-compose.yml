@@ -12,6 +12,8 @@ services:
       - ASPNETCORE_ENVIRONMENT=Docker
       # Events are Avro (ADR 0023): the schema registry is required, the Kafka topics are the *.events.v2 ones.
       # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
+      # Polling (default) or Cdc, with `--profile cdc` (ADR 0030): who delivers the outbox to Kafka.
+      - Outbox__Mode=${OUTBOX_MODE:-Polling}
       - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}
       # Optional read replica (ADR 0025, `--profile ha`): e.g. DIRECTORY_READ_DB="Server=postgres_replica;Port=5432;Database=platform;User Id=postgres;Password=...;Search Path=directory,public". Empty = reads use the primary.
       - ConnectionStrings__DirectoryServiceReadDb=${DIRECTORY_READ_DB:-}
@@ -67,6 +69,8 @@ services:
       - Kafka__Topics__0=employee.events.v2
       # Events are Avro (ADR 0023): the schema registry is required, the Kafka topics are the *.events.v2 ones.
       # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
+      # Polling (default) or Cdc, with `--profile cdc` (ADR 0030): who delivers the outbox to Kafka.
+      - Outbox__Mode=${OUTBOX_MODE:-Polling}
       - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}
       - ASPNETCORE_URLS=http://*:5130
       - ConnectionStrings__AuthServiceDb=Server=pgbouncer;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=auth,public
@@ -136,6 +140,8 @@ services:
       - Kafka__Topics__0=auth.events.v2
       # Events are Avro (ADR 0023): the schema registry is required, the Kafka topics are the *.events.v2 ones.
       # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
+      # Polling (default) or Cdc, with `--profile cdc` (ADR 0030): who delivers the outbox to Kafka.
+      - Outbox__Mode=${OUTBOX_MODE:-Polling}
       - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}
       - ASPNETCORE_URLS=http://*:5131
       - ConnectionStrings__EmployeeServiceDb=Server=pgbouncer;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=employee,public
@@ -247,6 +253,8 @@ services:
       - Kafka__Topics__1=auth.events.v2
       # Events are Avro (ADR 0023): the schema registry is required, the Kafka topics are the *.events.v2 ones.
       # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
+      # Polling (default) or Cdc, with `--profile cdc` (ADR 0030): who delivers the outbox to Kafka.
+      - Outbox__Mode=${OUTBOX_MODE:-Polling}
       - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}
       - ASPNETCORE_URLS=http://*:5134
       - ConnectionStrings__RewardsServiceDb=Server=pgbouncer;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=rewards,public
@@ -537,7 +545,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: platform
     # hba_file: the image's rules plus one that lets a standby stream WAL (ADR 0025).
-    command: ["postgres", "-c", "hba_file=/etc/postgresql/pg_hba.conf"]
+    # wal_level=logical lets Debezium read the outbox tables from the log (ADR 0030); a physical standby still works with it.
+    command: ["postgres", "-c", "hba_file=/etc/postgresql/pg_hba.conf", "-c", "wal_level=logical", "-c", "max_replication_slots=10", "-c", "max_wal_senders=20"]
     ports:
       - "5434:5432"
     volumes:
@@ -695,6 +704,58 @@ services:
     depends_on:
       registry_db_init:
         condition: service_completed_successfully
+
+  # Change data capture of the outbox tables (ADR 0030). Opt-in, `--profile cdc`, together with OUTBOX_MODE=Cdc for the
+  # four producing services: Debezium reads each outbox table's write-ahead log and produces its Avro bytes to the service's
+  # *.events.v2 topic, so the services' own polling publishers are off. Never run both for the same service: every event would be
+  # sent twice.
+  kafka_connect:
+    container_name: kafka_connect
+    profiles: ["cdc"]
+    image: quay.io/debezium/connect:3.0
+    restart: always
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: connect
+      CONFIG_STORAGE_TOPIC: connect_configs
+      OFFSET_STORAGE_TOPIC: connect_offsets
+      STATUS_STORAGE_TOPIC: connect_statuses
+      CONFIG_STORAGE_REPLICATION_FACTOR: "1"
+      OFFSET_STORAGE_REPLICATION_FACTOR: "1"
+      STATUS_STORAGE_REPLICATION_FACTOR: "1"
+      CONNECT_SECURITY_PROTOCOL: SASL_PLAINTEXT
+      CONNECT_SASL_MECHANISM: PLAIN
+      CONNECT_SASL_JAAS_CONFIG: org.apache.kafka.common.security.plain.PlainLoginModule required username="kafka" password="${KAFKA_PASSWORD:-changeme-kafka}";
+      CONNECT_PRODUCER_SECURITY_PROTOCOL: SASL_PLAINTEXT
+      CONNECT_PRODUCER_SASL_MECHANISM: PLAIN
+      CONNECT_PRODUCER_SASL_JAAS_CONFIG: org.apache.kafka.common.security.plain.PlainLoginModule required username="kafka" password="${KAFKA_PASSWORD:-changeme-kafka}";
+      CONNECT_CONSUMER_SECURITY_PROTOCOL: SASL_PLAINTEXT
+      CONNECT_CONSUMER_SASL_MECHANISM: PLAIN
+      CONNECT_CONSUMER_SASL_JAAS_CONFIG: org.apache.kafka.common.security.plain.PlainLoginModule required username="kafka" password="${KAFKA_PASSWORD:-changeme-kafka}";
+      CONNECT_ADMIN_SECURITY_PROTOCOL: SASL_PLAINTEXT
+      CONNECT_ADMIN_SASL_MECHANISM: PLAIN
+      CONNECT_ADMIN_SASL_JAAS_CONFIG: org.apache.kafka.common.security.plain.PlainLoginModule required username="kafka" password="${KAFKA_PASSWORD:-changeme-kafka}";
+    ports:
+      - "127.0.0.1:8083:8083"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  kafka_connect_setup:
+    container_name: kafka_connect_setup
+    profiles: ["cdc"]
+    restart: "no"
+    image: curlimages/curl:8.10.1
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      CONNECT_URL: http://kafka_connect:8083
+    entrypoint: ["/bin/sh", "/register-connectors.sh"]
+    volumes:
+      - ./docker/debezium/register-connectors.sh:/register-connectors.sh:ro
+    depends_on:
+      - kafka_connect
 
   # Distributed tracing/metrics/log-correlation stack. Opt-in via
   # `docker compose --profile obs up`: the main services already point at

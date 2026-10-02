@@ -34,6 +34,8 @@ descriptions as each phase shipped, not backfilled generically.
 | [0026](0026-failover-rpo-rto.md) | Failing over to the standby: what is lost, what it costs to lose nothing |
 | [0027](0027-audit-entries-partitioned-by-month.md) | The audit log, partitioned by month |
 | [0028](0028-no-kafka-transactions.md) | Kafka transactions are not used: the outbox and idempotent consumers are the exactly-once story |
+| [0029](0029-expand-contract-migrations.md) | Schema changes that never break the version running before them |
+| [0030](0030-change-data-capture-with-debezium.md) | Change data capture with Debezium instead of the polling publisher |
 | [0031](0031-event-sourced-wallets.md) | Wallets are event-sourced |
 
 Not yet written up, though each decision is already live in the codebase and explained
