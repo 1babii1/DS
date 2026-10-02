@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using NotificationService.Web.HubTickets;
 
 namespace NotificationService.Web;
 
@@ -7,7 +8,7 @@ namespace NotificationService.Web;
 // to Clients.Group(recipientAccountId.ToString()), so every connection this account opens
 // (multiple tabs, multiple devices) receives the same push. No hub methods beyond
 // connect/disconnect: this hub is server -> client only, nothing the client calls on it.
-[Authorize]
+[Authorize(AuthenticationSchemes = HubTicketDefaults.Scheme)]
 public class NotificationsHub : Hub
 {
     public override Task OnConnectedAsync()

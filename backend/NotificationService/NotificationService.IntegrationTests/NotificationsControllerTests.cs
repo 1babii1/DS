@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NotificationService.Domain;
 using NotificationService.Infrastructure.Postgres;
 using NotificationService.Web.Controllers;
+using NotificationService.Web.HubTickets;
 using Shared;
 
 namespace NotificationService.IntegrationTests;
@@ -162,11 +163,25 @@ public class NotificationsControllerTests : IClassFixture<NotificationTestWebFac
         return await read(scope.ServiceProvider.GetRequiredService<NotificationDbContext>());
     }
 
+    private static readonly HubTicketService Tickets = new(
+        Microsoft.Extensions.Options.Options.Create(new HubTicketOptions { SigningKeyBase64 = Convert.ToBase64String(HubTicketServiceTests.Key) }),
+        TimeProvider.System);
+
+    [Fact]
+    public async Task A_hub_ticket_is_issued_for_the_callers_own_account_only()
+    {
+        var mine = Guid.NewGuid();
+
+        var issued = await Act(mine, c => Task.FromResult(c.IssueHubTicket()));
+
+        Assert.Equal(mine, Tickets.Validate(issued.Value!.Ticket));
+    }
+
     private async Task<T> Act<T>(Guid accountId, Func<NotificationsController, Task<T>> act)
     {
         await using var scope = _services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<NotificationDbContext>();
-        var controller = new NotificationsController(dbContext)
+        var controller = new NotificationsController(dbContext, Tickets)
         {
             ControllerContext = new ControllerContext
             {
