@@ -34,6 +34,9 @@
         <ProjectReference Include="..\RewardsService\RewardsService.Infrastructure\RewardsService.Infrastructure.csproj" />
         <ProjectReference Include="..\NotificationService\NotificationService.Web\NotificationService.Web.csproj" />
         <ProjectReference Include="..\SearchService\SearchService.Web\SearchService.Web.csproj" />
+        <ProjectReference Include="..\McpServer\McpServer.csproj" />
+        <ProjectReference Include="..\AuditService\AuditService.Web\AuditService.Web.csproj" />
+        <ProjectReference Include="..\DirectoryService\DirectoryService.Contracts\DirectoryService.Contracts.csproj" />
     </ItemGroup>
 
 </Project>
