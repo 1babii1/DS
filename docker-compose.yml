@@ -13,7 +13,7 @@ services:
       # Events are Avro (ADR 0023): the schema registry is required, the Kafka topics are the *.events.v2 ones.
       # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
       - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}
-      - ConnectionStrings__DirectoryServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=directory,public
+      - ConnectionStrings__DirectoryServiceDb=Server=pgbouncer;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=directory,public
       - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:-changeme-redis}
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
       - Kafka__SaslUsername=kafka
@@ -27,6 +27,8 @@ services:
       start_period: 30s
     depends_on:
       postgres:
+        condition: service_healthy
+      pgbouncer:
         condition: service_healthy
       directory_service_migrations:
         condition: service_completed_successfully
@@ -65,7 +67,7 @@ services:
       # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
       - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}
       - ASPNETCORE_URLS=http://*:5130
-      - ConnectionStrings__AuthServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=auth,public
+      - ConnectionStrings__AuthServiceDb=Server=pgbouncer;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=auth,public
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - SigningKeys__SigningKeyBase64=${SIGNINGKEYS_SIGNING_KEY_BASE64:-}
@@ -94,6 +96,8 @@ services:
       start_period: 30s
     depends_on:
       postgres:
+        condition: service_healthy
+      pgbouncer:
         condition: service_healthy
       auth_service_migrations:
         condition: service_completed_successfully
@@ -132,7 +136,7 @@ services:
       # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
       - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}
       - ASPNETCORE_URLS=http://*:5131
-      - ConnectionStrings__EmployeeServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=employee,public
+      - ConnectionStrings__EmployeeServiceDb=Server=pgbouncer;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=employee,public
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
       - Kafka__SaslUsername=kafka
       - Kafka__SaslPassword=${KAFKA_PASSWORD:-changeme-kafka}
@@ -145,6 +149,8 @@ services:
       start_period: 30s
     depends_on:
       postgres:
+        condition: service_healthy
+      pgbouncer:
         condition: service_healthy
       employee_service_migrations:
         condition: service_completed_successfully
@@ -187,7 +193,7 @@ services:
       - Kafka__Topics__0=directory.events.v2
       - Kafka__Topics__1=employee.events.v2
       - ASPNETCORE_URLS=http://*:5132
-      - ConnectionStrings__AuditServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=audit,public
+      - ConnectionStrings__AuditServiceDb=Server=pgbouncer;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=audit,public
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
       - Kafka__SaslUsername=kafka
       - Kafka__SaslPassword=${KAFKA_PASSWORD:-changeme-kafka}
@@ -200,6 +206,8 @@ services:
       start_period: 30s
     depends_on:
       postgres:
+        condition: service_healthy
+      pgbouncer:
         condition: service_healthy
       audit_service_migrations:
         condition: service_completed_successfully
@@ -239,7 +247,7 @@ services:
       # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
       - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}
       - ASPNETCORE_URLS=http://*:5134
-      - ConnectionStrings__RewardsServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=rewards,public
+      - ConnectionStrings__RewardsServiceDb=Server=pgbouncer;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=rewards,public
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
       - Kafka__SaslUsername=kafka
       - Kafka__SaslPassword=${KAFKA_PASSWORD:-changeme-kafka}
@@ -252,6 +260,8 @@ services:
       start_period: 30s
     depends_on:
       postgres:
+        condition: service_healthy
+      pgbouncer:
         condition: service_healthy
       rewards_service_migrations:
         condition: service_completed_successfully
@@ -292,7 +302,7 @@ services:
       - Kafka__Topics__2=auth.events.v2
       - Kafka__Topics__3=rewards.events.v2
       - ASPNETCORE_URLS=http://*:5135
-      - ConnectionStrings__SearchServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=search,public
+      - ConnectionStrings__SearchServiceDb=Server=pgbouncer;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=search,public
       - Elasticsearch__Uri=http://elasticsearch:9200
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
       - Kafka__SaslUsername=kafka
@@ -306,6 +316,8 @@ services:
       start_period: 30s
     depends_on:
       postgres:
+        condition: service_healthy
+      pgbouncer:
         condition: service_healthy
       search_service_migrations:
         condition: service_completed_successfully
@@ -413,7 +425,7 @@ services:
       - Kafka__Topics__1=auth.events.v2
       - Kafka__Topics__2=employee.events.v2
       - ASPNETCORE_URLS=http://*:5133
-      - ConnectionStrings__NotificationServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=notification,public
+      - ConnectionStrings__NotificationServiceDb=Server=pgbouncer;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=notification,public
       - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:-changeme-redis}
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
       - Kafka__SaslUsername=kafka
@@ -427,6 +439,8 @@ services:
       start_period: 30s
     depends_on:
       postgres:
+        condition: service_healthy
+      pgbouncer:
         condition: service_healthy
       notification_service_migrations:
         condition: service_completed_successfully
@@ -531,6 +545,37 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # Connection pooler in front of Postgres (ADR 0024). Services hold many client connections (each instance has its own
+  # Npgsql pool); Postgres can only afford a few real ones, each a whole process. In transaction mode a server connection
+  # belongs to a client only for the length of a transaction, so a few dozen real connections serve hundreds of clients and
+  # the rest wait in PgBouncer's queue instead of making Postgres refuse them. Migrations connect directly: they take
+  # session-level locks, which transaction pooling does not keep.
+  pgbouncer:
+    container_name: pgbouncer
+    restart: always
+    image: edoburu/pgbouncer:latest
+    environment:
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      AUTH_TYPE: scram-sha-256
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: "1000"
+      DEFAULT_POOL_SIZE: "20"
+      # Npgsql sends search_path as a startup parameter (DirectoryService's Dapper queries rely on it); the pooler has to
+      # track it or it would be silently dropped when a server connection changes hands.
+      TRACK_EXTRA_PARAMETERS: IntervalStyle,search_path
+      IGNORE_STARTUP_PARAMETERS: extra_float_digits
+      MAX_PREPARED_STATEMENTS: "100"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U postgres || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   ollama:
     container_name: ollama
