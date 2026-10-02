@@ -9,8 +9,11 @@ test('an anonymous visitor sees a sign-in state for a protected workspace route'
 	await expect(
 		page.getByRole('heading', { name: 'Sign in to view this workspace' })
 	).toBeVisible()
-	await expect(
-		page.getByRole('link', { name: 'Continue to sign in' })
-	).toBeVisible()
+	const signInLink = page.getByRole('link', { name: 'Continue to sign in' })
+	await expect(signInLink).toBeVisible()
+	await expect(signInLink).toHaveAttribute(
+		'href',
+		'/login?returnTo=%2Fdepartments'
+	)
 	expect(Date.now() - startedAt).toBeLessThan(5_000)
 })
