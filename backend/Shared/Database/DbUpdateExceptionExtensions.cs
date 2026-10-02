@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 namespace Shared.Database;
@@ -16,6 +16,10 @@ public static class DbUpdateExceptionExtensions
 
     public static bool IsUniqueViolation(this DbUpdateException ex) =>
         ex.InnerException is PostgresException { SqlState: UniqueViolation };
+
+    /// <summary>A unique violation of one named constraint or index, as opposed to any unique violation.</summary>
+    public static bool IsUniqueViolationOf(this DbUpdateException ex, params string[] constraints) =>
+        ex.InnerException is PostgresException { SqlState: UniqueViolation } violation && constraints.Contains(violation.ConstraintName);
 
     public static bool IsForeignKeyViolation(this DbUpdateException ex) =>
         ex.InnerException is PostgresException { SqlState: ForeignKeyViolation };

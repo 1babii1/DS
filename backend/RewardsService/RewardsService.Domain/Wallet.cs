@@ -1,8 +1,7 @@
 namespace RewardsService.Domain;
 
-// Cached balance, not the source of truth - Transaction is the append-only ledger and
-// Balance is only ever moved by summing into it as each Transaction is written, in the
-// same SaveChanges call. Reading a wallet never needs a SUM() over the whole ledger.
+// A projection, not the source of truth: the wallet's events (WalletEvent, ADR 0031) are, and Balance is the fold of them,
+// written in the same SaveChanges call. Reading a wallet never needs a SUM() or a replay. It can be rebuilt from the events.
 public class Wallet
 {
     public Guid EmployeeId { get; private set; }
@@ -27,6 +26,13 @@ public class Wallet
             CreatedAt = now,
             UpdatedAt = now,
         };
+    }
+
+    /// <summary>The projection of the wallet's events (ADR 0031): the balance is set from the fold, never added to.</summary>
+    public void SetBalance(decimal balance)
+    {
+        Balance = balance;
+        UpdatedAt = DateTime.UtcNow;
     }
 
     public void Apply(decimal amount)

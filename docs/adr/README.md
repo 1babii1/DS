@@ -36,6 +36,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0028](0028-no-kafka-transactions.md) | Kafka transactions are not used: the outbox and idempotent consumers are the exactly-once story |
 | [0029](0029-expand-contract-migrations.md) | Schema changes that never break the version running before them |
 | [0030](0030-change-data-capture-with-debezium.md) | Change data capture with Debezium instead of the polling publisher |
+| [0031](0031-event-sourced-wallets.md) | Wallets are event-sourced |
 
 Not yet written up, though each decision is already live in the codebase and explained
 in its own commit messages: gRPC for internal calls, local JWT validation via JWKS,
