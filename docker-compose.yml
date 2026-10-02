@@ -134,6 +134,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
       - Kafka__Topics__0=auth.events.v2
+      - Kafka__Topics__1=rewards.events.v2
       # Events are Avro (ADR 0023): the schema registry is required, the Kafka topics are the *.events.v2 ones.
       # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
       - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}

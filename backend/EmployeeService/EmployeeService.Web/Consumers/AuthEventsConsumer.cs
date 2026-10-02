@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Confluent.Kafka;
 using EmployeeService.Application.Database;
+using EmployeeService.Application.Employees;
 using EmployeeService.Infrastructure.Postgres;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -11,7 +12,8 @@ namespace EmployeeService.Web.Consumers;
 
 // The employee side of the hire -> provision-account saga: AuthService reports whether the
 // login account was created, and the employee's provisioning state is completed or
-// compensated accordingly. Consume loop, retries and dead-lettering come from
+// compensated accordingly. The same events, and the welcome bonus RewardsService grants, also feed the
+// onboarding process (HireSagaCoordinator, ADR 0032), which decides whether the hire is complete or has to be undone. Consume loop, retries and dead-lettering come from
 // KafkaRetryConsumer.
 public class AuthEventsConsumer(
     IServiceScopeFactory scopeFactory,
@@ -36,6 +38,7 @@ public class AuthEventsConsumer(
 
         using var scope = ScopeFactory.CreateScope();
         var repository = scope.ServiceProvider.GetRequiredService<IEmployeeRepository>();
+        var saga = scope.ServiceProvider.GetRequiredService<HireSagaCoordinator>();
 
         switch (messageType)
         {
@@ -44,6 +47,7 @@ public class AuthEventsConsumer(
                 var evt = JsonSerializer.Deserialize<AccountProvisionedEvent>(result.Message.Value)
                     ?? throw new InvalidOperationException($"Could not deserialize {AccountProvisionedEvent.MessageType} payload");
                 CompleteProvisioning(repository, evt.EmployeeId, cancellationToken);
+                saga.OnAccountProvisioned(evt.EmployeeId, cancellationToken).GetAwaiter().GetResult();
                 break;
             }
 
@@ -52,11 +56,24 @@ public class AuthEventsConsumer(
                 var evt = JsonSerializer.Deserialize<AccountProvisioningFailedEvent>(result.Message.Value)
                     ?? throw new InvalidOperationException($"Could not deserialize {AccountProvisioningFailedEvent.MessageType} payload");
                 FailProvisioning(repository, evt.EmployeeId, evt.Reason, cancellationToken);
+                saga.OnAccountProvisioningFailed(evt.EmployeeId, evt.Reason, cancellationToken).GetAwaiter().GetResult();
+                break;
+            }
+
+            case CurrencyGrantedEvent.MessageType:
+            {
+                var evt = JsonSerializer.Deserialize<CurrencyGrantedEvent>(result.Message.Value)
+                    ?? throw new InvalidOperationException($"Could not deserialize {CurrencyGrantedEvent.MessageType} payload");
+                if (evt.Source == CurrencyGrantedEvent.WelcomeBonusSource)
+                {
+                    saga.OnBonusGranted(evt.EmployeeId, cancellationToken).GetAwaiter().GetResult();
+                }
+
                 break;
             }
 
             default:
-                // Nothing else on auth.events concerns the employee's provisioning state.
+                // Nothing else on these topics concerns the employee's onboarding.
                 break;
         }
 

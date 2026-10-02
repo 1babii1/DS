@@ -1,4 +1,4 @@
-﻿using EmployeeService.Application.Database;
+using EmployeeService.Application.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +17,7 @@ public static class DependencyInjectionExtensions
         services.AddDbContext<EmployeeDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IReadDbContext>(sp => sp.GetRequiredService<EmployeeDbContext>());
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+        services.AddScoped<IHireSagaRepository, HireSagaRepository>();
 
         return services;
     }
