@@ -1,0 +1,14 @@
+{
+  "type": "record",
+  "name": "EmployeeTerminated",
+  "namespace": "ds.employee",
+  "fields": [
+    {
+      "name": "EmployeeId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    }
+  ]
+}

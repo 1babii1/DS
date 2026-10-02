@@ -53,7 +53,7 @@ Three things worth your time, in this order, each with its evidence next to it:
 Run it yourself with `scripts/demo.sh up` (see [Running it](#running-it)); a 40-second captioned overview is
 [`docs/demo/video/portfolio-overview.mp4`](docs/demo/video/portfolio-overview.mp4), and the complete interactive
 walkthrough is scripted in [`docs/demo/storyboard.md`](docs/demo/storyboard.md). The reasoning behind every decision is in
-[`docs/adr/`](docs/adr/): 22 short records of the actual trade-offs, written the way I'd defend them in a design review,
+[`docs/adr/`](docs/adr/): 23 short records of the actual trade-offs, written the way I'd defend them in a design review,
 not backfilled to sound tidy. What is not done is listed plainly in [Honest status](#honest-status).
 
 ## Proof, not claims
@@ -140,6 +140,9 @@ silently ate 5-6 seconds per request under Docker.
 
 ## Architecture
 
+The full map (system context, containers, the hire path, a DDD context map and an event storm of hiring) is in
+[`docs/architecture/`](docs/architecture/README.md). The overview:
+
 ```mermaid
 flowchart TB
     Client["Browser / API client"] --> Nginx["nginx — the only way in"]
@@ -175,7 +178,7 @@ flowchart TB
     Rewards --> PG
     Notification --> PG
     Search --> PG
-    Directory -- embeddings --> Ollama[("Ollama<br/>local, no external API")]
+    Search -- embeddings --> Ollama[("Ollama<br/>local, no external API")]
 ```
 
 Every arrow into Kafka is a **transactional outbox** — the domain write and the "tell the

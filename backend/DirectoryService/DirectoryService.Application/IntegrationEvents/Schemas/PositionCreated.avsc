@@ -1,0 +1,36 @@
+{
+  "type": "record",
+  "name": "PositionCreated",
+  "namespace": "ds.directory",
+  "fields": [
+    {
+      "name": "PositionId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "Name",
+      "type": "string"
+    },
+    {
+      "name": "Description",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "DepartmentIds",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      }
+    }
+  ]
+}

@@ -555,6 +555,15 @@ services:
       - "127.0.0.1:1025:1025"
       - "127.0.0.1:8025:8025"
 
+  # Schema registry for the event contracts (ADR 0023). Nothing depends on it at runtime; it is the arbiter that
+  # scripts/check_schemas.py (and CI) ask whether a schema change is compatible. In memory: a restart forgets everything.
+  schema_registry:
+    container_name: schema_registry
+    profiles: ["contracts"]
+    image: quay.io/apicurio/apicurio-registry:3.0.7
+    ports:
+      - "127.0.0.1:8081:8080"
+
   # Distributed tracing/metrics/log-correlation stack. Opt-in via
   # `docker compose --profile obs up`: the main services already point at
   # otel-collector unconditionally, but the OTel SDK degrades gracefully

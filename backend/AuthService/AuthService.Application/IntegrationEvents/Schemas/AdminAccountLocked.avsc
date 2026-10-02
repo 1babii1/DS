@@ -1,0 +1,48 @@
+{
+  "type": "record",
+  "name": "AdminAccountLocked",
+  "namespace": "ds.auth",
+  "fields": [
+    {
+      "name": "TargetAccountId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "TargetEmail",
+      "type": "string"
+    },
+    {
+      "name": "LockoutEnd",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      },
+      "doc": "An instant (UTC); the offset the producer held is not carried"
+    },
+    {
+      "name": "PerformedByAccountId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "IpAddress",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "OccurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    }
+  ]
+}

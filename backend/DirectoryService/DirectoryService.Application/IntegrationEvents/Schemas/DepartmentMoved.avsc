@@ -1,0 +1,32 @@
+{
+  "type": "record",
+  "name": "DepartmentMoved",
+  "namespace": "ds.directory",
+  "fields": [
+    {
+      "name": "DepartmentId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "OldParentDepartmentId",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null
+    },
+    {
+      "name": "NewParentDepartmentId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    }
+  ]
+}
