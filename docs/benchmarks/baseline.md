@@ -41,7 +41,7 @@ ceiling - not a documented assumption:
 | Endpoint class | Verified ceiling (per source IP) |
 |---|---|
 | `/auth/login` | 5 / minute |
-| `GET /api/departments/search` (semantic, calls Ollama) | 30 / minute |
+| `GET /api/departments/search` (semantic, calls Ollama) | 30 / minute *(endpoint retired in ADR 0020; the scenario now measures `GET /api/search`)* |
 | `POST /api/{locations,departments,positions}` | 30 / minute |
 
 `GET /api/departments/roots` carries no limiter, which is why it's the one scenario run at
@@ -125,3 +125,20 @@ Reading it honestly:
 - The stack was rebuilt from the final code before this run, which also exposed a local-database defect unrelated to
   performance: NotificationService's migration history was empty although its tables existed (the same desync seen earlier
   in RewardsService), so its migration job failed until the already-applied `InitialCreate` was recorded.
+
+## After the events became Avro (ADR 0023) and the search scenario moved
+
+One run against the stack rebuilt with Avro-only publishing and the registry on Postgres. **`read_search_traffic` now
+measures `GET /api/search` (SearchService), not the retired DirectoryService endpoint, so its number is not comparable
+with the rows above.** The scenario had been left pointing at the removed endpoint by the change that retired it; it
+would have returned 404s, and this run is what found it.
+
+| Scenario | p95 |
+|---|---|
+| `read_roots_traffic` (15 VUs, unthrottled) | 4.0 ms |
+| `read_search_traffic` (SearchService, hybrid) | 17.5 ms |
+| `write_traffic` (full hire chain) | 11.7 ms |
+
+499/499 checks, 0% failed. The hire chain ran over Avro through every consumer: afterwards the audit log held the hires
+with their schema ids, Rewards had granted the welcome bonuses, Notification had stored the notifications, no outbox row
+was pending and no new dead letters appeared. One run, no variance estimate.
