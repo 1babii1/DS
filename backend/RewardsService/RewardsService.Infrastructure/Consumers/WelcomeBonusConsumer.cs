@@ -72,13 +72,16 @@ public class WelcomeBonusConsumer(
             return;
         }
 
-        writer.Grant(hired.EmployeeId, _options.WelcomeBonusAmount, "Welcome bonus", TransactionSource.WelcomeBonus, null);
-
         try
         {
+            writer.Grant(hired.EmployeeId, _options.WelcomeBonusAmount, "Welcome bonus", TransactionSource.WelcomeBonus, null);
             dbContext.SaveChanges();
         }
-        catch (DbUpdateException ex) when (ex.IsUniqueViolation())
+        catch (WelcomeBonusAlreadyGrantedException)
+        {
+            // The wallet's own history already holds it: a redelivery that got past the check above.
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueViolationOf("IX_transactions_EmployeeId_WelcomeBonus"))
         {
             // Lost the race - another concurrent/redelivered attempt already committed its own
             // welcome-bonus transaction. The unique index is what makes this race-safe regardless

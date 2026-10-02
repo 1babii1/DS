@@ -33,6 +33,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0025](0025-read-replica-and-read-your-writes.md) | A read replica, and reading your own writes from it |
 | [0026](0026-failover-rpo-rto.md) | Failing over to the standby: what is lost, what it costs to lose nothing |
 | [0027](0027-audit-entries-partitioned-by-month.md) | The audit log, partitioned by month |
+| [0031](0031-event-sourced-wallets.md) | Wallets are event-sourced |
 
 Not yet written up, though each decision is already live in the codebase and explained
 in its own commit messages: gRPC for internal calls, local JWT validation via JWKS,

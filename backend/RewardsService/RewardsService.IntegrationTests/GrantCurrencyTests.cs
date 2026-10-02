@@ -324,6 +324,45 @@ public class GrantCurrencyTests : IClassFixture<RewardsTestWebFactory>, IAsyncLi
         Assert.Equal(1900, used.Used);
     }
 
+    // The wallet's balance is read, changed in memory and written back, so two grants to the SAME employee that overlap can each read
+    // the old balance and the later write erases the earlier one: the ledger shows both grants and the balance only one. Every
+    // other concurrent test here uses different employees, which is why this went unnoticed. Eight at once, so the overlap
+    // actually happens.
+    [Fact]
+    public async Task Simultaneous_grants_to_one_employee_all_count_in_the_balance()
+    {
+        var employee = Guid.NewGuid();
+        var admin = Guid.NewGuid();
+
+        var results = await Concurrently(Enumerable.Range(0, 8)
+            .Select<int, Func<Task<(int Status, string? ErrorCode)>>>(i => () => Grant(admin, new GrantCurrencyRequest(employee, 10, $"Grant {i}")))
+            .ToArray());
+
+        Assert.All(results, r => Assert.Equal(StatusCodes.Status200OK, r.Status));
+        Assert.Equal(8, await ReadInDb(db => db.Transactions.CountAsync(t => t.EmployeeId == employee)));
+        var wallet = await ReadInDb(db => db.Wallets.SingleAsync(w => w.EmployeeId == employee));
+        Assert.Equal(80, wallet.Balance);
+    }
+
+    // The same race with the wallet already existing: now nothing collides on insert, so the overlapping grants each write a
+    // balance computed from the one they read, and some are lost without any error.
+    [Fact]
+    public async Task Simultaneous_grants_to_an_existing_wallet_all_count_in_the_balance()
+    {
+        var employee = Guid.NewGuid();
+        var admin = Guid.NewGuid();
+        await Grant(admin, new GrantCurrencyRequest(employee, 100, "Opening"));
+
+        var results = await Concurrently(Enumerable.Range(0, 8)
+            .Select<int, Func<Task<(int Status, string? ErrorCode)>>>(i => () => Grant(admin, new GrantCurrencyRequest(employee, 10, $"Grant {i}")))
+            .ToArray());
+
+        Assert.All(results, r => Assert.Equal(StatusCodes.Status200OK, r.Status));
+        Assert.Equal(9, await ReadInDb(db => db.Transactions.CountAsync(t => t.EmployeeId == employee)));
+        var wallet = await ReadInDb(db => db.Wallets.SingleAsync(w => w.EmployeeId == employee));
+        Assert.Equal(180, wallet.Balance);
+    }
+
     // Several requests with the same key at once: one wins the idempotency race, the others must not keep the quota
     // they had already taken: the count is 500, not 500 times the number of requests.
     [Fact]
