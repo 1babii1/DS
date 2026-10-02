@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Shared.Avro;
@@ -33,6 +33,9 @@ public static class DependencyInjectionExtensions
 
         // Whole records, in the writer's shape: the audit log keeps every field. Active only with a registry configured.
         services.AddEventAvroDecoder(configuration);
+        services.Configure<AuditPartitionOptions>(configuration.GetSection(AuditPartitionOptions.SectionName));
+        services.AddSingleton(TimeProvider.System);
+        services.AddHostedService<AuditPartitionMaintainer>();
         services.AddHostedService<AuditConsumer>();
         services.AddKafkaHealthCheck(bootstrapServers, security);
 

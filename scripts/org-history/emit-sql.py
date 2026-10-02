@@ -43,16 +43,30 @@ def insert_sql(events):
             )
             + ")"
         )
+    values = ",\n".join(rows)
+    ids = ", ".join("(" + literal(e["id"]) + "::uuid)" for e in events)
+    # entries is partitioned by event time and cannot carry a unique index on the message id, so "recorded once" lives in
+    # audit.recorded_messages (ADR 0027): entries are written only for ids not recorded yet, then the ids are recorded.
+    # Loading twice therefore adds nothing the second time.
     return (
-        'INSERT INTO audit.entries ("Id", "MessageId", "SourceService", "EventType", "AggregateId", "Payload", "OccurredAt", "ReceivedAt")\nVALUES\n'
-        + ",\n".join(rows)
-        + '\nON CONFLICT ("MessageId") DO NOTHING;\n'
+        "BEGIN;\n"
+        'INSERT INTO audit.entries ("Id", "MessageId", "SourceService", "EventType", "AggregateId", "Payload", "OccurredAt", "ReceivedAt")\n'
+        'SELECT * FROM (VALUES\n' + values + '\n) AS v("Id", "MessageId", "SourceService", "EventType", "AggregateId", "Payload", "OccurredAt", "ReceivedAt")\n'
+        'WHERE NOT EXISTS (SELECT 1 FROM audit.recorded_messages r WHERE r."MessageId" = v."MessageId");\n'
+        'INSERT INTO audit.recorded_messages ("MessageId", "RecordedAt") SELECT id, now() FROM (VALUES ' + ids + ') AS t(id)\n'
+        'ON CONFLICT ("MessageId") DO NOTHING;\n'
+        "COMMIT;\n"
     )
 
 
 def remove_sql(events):
     ids = ", ".join(literal(e["id"]) + "::uuid" for e in events)
-    return f'DELETE FROM audit.entries WHERE "MessageId" IN ({ids});\n'
+    return (
+        "BEGIN;\n"
+        f'DELETE FROM audit.entries WHERE "MessageId" IN ({ids});\n'
+        f'DELETE FROM audit.recorded_messages WHERE "MessageId" IN ({ids});\n'
+        "COMMIT;\n"
+    )
 
 
 if __name__ == "__main__":
