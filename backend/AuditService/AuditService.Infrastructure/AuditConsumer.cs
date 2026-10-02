@@ -1,4 +1,4 @@
-﻿using AuditService.Domain;
+using AuditService.Domain;
 using Confluent.Kafka;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -49,7 +49,7 @@ public class AuditConsumer(
         using var scope = ScopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
 
-        if (dbContext.Entries.Any(e => e.MessageId == messageGuid))
+        if (dbContext.RecordedMessages.Any(m => m.MessageId == messageGuid))
         {
             return Task.CompletedTask;
         }
@@ -67,13 +67,16 @@ public class AuditConsumer(
             EventTime(result),
             schemaId);
 
+        // Both rows in one transaction: the message is recorded exactly when its entry is. RecordedMessages carries the
+        // uniqueness the partitioned entries table cannot (ADR 0027).
+        dbContext.RecordedMessages.Add(RecordedMessage.Create(messageGuid));
         dbContext.Entries.Add(entry);
 
         try
         {
             dbContext.SaveChanges();
         }
-        catch (DbUpdateException) when (dbContext.Entries.Any(e => e.MessageId == messageGuid))
+        catch (DbUpdateException) when (dbContext.RecordedMessages.AsNoTracking().Any(m => m.MessageId == messageGuid))
         {
             // Lost a race with another consumer instance on the unique index - fine, already recorded.
         }
