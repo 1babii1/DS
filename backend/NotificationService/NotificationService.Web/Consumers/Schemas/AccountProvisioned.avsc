@@ -1,0 +1,21 @@
+{
+  "type": "record",
+  "name": "AccountProvisioned",
+  "namespace": "ds.auth",
+  "fields": [
+    {
+      "name": "EmployeeId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "AccountId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    }
+  ]
+}

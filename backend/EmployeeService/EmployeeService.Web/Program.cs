@@ -60,6 +60,7 @@ builder.Services.Configure<EmployeeConsumerOptions>(options =>
         ?? throw new InvalidOperationException("Configuration 'Kafka:Topics' is not set.");
     options.GroupId = builder.Configuration["Kafka:GroupId"] ?? "employee-service";
 });
+builder.Services.AddEventAvroDecoder(builder.Configuration, typeof(EmployeeService.Web.Consumers.AuthEventsConsumer).Assembly);
 builder.Services.AddHostedService<AuthEventsConsumer>();
 
 builder.Services.AddScoped<HireEmployeeHandler>();

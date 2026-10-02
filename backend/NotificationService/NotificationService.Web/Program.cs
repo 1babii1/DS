@@ -1,3 +1,4 @@
+using Shared.Avro;
 using Shared.Ops;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
@@ -89,6 +90,7 @@ builder.Services.Configure<DomainEventsConsumerOptions>(options =>
         ?? throw new InvalidOperationException("Configuration 'Kafka:Topics' is not set.");
     options.GroupId = builder.Configuration["Kafka:GroupId"] ?? "notification-service";
 });
+builder.Services.AddEventAvroDecoder(builder.Configuration, typeof(NotificationService.Web.Consumers.DomainEventsConsumer).Assembly);
 builder.Services.AddHostedService<DomainEventsConsumer>();
 
 builder.Services.AddDatabaseHealthCheck<NotificationDbContext>();

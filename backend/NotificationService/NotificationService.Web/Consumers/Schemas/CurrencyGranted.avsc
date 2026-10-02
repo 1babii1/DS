@@ -1,0 +1,36 @@
+{
+  "type": "record",
+  "name": "CurrencyGranted",
+  "namespace": "ds.rewards",
+  "fields": [
+    {
+      "name": "EmployeeId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "Amount",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 18,
+        "scale": 2
+      }
+    },
+    {
+      "name": "Reason",
+      "type": "string"
+    },
+    {
+      "name": "NewBalance",
+      "type": {
+        "type": "bytes",
+        "logicalType": "decimal",
+        "precision": 18,
+        "scale": 2
+      }
+    }
+  ]
+}

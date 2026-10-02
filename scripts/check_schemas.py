@@ -89,6 +89,29 @@ def lint(path, schema):
     return problems
 
 
+def topic_of_namespace(namespace):
+    for _, (topic, ns) in PRODUCERS.items():
+        if ns == namespace:
+            return topic
+    return None
+
+
+def check_reader(registry, path, schema):
+    """A consumer's reader schema must be able to read what the producer's latest schema writes (Avro resolution)."""
+    topic = topic_of_namespace(schema.get("namespace"))
+    if topic is None:
+        return [f"{path}: namespace '{schema.get('namespace')}' is not a producer's namespace"]
+    subject = f"{topic}-{schema['namespace']}.{schema['name']}"
+    status, text = call(registry, "POST", f"/compatibility/subjects/{subject}/versions/latest", {"schema": json.dumps(schema)})
+    if status == 404:
+        return [f"{path}: no producer schema is registered as {subject}; a consumer cannot read an event nobody publishes"]
+    if status != 200:
+        return [f"{path}: compatibility check failed with {status} {text}"]
+    if not json.loads(text).get("is_compatible", False):
+        return [f"{path}: this reader schema cannot read what the producer writes ({subject}); a field it needs has no default in the producer's schema, or its type differs"]
+    return []
+
+
 def removed_fields(base_schema, new_schema):
     new_names = {field["name"] for field in new_schema.get("fields", [])}
     return [field["name"] for field in base_schema.get("fields", []) if field["name"] not in new_names]
@@ -157,13 +180,18 @@ def main():
             if not ok:
                 problems.append(f"{path} ({label}, subject {subject}): {message}")
 
+    # Reader schemas of consumers, against the producers' latest (registered above).
+    readers = {p: s for p, s in current.items() if READER_DIR in p.replace("\\", "/")}
+    for path, schema in sorted(readers.items()):
+        problems += check_reader(args.registry, path, schema)
+
     checked = sum(1 for p in current if producer_of(p))
     if problems:
         print(f"FAIL: {len(problems)} problem(s) in {checked} producer schema(s)")
         for problem in problems:
             print(f"  - {problem}")
         return 1
-    print(f"OK: {checked} producer schema(s) are BACKWARD_TRANSITIVE-compatible with everything released on {args.base}")
+    print(f"OK: {len(readers)} reader schema(s) read what the producers write; {checked} producer schema(s) are BACKWARD_TRANSITIVE-compatible with everything released on {args.base}")
     return 0
 
 

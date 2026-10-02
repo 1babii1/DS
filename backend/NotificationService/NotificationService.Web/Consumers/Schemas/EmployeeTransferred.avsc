@@ -1,0 +1,28 @@
+{
+  "type": "record",
+  "name": "EmployeeTransferred",
+  "namespace": "ds.employee",
+  "fields": [
+    {
+      "name": "EmployeeId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "DepartmentId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "PositionId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "type": "record",
+  "name": "EmployeeHired",
+  "namespace": "ds.employee",
+  "fields": [
+    {
+      "name": "EmployeeId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "FullName",
+      "type": "string"
+    },
+    {
+      "name": "Email",
+      "type": "string"
+    },
+    {
+      "name": "DepartmentId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "PositionId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    }
+  ]
+}

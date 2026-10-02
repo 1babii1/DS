@@ -19,6 +19,7 @@
 
     <ItemGroup>
         <EmbeddedResource Include="IntegrationEvents\Schemas\*.avsc" />
+        <EmbeddedResource Include="Consumers\Schemas\*.avsc" />
     </ItemGroup>
 
 </Project>

@@ -18,8 +18,9 @@ public class DomainEventsConsumer(
     IServiceScopeFactory scopeFactory,
     IHubContext<NotificationsHub> hub,
     IOptions<DomainEventsConsumerOptions> options,
-    ILogger<DomainEventsConsumer> logger)
-    : KafkaRetryConsumer<NotificationDbContext>(scopeFactory, options.Value, logger)
+    ILogger<DomainEventsConsumer> logger,
+    Shared.Avro.IEventAvroDecoder? avro = null)
+    : KafkaRetryConsumer<NotificationDbContext>(scopeFactory, options.Value, logger, avro)
 {
     protected override string MessageKind => "notification";
 

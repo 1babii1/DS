@@ -168,6 +168,7 @@ builder.Services.Configure<AuthConsumerOptions>(options =>
         ?? throw new InvalidOperationException("Configuration 'Kafka:Topics' is not set.");
     options.GroupId = builder.Configuration["Kafka:GroupId"] ?? "auth-service";
 });
+builder.Services.AddEventAvroDecoder(builder.Configuration, typeof(AuthService.Web.Consumers.EmployeeEventsConsumer).Assembly);
 builder.Services.AddHostedService<EmployeeEventsConsumer>();
 builder.Services.AddKafkaHealthCheck(kafkaBootstrapServers, kafkaSecurity);
 

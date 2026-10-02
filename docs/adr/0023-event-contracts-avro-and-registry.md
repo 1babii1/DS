@@ -34,8 +34,10 @@ mis-fold last March.
   schemas, retrying until the registry answers, and until it has, `TryEncode` says no and the row carries only the JSON.
   So a registry outage never fails a hire or a grant; it only delays Avro. The publishing step encodes such rows from
   their JSON when it publishes. It is off unless `SchemaRegistry:Url` is configured. *(Step 2; publishing is step 3.)*
-- **Consumers own a reader schema** beside their local record copy; CI checks it against the producer's latest. *(Reader
-  schemas and the CI check arrive with the first consumer that has one; AuditService reads whole records and has none.)*
+- **Consumers own a reader schema** beside their local record copy (`.../Consumers/Schemas/`, embedded in the consumer's
+  assembly), declaring exactly the fields that consumer's record has. CI asks the registry whether each reader schema can
+  read what the producer's latest schema writes, so a reader that needs a field the producer does not have (and has no
+  default for) fails the build. AuditService reads whole records and has none.
 - **One mechanism in the shared consumer base.** `KafkaRetryConsumer` now reads the message value as bytes. A value that
   starts with a zero byte is Avro in the Confluent wire format (JSON never does) and is decoded through the registry into
   the same JSON the handlers have always received (logical types back to Guid text, ISO times, numbers), so a consumer can
@@ -44,6 +46,11 @@ mis-fold last March.
   one the writer's whole record is returned. A message that can never be decoded (corrupt, not Avro) goes to
   `dead_letters` with its bytes in base64; one that cannot be decoded *yet* (the registry is unreachable, no decoder
   configured) makes the consumer stall on it and ask again, as it already does for a database that is down.
+- **All six consumers (steps 4a and 4b):** Audit, Notification, Search, Rewards, Auth and Employee all go through the shared
+  decoder; the five with record copies have 17 reader schemas between them, one per event they consume. A test keeps each
+  reader schema equal to its record (same fields, same optionality) and runs the real path for every one: the producer's
+  bytes, decoded with the consumer's own reader schema, deserialized into the consumer's own record, with only the
+  declared fields coming through.
 - **AuditService (step 4a):** decodes whole records, stores the JSON and the id of the schema it was written with
   (`entries.SchemaId`, null for JSON), and treats `directory.events.v2` and `directory.events` as one source.
 - **Switching a consumer to the Avro topics is configuration:** `EVENT_TOPIC_SUFFIX=.v2` together with
@@ -125,8 +132,15 @@ check, both halves of the pending predicate, two conversions on the JSON path. *
 rebuilt with a registry configured registered its seven schemas under `directory.events.v2-...`, and a row inserted into
 its outbox was published to both topics (`ProcessedAt` and `AvroPublishedAt` set, its bytes made at publish time).
 
-Not verified yet: reading the Avro topic with a consumer (the broker needs credentials I did not use; the wire format is
-checked by the Confluent deserializer in tests), consumers on reader schemas, AuditService on decoded events, retiring
-the old topics, and the other three producers live (same code; only DirectoryService was rebuilt). The registry is
-in-memory (a restart forgets it); CI starts a fresh one per run, so what the gate compares against is the base branch's
-files, not a persistent registry.
+Step 4b, run live: the whole local stack rebuilt with the registry and the `.v2` topics on. By accident the registry
+container was down when the services came up (it is in-memory and had exited): the consumers logged "could not decode,
+will try again", the publishers kept the Avro side owed, nothing was dead-lettered, and when the registry was started again
+the services registered their 28 subjects by themselves and an `EmployeeTerminated` row inserted into Employee's outbox
+reached the audit log through the Avro topic (`SchemaId` set, `AvroPublishedAt` set). That is a real, if unplanned, outage
+drill, not a test; it did not cover the case where a registry comes back *empty* after consumers had cached schema ids
+(the services here were new, so they had no stale ids).
+
+Not verified yet: a registry that restarts empty under running services (their cached schema ids would be stale), reading
+the Avro topics in each consumer with real domain events (only a harmless `EmployeeTerminated` was sent, not a hire),
+retiring the old topics (step 5). The registry is in-memory (a restart forgets it); CI starts a fresh one per run, so what
+the gate compares against is the base branch's files, not a persistent registry.

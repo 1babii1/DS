@@ -60,6 +60,7 @@ services:
       - "5130:5130"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
+      - Kafka__Topics__0=employee.events${EVENT_TOPIC_SUFFIX:-}
       # Opt-in (ADR 0023): set SCHEMA_REGISTRY_URL (e.g. http://schema_registry:8080/apis/ccompat/v7, with `--profile contracts`)
       # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
       - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-}
@@ -126,6 +127,7 @@ services:
       - "5131:5131"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
+      - Kafka__Topics__0=auth.events${EVENT_TOPIC_SUFFIX:-}
       # Opt-in (ADR 0023): set SCHEMA_REGISTRY_URL (e.g. http://schema_registry:8080/apis/ccompat/v7, with `--profile contracts`)
       # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
       - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-}
@@ -231,6 +233,8 @@ services:
       - "5134:5134"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
+      - Kafka__Topics__0=employee.events${EVENT_TOPIC_SUFFIX:-}
+      - Kafka__Topics__1=auth.events${EVENT_TOPIC_SUFFIX:-}
       # Opt-in (ADR 0023): set SCHEMA_REGISTRY_URL (e.g. http://schema_registry:8080/apis/ccompat/v7, with `--profile contracts`)
       # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
       - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-}
@@ -281,6 +285,12 @@ services:
       - "5135:5135"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
+      # Opt-in (ADR 0023): SCHEMA_REGISTRY_URL and EVENT_TOPIC_SUFFIX=.v2 together make this service read the Avro topics.
+      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-}
+      - Kafka__Topics__0=directory.events${EVENT_TOPIC_SUFFIX:-}
+      - Kafka__Topics__1=employee.events${EVENT_TOPIC_SUFFIX:-}
+      - Kafka__Topics__2=auth.events${EVENT_TOPIC_SUFFIX:-}
+      - Kafka__Topics__3=rewards.events${EVENT_TOPIC_SUFFIX:-}
       - ASPNETCORE_URLS=http://*:5135
       - ConnectionStrings__SearchServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=search,public
       - Elasticsearch__Uri=http://elasticsearch:9200
@@ -397,13 +407,15 @@ services:
       - "5133:5133"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
+      # Opt-in (ADR 0023): SCHEMA_REGISTRY_URL and EVENT_TOPIC_SUFFIX=.v2 together make this service read the Avro topics.
+      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-}
+      - Kafka__Topics__0=rewards.events${EVENT_TOPIC_SUFFIX:-}
+      - Kafka__Topics__1=auth.events${EVENT_TOPIC_SUFFIX:-}
+      - Kafka__Topics__2=employee.events${EVENT_TOPIC_SUFFIX:-}
       - ASPNETCORE_URLS=http://*:5133
       - ConnectionStrings__NotificationServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=notification,public
       - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:-changeme-redis}
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
-      - Kafka__Topics__0=rewards.events
-      - Kafka__Topics__1=auth.events
-      - Kafka__Topics__2=employee.events
       - Kafka__SaslUsername=kafka
       - Kafka__SaslPassword=${KAFKA_PASSWORD:-changeme-kafka}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317

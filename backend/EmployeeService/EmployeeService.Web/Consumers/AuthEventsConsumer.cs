@@ -16,8 +16,9 @@ namespace EmployeeService.Web.Consumers;
 public class AuthEventsConsumer(
     IServiceScopeFactory scopeFactory,
     IOptions<EmployeeConsumerOptions> options,
-    ILogger<AuthEventsConsumer> logger)
-    : KafkaRetryConsumer<EmployeeDbContext>(scopeFactory, options.Value, logger)
+    ILogger<AuthEventsConsumer> logger,
+    Shared.Avro.IEventAvroDecoder? avro = null)
+    : KafkaRetryConsumer<EmployeeDbContext>(scopeFactory, options.Value, logger, avro)
 {
     protected override string MessageKind => "employee";
 

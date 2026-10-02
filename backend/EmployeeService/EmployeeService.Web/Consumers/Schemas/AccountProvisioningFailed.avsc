@@ -1,0 +1,18 @@
+{
+  "type": "record",
+  "name": "AccountProvisioningFailed",
+  "namespace": "ds.auth",
+  "fields": [
+    {
+      "name": "EmployeeId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "Reason",
+      "type": "string"
+    }
+  ]
+}
