@@ -1,0 +1,48 @@
+:root { color-scheme: dark; font-family: system-ui, sans-serif; background: #131a17; color: #f0f4f1; }
+body { margin: 0; min-height: 100dvh; }
+.auth-shell { display: grid; min-height: 100dvh; place-items: center; padding: 1.5rem; }
+.auth-card { width: min(26rem, 100%); }
+.auth-brand { color: #a8d7b8; font-weight: 700; letter-spacing: .15em; }
+h1 { font-size: clamp(2.25rem, 7vw, 2.75rem); letter-spacing: -.04em; margin: 1.5rem 0 .75rem; }
+p { color: #abb9b0; line-height: 1.6; }
+.auth-link { margin-top: 1.5rem; }
+.auth-link a { color: #a8d7b8; font-weight: 600; }
+.auth-form { display: grid; gap: .75rem; margin-top: 2rem; }
+.auth-form--compact { margin-top: .75rem; }
+.auth-form input, button, .button-link { box-sizing: border-box; width: 100%; border-radius: .75rem; padding: .875rem 1rem; font: inherit; }
+.auth-form input { background: #1c2520; color: #f0f4f1; border: 1px solid #53685b; }
+button { border: 0; background: #a8d7b8; color: #131a17; cursor: pointer; font-weight: 600; }
+.button-secondary, .button-link { background: transparent; border: 1px solid #53685b; color: #f0f4f1; }
+.button-link { display: block; margin-top: .75rem; text-align: center; text-decoration: none; }
+.password-field { position: relative; }
+.password-field input { padding-right: 3.5rem; width: 100%; }
+.password-toggle { background: transparent; color: #a8d7b8; height: 100%; padding: 0; position: absolute; right: 0; top: 0; width: 3.25rem; }
+.password-toggle__icon { border: 2px solid currentColor; border-radius: 50%; display: block; height: .72rem; margin: auto; position: relative; width: 1.15rem; }
+.password-toggle__icon::after { background: currentColor; border-radius: 50%; content: ""; height: .28rem; left: 50%; position: absolute; top: 50%; transform: translate(-50%, -50%); width: .28rem; }
+.password-toggle[data-visible="true"] .password-toggle__icon::before { background: #a8d7b8; content: ""; height: 2px; left: 50%; position: absolute; top: 50%; transform: translate(-50%, -50%) rotate(-45deg); width: 1.4rem; }
+.validation-summary, .form-error, .validation-message { color: #ffb5b5; }
+
+
+h2 { font-size: 1.15rem; margin: 2rem 0 .5rem; }
+a { color: #a8d7b8; }
+input, button, .button-link { box-sizing: border-box; border-radius: .75rem; font: inherit; }
+input { background: #1c2520; border: 1px solid #53685b; color: #f0f4f1; margin: .35rem 0 .75rem; padding: .875rem 1rem; width: 100%; }
+button { margin-top: .5rem; padding: .875rem 1rem; width: 100%; }
+button:disabled { cursor: default; opacity: .6; }
+input:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid #a8d7b8; outline-offset: 3px; }
+.status { border-radius: 999px; display: inline-block; font-size: .85rem; font-weight: 700; padding: .2rem .65rem; }
+.status--on, .message--success { background: #1f3a28; color: #a8d7b8; }
+.status--off, .message--error { background: #3a2020; color: #ffb5b5; }
+.warning, .message, .key, .recovery-codes, .session-row, .passkey-row, .danger-zone { border-radius: .75rem; margin: 1rem 0; padding: 1rem; }
+.warning { background: #2c2313; border: 1px solid #a8873a; color: #e3c98a; }
+.message--error, .danger-zone { border: 1px solid #a83a3a; }
+.message--success { border: 1px solid #4d7a5a; }
+.key, .recovery-codes, .session-row, .passkey-row { background: #1c2520; border: 1px solid #53685b; }
+.recovery-codes { display: grid; font-family: ui-monospace, monospace; gap: .5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.recovery-code { overflow-wrap: anywhere; }
+.session-row, .passkey-row { align-items: center; display: flex; gap: 1rem; justify-content: space-between; }
+.session-row__meta, .passkey-row__meta, .message--empty { color: #abb9b0; font-size: .85rem; margin: .25rem 0 0; }
+.session-row button, .passkey-row button { margin: 0; width: auto; }
+.button-danger { background: #a83a3a; color: #f0f4f1; }
+.danger-zone { background: #2c1313; }
+@media (max-width: 34rem) { .auth-shell { padding: 1rem; } .recovery-codes { grid-template-columns: 1fr; } .session-row, .passkey-row { align-items: stretch; flex-direction: column; } .session-row button, .passkey-row button { width: 100%; } }

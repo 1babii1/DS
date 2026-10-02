@@ -1,0 +1,167 @@
+@page "/auth/2fa/manage"
+@attribute [Authorize(AuthenticationSchemes = "Identity.Application")]
+@attribute [EnableRateLimiting("auth")]
+@attribute [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+@attribute [ExcludeFromInteractiveRouting]
+@inject UserManager<Account> UserManager
+@inject TwoFactorService TwoFactor
+@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager Navigation
+
+<PageTitle>Two-factor authentication · DS</PageTitle>
+
+<h1 id="page-title">Two-factor authentication</h1>
+<p>Status: <span class="status @(Enabled ? "status--on" : "status--off")">@(Enabled ? "Enabled" : "Disabled")</span></p>
+<p class="auth-link"><a href="/auth/passkeys/manage">Manage passkeys</a> · <a href="/auth/sessions/manage">View active sessions</a> · <a href="/auth/account/settings">Account settings</a></p>
+
+@if (RecoveryCodes is not null)
+{
+    <div class="warning" role="status">
+        <strong>Save these recovery codes now.</strong> Each one lets you sign in once if you lose access to your authenticator app. They will not be shown again.
+    </div>
+    <div class="recovery-codes">
+        @foreach (var recoveryCode in RecoveryCodes)
+        {
+            <span class="recovery-code">@recoveryCode</span>
+        }
+    </div>
+}
+
+@if (!Enabled && Setup is not null)
+{
+    <h2>Set up an authenticator app</h2>
+    <p>Scan this with an authenticator app, or enter the key manually, then confirm with the six-digit code it generates.</p>
+    <p class="key"><code>@Setup.SharedKey</code></p>
+    <p><a href="@Setup.AuthenticatorUri">Open authenticator setup link</a></p>
+    <EditForm FormName="enable-two-factor" Model="SetupForm!" OnValidSubmit="EnableAsync" class="auth-form">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="validation-summary" />
+        @if (SetupError is not null)
+        {
+            <p class="form-error" role="alert">@SetupError</p>
+        }
+        <label for="two-factor-code">Confirmation code</label>
+        <InputText id="two-factor-code" @bind-Value="SetupForm!.Code" autocomplete="one-time-code" inputmode="numeric" placeholder="123 456" aria-describedby="two-factor-code-error" />
+        <ValidationMessage For="() => SetupForm!.Code" id="two-factor-code-error" />
+        <button type="submit">Enable two-factor authentication</button>
+    </EditForm>
+}
+
+@if (Enabled)
+{
+    <h2>Regenerate recovery codes</h2>
+    <p>Generating new codes invalidates every code you were given before.</p>
+    <EditForm FormName="regenerate-recovery-codes" Model="RegenerateForm!" OnValidSubmit="RegenerateCodesAsync" class="auth-form">
+        <DataAnnotationsValidator />
+        @if (RegenerateError is not null)
+        {
+            <p class="form-error" role="alert">@RegenerateError</p>
+        }
+        <label for="regenerate-password">Confirm your password</label>
+        <PasswordField Id="regenerate-password" Name="RegenerateForm.Password" Value="RegenerateForm!.Password" Autocomplete="current-password" DescribedBy="regenerate-password-error" />
+        <ValidationMessage For="() => RegenerateForm!.Password" id="regenerate-password-error" />
+        <button class="button-secondary" type="submit">Regenerate recovery codes</button>
+    </EditForm>
+
+    <h2>Disable two-factor authentication</h2>
+    <p>Your account will only require a password to sign in.</p>
+    <EditForm FormName="disable-two-factor" Model="DisableForm!" OnValidSubmit="DisableAsync" class="auth-form">
+        <DataAnnotationsValidator />
+        @if (DisableError is not null)
+        {
+            <p class="form-error" role="alert">@DisableError</p>
+        }
+        <label for="disable-password">Confirm your password</label>
+        <PasswordField Id="disable-password" Name="DisableForm.Password" Value="DisableForm!.Password" Autocomplete="current-password" DescribedBy="disable-password-error" />
+        <ValidationMessage For="() => DisableForm!.Password" id="disable-password-error" />
+        <button class="button-secondary" type="submit">Disable two-factor authentication</button>
+    </EditForm>
+}
+
+@code {
+    [SupplyParameterFromForm(FormName = "enable-two-factor")]
+    private TwoFactorSetupForm? SetupForm { get; set; }
+
+    [SupplyParameterFromForm(FormName = "regenerate-recovery-codes")]
+    private PasswordConfirmationForm? RegenerateForm { get; set; }
+
+    [SupplyParameterFromForm(FormName = "disable-two-factor")]
+    private PasswordConfirmationForm? DisableForm { get; set; }
+
+    private bool Enabled { get; set; }
+
+    private TwoFactorSetupResponse? Setup { get; set; }
+
+    private IReadOnlyList<string>? RecoveryCodes { get; set; }
+
+        private string? SetupError { get; set; }
+
+    private string? RegenerateError { get; set; }
+
+    private string? DisableError { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        SetupForm ??= new();
+        RegenerateForm ??= new();
+        DisableForm ??= new();
+
+        var user = await CurrentUserAsync();
+        Enabled = await UserManager.GetTwoFactorEnabledAsync(user);
+        if (!Enabled)
+        {
+            Setup = await TwoFactor.GetOrCreateSetupAsync(user);
+        }
+    }
+
+    private async Task EnableAsync()
+    {
+        var user = await CurrentUserAsync();
+        var codes = await TwoFactor.EnableAsync(user, SetupForm!.Code.Replace(" ", string.Empty, StringComparison.Ordinal));
+        SetupForm!.Code = string.Empty;
+        if (codes is null)
+        {
+            SetupError = "That code didn't work. Check your authenticator app and try again.";
+            return;
+        }
+
+        Enabled = true;
+        Setup = null;
+        RecoveryCodes = codes;
+    }
+
+    private async Task RegenerateCodesAsync()
+    {
+        var user = await CurrentUserAsync();
+        var codes = await TwoFactor.RegenerateRecoveryCodesAsync(user, RegenerateForm!.Password);
+        RegenerateForm!.Password = string.Empty;
+        if (codes is null)
+        {
+            RegenerateError = "Incorrect password.";
+            return;
+        }
+
+        RecoveryCodes = codes;
+    }
+
+    private async Task DisableAsync()
+    {
+        var user = await CurrentUserAsync();
+        if (!await TwoFactor.DisableAsync(user, DisableForm!.Password))
+        {
+            DisableForm!.Password = string.Empty;
+            DisableError = "Incorrect password.";
+            return;
+        }
+
+        Navigation.NavigateTo("/auth/2fa/manage", forceLoad: true);
+    }
+
+    private async Task<Account> CurrentUserAsync()
+    {
+        var principal = HttpContextAccessor.HttpContext?.User
+            ?? throw new InvalidOperationException("Signed-in user not found.");
+        return await UserManager.GetUserAsync(principal)
+            ?? throw new InvalidOperationException("Signed-in user not found.");
+    }
+}

@@ -1,0 +1,104 @@
+@page "/auth/2fa/login"
+@attribute [AllowAnonymous]
+@attribute [EnableRateLimiting("auth")]
+@attribute [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+@attribute [ExcludeFromInteractiveRouting]
+@inject SignInManager<Account> SignInManager
+@inject TwoFactorService TwoFactor
+@inject SecurityAuditService SecurityAudit
+@inject AuthSessionService AuthSessions
+@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager Navigation
+
+<PageTitle>Two-factor authentication · DS</PageTitle>
+
+@if (InvalidRequest)
+{
+    <h1 id="page-title">Sign-in request expired.</h1>
+    <p>Start again from the sign-in page.</p>
+}
+else
+{
+    <h1 id="page-title">Enter your verification code.</h1>
+    <p>Use the current code from your authenticator app.</p>
+    <EditForm FormName="two-factor-login" Model="Form!" OnValidSubmit="SubmitAsync" class="auth-form">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="validation-summary" />
+        @if (FormError is not null)
+        {
+            <p class="form-error" role="alert">@FormError</p>
+        }
+        <input name="Form.ReturnUrl" type="hidden" value="@Form!.ReturnUrl" />
+        <label for="code">Verification code</label>
+        <InputText id="code" @bind-Value="Form!.Code" autocomplete="one-time-code" inputmode="numeric" aria-describedby="code-error" />
+        <ValidationMessage For="() => Form!.Code" id="code-error" />
+        <label><InputCheckbox @bind-Value="Form!.RememberClient" /> Remember this browser</label>
+        <button type="submit">Verify and sign in</button>
+    </EditForm>
+    <p class="auth-link"><a href="@RecoveryUrl">Use a recovery code</a></p>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "ReturnUrl")]
+    private string? RequestedReturnUrl { get; set; }
+
+    [SupplyParameterFromForm(FormName = "two-factor-login")]
+    private TwoFactorCodeForm? Form { get; set; }
+
+        private string? FormError { get; set; }
+
+    private bool InvalidRequest { get; set; }
+
+    private string RecoveryUrl => $"/auth/2fa/recovery?ReturnUrl={Uri.EscapeDataString(Form!.ReturnUrl)}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        Form ??= new TwoFactorCodeForm { ReturnUrl = RequestedReturnUrl ?? string.Empty };
+        InvalidRequest = !AuthorizationReturnUrl.IsValid(Form!.ReturnUrl);
+        if (InvalidRequest)
+        {
+            HttpContextAccessor.HttpContext?.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
+        }
+
+        if (await SignInManager.GetTwoFactorAuthenticationUserAsync() is null)
+        {
+            Navigation.NavigateTo($"/auth/sign-in?ReturnUrl={Uri.EscapeDataString(Form!.ReturnUrl)}", forceLoad: true);
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        var user = await SignInManager.GetTwoFactorAuthenticationUserAsync();
+        if (user is null)
+        {
+            InvalidRequest = true;
+            return;
+        }
+
+        var result = await TwoFactor.CompleteWithAuthenticatorCodeAsync(Form!.Code.Replace(" ", string.Empty, StringComparison.Ordinal), Form!.RememberClient);
+        Form!.Code = string.Empty;
+        if (!result.Succeeded)
+        {
+            if (result.IsLockedOut)
+            {
+                await SecurityAudit.RecordAccountLockedOutAsync(user, ClientIpAddress, CancellationToken.None);
+            }
+            else
+            {
+                await SecurityAudit.RecordLoginFailedAsync(user.Email!, "two_factor_invalid", ClientIpAddress, CancellationToken.None);
+            }
+
+            FormError = "That code didn't work. Check your authenticator app and try again.";
+            return;
+        }
+
+        await SecurityAudit.RecordLoginSucceededAsync(user, ClientIpAddress, CancellationToken.None);
+        await AuthSessions.EstablishAsync(user, ClientIpAddress, UserAgent, CancellationToken.None);
+        Navigation.NavigateTo(Form!.ReturnUrl, forceLoad: true);
+    }
+
+    private string? ClientIpAddress => HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+
+    private string? UserAgent => HttpContextAccessor.HttpContext?.Request.Headers.UserAgent.ToString() is { Length: > 0 } value ? value : null;
+}

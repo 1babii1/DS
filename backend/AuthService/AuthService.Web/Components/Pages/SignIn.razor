@@ -1,0 +1,162 @@
+@page "/auth/sign-in"
+@attribute [AllowAnonymous]
+@attribute [EnableRateLimiting("auth")]
+@attribute [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+@attribute [ExcludeFromInteractiveRouting]
+@inject UserManager<Account> UserManager
+@inject SignInManager<Account> SignInManager
+@inject AccountRecoveryService Recovery
+@inject SecurityAuditService SecurityAudit
+@inject AuthSessionService AuthSessions
+@inject IOptions<GoogleOptions> GoogleOptions
+@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager Navigation
+
+<PageTitle>Sign in · DS</PageTitle>
+
+@if (InvalidReturnUrl)
+{
+    <h1 id="page-title">Invalid sign-in request.</h1>
+    <p>This sign-in link is incomplete or no longer valid.</p>
+}
+else
+{
+<h1 id="page-title">Welcome back.</h1>
+<p>Sign in to your organization's workspace.</p>
+
+<EditForm FormName="sign-in" Model="Form!" OnValidSubmit="SignInAsync" class="auth-form">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="validation-summary" />
+    @if (FormError is not null)
+    {
+        <p class="form-error" role="alert">@FormError</p>
+    }
+    <input name="Form.ReturnUrl" type="hidden" value="@Form!.ReturnUrl" />
+    <label for="email">Work email</label>
+    <InputText id="email" @bind-Value="Form!.Email" autocomplete="username" aria-describedby="email-error" />
+    <ValidationMessage For="() => Form!.Email" id="email-error" />
+    <label for="password">Password</label>
+    <PasswordField Id="password" Name="Form.Password" Value="Form!.Password" DescribedBy="password-error" />
+    <ValidationMessage For="() => Form!.Password" id="password-error" />
+    <button type="submit">Sign in</button>
+</EditForm>
+
+@if (EmailNotConfirmed)
+{
+    <EditForm FormName="resend-confirmation" Model="Resend" OnValidSubmit="ResendConfirmationAsync" class="auth-form auth-form--compact">
+        <input name="Resend.Email" type="hidden" value="@Resend!.Email" />
+        <button type="submit" class="button-secondary">Resend confirmation email</button>
+    </EditForm>
+}
+
+<button type="button" class="button-secondary" data-passkey-sign-in data-return-url="@Form!.ReturnUrl" hidden>Sign in with a passkey</button>
+<p class="form-error" data-passkey-message role="alert" hidden></p>
+
+@if (GoogleOptions.Value.Enabled)
+{
+    <a class="button-link" href="@GoogleSignInUrl">Sign in with Google</a>
+}
+
+<p class="auth-link"><a href="@ForgotPasswordUrl">Forgot password?</a></p>
+<p class="auth-link">New here? <a href="@RegisterUrl">Create a viewer account</a></p>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "ReturnUrl")]
+    private string? RequestedReturnUrl { get; set; }
+
+    [SupplyParameterFromForm(FormName = "sign-in")]
+    private SignInForm? Form { get; set; }
+
+    [SupplyParameterFromForm(FormName = "resend-confirmation")]
+    private SignInForm? Resend { get; set; }
+
+        private string? FormError { get; set; }
+
+    private bool EmailNotConfirmed { get; set; }
+
+    private bool InvalidReturnUrl { get; set; }
+
+    private string ReturnUrl => Form!.ReturnUrl;
+
+    private string GoogleSignInUrl => $"/auth/external/google/start?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
+
+    private string ForgotPasswordUrl => $"/auth/password/forgot?ReturnUrl={Uri.EscapeDataString(ReturnUrl)}";
+
+    private string RegisterUrl => $"/auth/sign-up?ReturnUrl={Uri.EscapeDataString(ReturnUrl)}";
+
+    protected override void OnParametersSet()
+    {
+        Form ??= new SignInForm { ReturnUrl = RequestedReturnUrl ?? string.Empty };
+        Resend ??= new SignInForm { Email = Form!.Email, ReturnUrl = Form!.ReturnUrl };
+
+        if (!AuthorizationReturnUrl.IsValid(Form!.ReturnUrl))
+        {
+            InvalidReturnUrl = true;
+            HttpContextAccessor.HttpContext?.Response.StatusCode = StatusCodes.Status400BadRequest;
+        }
+    }
+
+    private async Task SignInAsync()
+    {
+        var result = await SignInManager.PasswordSignInAsync(Form!.Email, Form!.Password, isPersistent: false, lockoutOnFailure: true);
+        Form!.Password = string.Empty;
+
+        if (result.RequiresTwoFactor)
+        {
+            Navigation.NavigateTo($"/auth/2fa/login?ReturnUrl={Uri.EscapeDataString(ReturnUrl)}", forceLoad: true);
+            return;
+        }
+
+        if (result.Succeeded)
+        {
+            var user = await UserManager.FindByEmailAsync(Form!.Email)
+                ?? throw new InvalidOperationException("Signed-in user not found.");
+            await SecurityAudit.RecordLoginSucceededAsync(user, ClientIpAddress, CancellationToken.None);
+            await AuthSessions.EstablishAsync(user, ClientIpAddress, UserAgent, CancellationToken.None);
+            Navigation.NavigateTo(ReturnUrl, forceLoad: true);
+            return;
+        }
+
+        if (result.IsLockedOut)
+        {
+            var lockedOutUser = await UserManager.FindByEmailAsync(Form!.Email);
+            if (lockedOutUser is not null)
+            {
+                await SecurityAudit.RecordAccountLockedOutAsync(lockedOutUser, ClientIpAddress, CancellationToken.None);
+            }
+
+            FormError = "We couldn't sign you in. Check your details or try again later.";
+            return;
+        }
+
+        if (result.IsNotAllowed)
+        {
+            await SecurityAudit.RecordLoginFailedAsync(Form!.Email, "email_not_confirmed", ClientIpAddress, CancellationToken.None);
+            EmailNotConfirmed = true;
+            Resend = new SignInForm { Email = Form!.Email, ReturnUrl = ReturnUrl };
+            FormError = "Please confirm your email before signing in.";
+            return;
+        }
+
+        await SecurityAudit.RecordLoginFailedAsync(Form!.Email, "invalid_credentials", ClientIpAddress, CancellationToken.None);
+        FormError = "We couldn't sign you in. Check your details or try again later.";
+    }
+
+    private async Task ResendConfirmationAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(Resend!.Email))
+        {
+            await Recovery.ResendConfirmationIfEligibleAsync(Resend!.Email, CancellationToken.None);
+        }
+
+        EmailNotConfirmed = true;
+        Form = new SignInForm { Email = Resend!.Email, ReturnUrl = Resend!.ReturnUrl };
+        Resend = new SignInForm { Email = Form!.Email, ReturnUrl = Form!.ReturnUrl };
+        FormError = "If that account needs confirming, a new link is on its way.";
+    }
+
+    private string? ClientIpAddress => HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+
+    private string? UserAgent => HttpContextAccessor.HttpContext?.Request.Headers.UserAgent.ToString() is { Length: > 0 } value ? value : null;
+}
