@@ -154,8 +154,11 @@ a registry that is down or erroring is waited out (mutation-checked). **Run live
 whole stack rebuilt with only the Avro topics, an event inserted into Employee's outbox reached the audit log with its
 schema id, nothing was dead-lettered, and a restart of the registry kept all 28 subjects and the same ids.
 
-Not verified in step 5: a real hire end to end through every consumer (it needs a signed-in session, and a hire would
-create an account and a bonus for a person who does not exist); stale messages from the in-memory registry era that were
+A real hire end to end was covered afterwards by the k6 hire chain on the Avro-only stack (`docs/benchmarks/baseline.md`):
+the audit log, Rewards (welcome bonuses) and Notification all received it, nothing was pending in any outbox and nothing
+was dead-lettered.
+
+Not verified in step 5: stale messages from the in-memory registry era that were
 left on the dev topics (their ids may now point at other schemas: development data only); behaviour on a registry that
 loses its database.
 
