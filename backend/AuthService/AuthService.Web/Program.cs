@@ -1,4 +1,3 @@
-﻿using Shared.Ops;
 using System.Threading.RateLimiting;
 using AuthService.Application;
 using AuthService.Application.Database;
@@ -7,16 +6,17 @@ using AuthService.Web.Configuration;
 using AuthService.Web.Consumers;
 using Fido2NetLib;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Polly;
 using Polly.CircuitBreaker;
 using Polly.Retry;
-using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using Shared.Avro;
 using Shared.Cors;
 using Shared.HealthChecks;
 using Shared.Middlewares;
 using Shared.Observability;
+using Shared.Ops;
 using Shared.Outbox;
 using Shared.Security;
 
@@ -33,7 +33,8 @@ builder.Host.UseSerilog((context, _, configuration) =>
 builder.Services.AddObservability(builder.Configuration, "auth-service");
 
 builder.Services.AddControllers();
-builder.Services.AddRazorPages();
+builder.Services.AddRazorComponents();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddEnvelopeModelStateValidation();
 builder.Services.AddOpenApi();
 
@@ -73,7 +74,7 @@ builder.Services.AddScoped<PasskeyService>();
 
 // RPID/Origins come from Auth:Issuer (the same value AddOpenIddictServer already reads for
 // SetIssuer) rather than a second config entry: WebAuthn's relying-party identity is AuthService's
-// own domain, since the passkey ceremonies run on its own Razor Pages, not the SPA's origin.
+// own domain, since the passkey ceremonies run on its own Blazor pages, not the SPA's origin.
 var issuerUri = new Uri(builder.Configuration["Auth:Issuer"] ?? "http://localhost:5100");
 builder.Services.AddFido2(options =>
 {
@@ -221,12 +222,13 @@ app.ConfigureCors();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
 app.UseRateLimiter();
 
 app.MapControllers();
 app.MapOutboxOps<AuthDbContext>("/auth/ops");
 app.MapDeadLetterOps<AuthDbContext>("/auth/ops");
-app.MapRazorPages();
+app.MapRazorComponents<AuthService.Web.Components.App>();
 app.MapDefaultHealthChecks();
 
 await SigningKeySeeder.SeedAsync(app.Services, app.Configuration);

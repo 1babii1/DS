@@ -1,0 +1,113 @@
+@page "/auth/sign-up"
+@attribute [AllowAnonymous]
+@attribute [EnableRateLimiting("auth")]
+@attribute [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+@attribute [ExcludeFromInteractiveRouting]
+@inject UserManager<Account> UserManager
+@inject AccountRecoveryService Recovery
+@inject IOptions<GoogleOptions> GoogleOptions
+@inject IHttpContextAccessor HttpContextAccessor
+
+<PageTitle>Create account · DS</PageTitle>
+
+@if (InvalidReturnUrl)
+{
+    <h1 id="page-title">Invalid registration request.</h1>
+    <p>This registration link is incomplete or no longer valid.</p>
+}
+else if (Registered)
+{
+    <h1 id="page-title">Check your email.</h1>
+    <p>We sent a confirmation link to @Form!.Email. Follow it to activate your account, then sign in.</p>
+    <p class="auth-link"><a href="@SignInUrl">Back to sign in</a></p>
+}
+else
+{
+    <h1 id="page-title">Create your account.</h1>
+    <p>Start with viewer access. An administrator can grant additional permissions later.</p>
+
+    <EditForm FormName="register" Model="Form!" OnValidSubmit="RegisterAsync" class="auth-form">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="validation-summary" />
+        @if (FormError is not null)
+        {
+            <p class="form-error" role="alert">@FormError</p>
+        }
+        <input name="Form.ReturnUrl" type="hidden" value="@Form!.ReturnUrl" />
+        <label for="email">Work email</label>
+        <InputText id="email" @bind-Value="Form!.Email" autocomplete="email" aria-describedby="email-error" />
+        <ValidationMessage For="() => Form!.Email" id="email-error" />
+        <label for="new-password">Password</label>
+        <PasswordField Id="new-password" Name="Form.Password" Value="Form!.Password" Autocomplete="new-password" DescribedBy="password-error" />
+        <ValidationMessage For="() => Form!.Password" id="password-error" />
+        <label for="confirm-password">Confirm password</label>
+        <PasswordField Id="confirm-password" Name="Form.ConfirmPassword" Value="Form!.ConfirmPassword" Autocomplete="new-password" DescribedBy="confirm-password-error" />
+        <ValidationMessage For="() => Form!.ConfirmPassword" id="confirm-password-error" />
+        <button type="submit">Create viewer account</button>
+    </EditForm>
+
+    @if (GoogleOptions.Value.Enabled)
+    {
+        <a class="button-link" href="@GoogleSignUpUrl">Sign up with Google</a>
+    }
+
+    <p class="auth-link">Already have an account? <a href="@SignInUrl">Sign in</a></p>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "ReturnUrl")]
+    private string? RequestedReturnUrl { get; set; }
+
+    [SupplyParameterFromForm(FormName = "register")]
+    private RegisterForm? Form { get; set; }
+
+        private string? FormError { get; set; }
+
+    private bool InvalidReturnUrl { get; set; }
+
+    private bool Registered { get; set; }
+
+    private string SignInUrl => $"/auth/sign-in?ReturnUrl={Uri.EscapeDataString(Form!.ReturnUrl)}";
+
+    private string GoogleSignUpUrl => $"/auth/external/google/start?returnUrl={Uri.EscapeDataString(Form!.ReturnUrl)}";
+
+    protected override void OnParametersSet()
+    {
+        Form ??= new RegisterForm { ReturnUrl = RequestedReturnUrl ?? string.Empty };
+        if (!AuthorizationReturnUrl.IsValid(Form!.ReturnUrl))
+        {
+            InvalidReturnUrl = true;
+            HttpContextAccessor.HttpContext?.Response.StatusCode = StatusCodes.Status400BadRequest;
+        }
+    }
+
+    private async Task RegisterAsync()
+    {
+        var user = new Account
+        {
+            UserName = Form!.Email,
+            Email = Form!.Email,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        };
+        var result = await UserManager.CreateAsync(user, Form!.Password);
+        Form!.Password = string.Empty;
+        Form!.ConfirmPassword = string.Empty;
+
+        if (!result.Succeeded)
+        {
+            FormError = "We couldn't create your account. Check the details and try again.";
+            return;
+        }
+
+        var roleResult = await UserManager.AddToRoleAsync(user, RoleNames.Viewer);
+        if (!roleResult.Succeeded)
+        {
+            FormError = "We couldn't create your account. Check the details and try again.";
+            return;
+        }
+
+        await Recovery.SendConfirmationEmailAsync(user, HttpContextAccessor.HttpContext?.RequestAborted ?? CancellationToken.None);
+        Registered = true;
+    }
+}

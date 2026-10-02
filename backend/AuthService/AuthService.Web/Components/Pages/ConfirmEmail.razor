@@ -1,0 +1,43 @@
+@page "/auth/email/confirm"
+@attribute [AllowAnonymous]
+@attribute [EnableRateLimiting("auth")]
+@attribute [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+@inject UserManager<Account> UserManager
+@inject IHttpContextAccessor HttpContextAccessor
+
+<PageTitle>Confirm email · DS</PageTitle>
+
+@if (Confirmed)
+{
+    <h1 id="page-title">Email confirmed.</h1>
+    <p>Your account is active. You can sign in now.</p>
+}
+else
+{
+    <h1 id="page-title">Link invalid or expired.</h1>
+    <p>This confirmation link no longer works. Sign in and request a new one, or register again.</p>
+}
+
+<p class="auth-link"><a href="/auth/sign-in">Sign in</a></p>
+
+@code {
+    [SupplyParameterFromQuery(Name = "email")]
+    private string? Email { get; set; }
+
+    [SupplyParameterFromQuery(Name = "token")]
+    private string? Token { get; set; }
+
+    private bool Confirmed { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Token))
+        {
+            HttpContextAccessor.HttpContext?.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
+        }
+
+        var user = await UserManager.FindByEmailAsync(Email);
+        Confirmed = user is not null && (await UserManager.ConfirmEmailAsync(user, Token)).Succeeded;
+    }
+}

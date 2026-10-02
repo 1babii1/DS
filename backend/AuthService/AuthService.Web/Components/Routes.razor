@@ -1,0 +1,11 @@
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.AuthLayout)" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="typeof(Layout.AuthLayout)">
+            <PageTitle>Not found · DS</PageTitle>
+            <main class="auth-card"><h1>Page not found.</h1></main>
+        </LayoutView>
+    </NotFound>
+</Router>
