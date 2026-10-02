@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Text.Json;
 using Avro;
 using Avro.Generic;
 
@@ -13,16 +14,59 @@ public static class AvroRecordMapper
 {
     public static GenericRecord ToGenericRecord(RecordSchema schema, object payload)
     {
-        var record = new GenericRecord(schema);
         var type = payload.GetType();
-        foreach (var field in schema.Fields)
+        return Build(schema, field =>
         {
             var property = type.GetProperty(field.Name)
                 ?? throw new InvalidOperationException($"{type.Name} has no property '{field.Name}' that the schema {schema.Fullname} requires");
-            record.Add(field.Name, Convert(property.GetValue(payload), field.Schema, $"{schema.Name}.{field.Name}"));
+            return property.GetValue(payload);
+        });
+    }
+
+    /// <summary>
+    /// The same record from the event's JSON (what the outbox stored), for rows whose Avro could not be made when they
+    /// were written. Values go through exactly the same conversion as a live record, so both paths give the same bytes.
+    /// </summary>
+    public static GenericRecord ToGenericRecord(RecordSchema schema, JsonElement json) =>
+        Build(schema, field => json.TryGetProperty(field.Name, out var value) ? FromJson(value, field.Schema, $"{schema.Name}.{field.Name}") : null);
+
+    private static GenericRecord Build(RecordSchema schema, Func<Field, object?> valueOf)
+    {
+        var record = new GenericRecord(schema);
+        foreach (var field in schema.Fields)
+        {
+            record.Add(field.Name, Convert(valueOf(field), field.Schema, $"{schema.Name}.{field.Name}"));
         }
 
         return record;
+    }
+
+    // JSON has no uuid, time or decimal; the field's schema says what the text or number means.
+    private static object? FromJson(JsonElement value, Schema schema, string where)
+    {
+        if (value.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (schema is UnionSchema union)
+        {
+            return FromJson(value, union.Schemas.First(s => s.Tag != Schema.Type.Null), where);
+        }
+
+        return schema switch
+        {
+            LogicalSchema { LogicalType.Name: "uuid" } => value.GetGuid(),
+            LogicalSchema { LogicalType.Name: "timestamp-millis" } => value.GetDateTimeOffset(),
+            LogicalSchema { LogicalType.Name: "decimal" } => value.GetDecimal(),
+            ArraySchema array => value.EnumerateArray().Select(item => FromJson(item, array.ItemSchema, where)).ToList(),
+            _ when schema.Tag == Schema.Type.String => value.GetString(),
+            _ when schema.Tag == Schema.Type.Boolean => value.GetBoolean(),
+            _ when schema.Tag == Schema.Type.Int => value.GetInt32(),
+            _ when schema.Tag == Schema.Type.Long => value.GetInt64(),
+            _ when schema.Tag == Schema.Type.Double => value.GetDouble(),
+            _ => throw new InvalidOperationException($"{where}: JSON has no mapping for an Avro {schema.Tag}"),
+        };
     }
 
     private static object? Convert(object? value, Schema schema, string where)

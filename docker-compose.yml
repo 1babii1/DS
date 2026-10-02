@@ -10,6 +10,9 @@ services:
       # 5179 (gRPC) is service-to-service only and stays on the compose network.
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
+      # Opt-in (ADR 0023): set SCHEMA_REGISTRY_URL (e.g. http://schema_registry:8080/apis/ccompat/v7, with `--profile contracts`)
+      # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
+      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-}
       - ConnectionStrings__DirectoryServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=directory,public
       - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:-changeme-redis}
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
@@ -57,6 +60,9 @@ services:
       - "5130:5130"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
+      # Opt-in (ADR 0023): set SCHEMA_REGISTRY_URL (e.g. http://schema_registry:8080/apis/ccompat/v7, with `--profile contracts`)
+      # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
+      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-}
       - ASPNETCORE_URLS=http://*:5130
       - ConnectionStrings__AuthServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=auth,public
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
@@ -120,6 +126,9 @@ services:
       - "5131:5131"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
+      # Opt-in (ADR 0023): set SCHEMA_REGISTRY_URL (e.g. http://schema_registry:8080/apis/ccompat/v7, with `--profile contracts`)
+      # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
+      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-}
       - ASPNETCORE_URLS=http://*:5131
       - ConnectionStrings__EmployeeServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=employee,public
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
@@ -218,6 +227,9 @@ services:
       - "5134:5134"
     environment:
       - ASPNETCORE_ENVIRONMENT=Docker
+      # Opt-in (ADR 0023): set SCHEMA_REGISTRY_URL (e.g. http://schema_registry:8080/apis/ccompat/v7, with `--profile contracts`)
+      # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
+      - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-}
       - ASPNETCORE_URLS=http://*:5134
       - ConnectionStrings__RewardsServiceDb=Server=postgres;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=rewards,public
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}

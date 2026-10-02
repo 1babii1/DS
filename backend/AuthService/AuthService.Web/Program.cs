@@ -154,7 +154,7 @@ builder.Services.AddHttpClient<IPasswordBreachChecker, HaveIBeenPwnedPasswordChe
 
 builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
 builder.Services.AddEventAvroEncoder(builder.Configuration, "auth.events.v2", typeof(AuthService.Application.IntegrationEvents.AccountProvisionedEvent).Assembly);
-builder.Services.AddOutboxPublisher<AuthDbContext>(builder.Configuration, "auth.events");
+builder.Services.AddOutboxPublisher<AuthDbContext>(builder.Configuration, "auth.events", "auth.events.v2");
 
 var kafkaBootstrapServers = builder.Configuration["Kafka:BootstrapServers"]
     ?? throw new InvalidOperationException("Configuration 'Kafka:BootstrapServers' is not set.");

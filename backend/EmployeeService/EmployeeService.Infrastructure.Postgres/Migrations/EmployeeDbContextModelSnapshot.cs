@@ -151,8 +151,14 @@ namespace EmployeeService.Infrastructure.Postgres.Migrations
                     b.Property<int>("AttemptCount")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("AvroExpected")
+                        .HasColumnType("boolean");
+
                     b.Property<byte[]>("AvroPayload")
                         .HasColumnType("bytea");
+
+                    b.Property<DateTime?>("AvroPublishedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("LastError")
                         .HasMaxLength(2000)

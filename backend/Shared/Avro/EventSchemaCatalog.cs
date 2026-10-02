@@ -11,15 +11,18 @@ public sealed class EventSchemaCatalog
 {
     private readonly Dictionary<string, (RecordSchema Schema, string Json)> _byEventType = new(StringComparer.Ordinal);
 
-    public EventSchemaCatalog(Assembly assembly)
+    public EventSchemaCatalog(params Assembly[] assemblies)
     {
-        foreach (var resource in assembly.GetManifestResourceNames().Where(n => n.EndsWith(".avsc", StringComparison.Ordinal)))
+        foreach (var assembly in assemblies.Distinct())
         {
-            using var stream = assembly.GetManifestResourceStream(resource)!;
-            using var reader = new StreamReader(stream);
-            var json = reader.ReadToEnd();
-            var schema = (RecordSchema)Schema.Parse(json);
-            _byEventType[schema.Name] = (schema, json);
+            foreach (var resource in assembly.GetManifestResourceNames().Where(n => n.EndsWith(".avsc", StringComparison.Ordinal)))
+            {
+                using var stream = assembly.GetManifestResourceStream(resource)!;
+                using var reader = new StreamReader(stream);
+                var json = reader.ReadToEnd();
+                var schema = (RecordSchema)Schema.Parse(json);
+                _byEventType[schema.Name] = (schema, json);
+            }
         }
     }
 

@@ -49,7 +49,7 @@ builder.Services.AddDirectoryGrpcClient(builder.Configuration);
 
 builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
 builder.Services.AddEventAvroEncoder(builder.Configuration, "employee.events.v2", typeof(EmployeeService.Application.IntegrationEvents.EmployeeHiredEvent).Assembly);
-builder.Services.AddOutboxPublisher<EmployeeDbContext>(builder.Configuration, "employee.events");
+builder.Services.AddOutboxPublisher<EmployeeDbContext>(builder.Configuration, "employee.events", "employee.events.v2");
 
 builder.Services.Configure<EmployeeConsumerOptions>(options =>
 {

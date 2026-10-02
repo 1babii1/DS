@@ -23,8 +23,8 @@ public static class OpsEndpointExtensions
         group.MapGet("parked/{id:guid}", async (TContext db, Guid id, CancellationToken ct) =>
             await OpsHandlers.GetParkedAsync(db, id, ct) is { } detail ? Results.Ok(detail) : Results.NotFound());
 
-        group.MapPost("parked/{id:guid}/redrive", async (TContext db, Guid id, ClaimsPrincipal user, CancellationToken ct) =>
-            await OpsHandlers.RedriveAsync(db, id, user.FindFirstValue("sub") ?? "unknown", ct) switch
+        group.MapPost("parked/{id:guid}/redrive", async (TContext db, Guid id, ClaimsPrincipal user, CancellationToken ct, Shared.Avro.IEventAvroEncoder? avro = null) =>
+            await OpsHandlers.RedriveAsync(db, id, user.FindFirstValue("sub") ?? "unknown", ct, avro) switch
             {
                 RedriveOutcome.Redriven => Results.NoContent(),
                 RedriveOutcome.NotParked => Results.Conflict(),

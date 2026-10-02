@@ -26,6 +26,8 @@ PRODUCERS = {
     "EmployeeService": ("employee.events.v2", "ds.employee"),
     "AuthService": ("auth.events.v2", "ds.auth"),
     "RewardsService": ("rewards.events.v2", "ds.rewards"),
+    # Events every service can publish (the operator redrive audit event); registered under one synthetic topic here.
+    "Shared": ("ops.events.v2", "ds.ops"),
 }
 PRODUCER_DIR = "IntegrationEvents/Schemas/"
 READER_DIR = "Consumers/Schemas/"

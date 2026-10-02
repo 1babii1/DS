@@ -39,7 +39,20 @@ mis-fold last March.
 - **AuditService decodes and stores JSON plus the schema version**, so the log outlives the registry and `OrgReplay`
   is unchanged. *(Later steps.)*
 - **Migration through new topics `*.events.v2`**, with dual publishing while consumers move, then the old topics and
-  the JSON column go. *(Later steps.)*
+  the JSON column go. *(Step 3 is dual publishing; the rest is later.)*
+  - **Two sides, tracked apart.** A row is owed to the old topic until `ProcessedAt` and to the Avro topic until
+    `AvroPublishedAt`. The JSON side is marked done before the Avro side is tried, so a failure on one side never makes
+    the other repeat; a row owed only its Avro side comes back on the next poll for just that. Consumers still dedupe
+    by message id, so the unavoidable at-least-once duplicate is harmless.
+  - **Which rows are owed to Avro.** Only rows written while a registry was configured (`AvroExpected`). Rows written
+    before are never sent to the Avro topic, so switching it on does not replay history. A row written while the registry
+    was unreachable is owed too: its bytes are made from its stored JSON at publish time, by the same conversion as a
+    live event (a test requires identical bytes for all 23 events), and publishing waits for the registry rather than
+    skipping the row.
+  - **A registry outage delays Avro, never the JSON topics or the write.** The backlog is visible as
+    `outbox_avro_pending_messages`.
+  - It is off unless `SchemaRegistry:Url` is set (compose: `SCHEMA_REGISTRY_URL`, with `--profile contracts`).
+  - The headers (`message-id`, `message-type`, `occurred-at`) and the key are the same on both topics.
 - **Avro, not Protobuf or JSON Schema.** Avro's resolution of writer and reader schemas is the mechanism the replay
   needs; the registry ecosystem (including Debezium, roadmap item 9) speaks it natively. gRPC between services stays
   Protobuf: a synchronous contract with generated stubs, a different problem.
@@ -85,10 +98,22 @@ one nullable column.
 A finding worth keeping: the Avro .NET writer applies logical types itself and expects their natural CLR values (`Guid`,
 `DateTime`, `AvroDecimal`), not the base representation; passing the base values fails at write time with a cast error.
 
-Known gap, to close in step 3: `OutboxMessageRedriven` (written by every service when an operator redrives a parked message)
-goes through the same outbox but has no schema; it needs one, owned by the shared ops code, before the Avro topics can
-carry everything the old ones do.
+`OutboxMessageRedriven` (written by every service when an operator redrives a parked message) goes through the same outbox
+and now has a schema, owned by the shared code (`ds.ops`), embedded in every service's catalog, and a record of its own
+instead of an anonymous object.
 
-Not verified yet: the warm-up retry loop (simple, untested), dual publishing, consumers on reader schemas, AuditService on decoded
-events, retiring the old topics, a running service with a registry configured. The registry is in-memory (a restart forgets it); CI starts a fresh one per run, so what
-the gate compares against is the base branch's files, not a persistent registry.
+Step 3 (dual publishing): the per-row decision is a function of its transport and is unit-tested for both topics, the
+Avro side failing after the JSON side succeeded (the JSON is not sent again), a registry that is down, rows from before
+Avro (never sent to it), no registry or no Avro topic (JSON only), and a row done on both sides; the pending-rows query
+is run by Postgres over rows in every state; the bytes made from stored JSON equal the bytes made from the live event for
+all 23 events, optional fields empty and filled; the redrive audit event is encoded; the Avro backlog is counted apart
+from the JSON one. Mutation-checked: the JSON side marked before the Avro side, the legacy-row guard, the configured
+check, both halves of the pending predicate, two conversions on the JSON path. **Run live** on the local stack: DirectoryService
+rebuilt with a registry configured registered its seven schemas under `directory.events.v2-...`, and a row inserted into
+its outbox was published to both topics (`ProcessedAt` and `AvroPublishedAt` set, its bytes made at publish time).
+
+Not verified yet: reading the Avro topic with a consumer (the broker needs credentials I did not use; the wire format is
+checked by the Confluent deserializer in tests), consumers on reader schemas, AuditService on decoded events, retiring
+the old topics, and the other three producers live (same code; only DirectoryService was rebuilt). The registry is
+in-memory (a restart forgets it); CI starts a fresh one per run, so what the gate compares against is the base branch's
+files, not a persistent registry.

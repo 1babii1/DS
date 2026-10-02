@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Shared.Kafka;
+using Shared.Avro;
+using Shared.IntegrationEvents;
 using Shared.Outbox;
 
 namespace Shared.Ops;
@@ -50,7 +52,7 @@ public static class OpsHandlers
     // Redrive is safe to repeat and safe against the original having half-succeeded: consumers
     // dedupe by message-id, and the message keeps its id.
     public static async Task<RedriveOutcome> RedriveAsync(
-        DbContext db, Guid id, string actor, CancellationToken ct)
+        DbContext db, Guid id, string actor, CancellationToken ct, IEventAvroEncoder? avro = null)
     {
         var message = await db.Set<OutboxMessage>().SingleOrDefaultAsync(m => m.Id == id, ct);
         if (message is null)
@@ -67,10 +69,14 @@ public static class OpsHandlers
 
         // Recorded as an event on the service's own outbox, so AuditService (which consumes every
         // topic) shows who put this message back, in the same transaction as the redrive itself.
-        db.Set<OutboxMessage>().Add(OutboxMessage.Create(
-            RedrivenEventType,
-            message.AggregateId,
-            JsonSerializer.Serialize(new { MessageId = message.Id, MessageType = message.Type, RedrivenBy = actor })));
+        var redriven = new OutboxMessageRedrivenEvent(message.Id, message.Type, actor);
+        var record = OutboxMessage.Create(RedrivenEventType, message.AggregateId, JsonSerializer.Serialize(redriven));
+        if (avro is { IsConfigured: true })
+        {
+            record.ExpectAvro(avro.TryEncode(RedrivenEventType, redriven, out var bytes) ? bytes : null);
+        }
+
+        db.Set<OutboxMessage>().Add(record);
 
         await db.SaveChangesAsync(ct);
         return RedriveOutcome.Redriven;
