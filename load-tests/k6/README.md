@@ -11,8 +11,9 @@ k6 scenarios exercising the stack through nginx and the individual services dire
 - **read_roots_traffic** — 15 constant VUs for 30s hitting `GET /api/departments/roots`,
   which carries no rate limit — the one scenario that measures real concurrent-read
   capacity rather than a limiter's ceiling.
-- **read_search_traffic** — 1 VU, paced under DirectoryService's 30/60s-per-IP search
-  limiter, hitting `GET /api/departments/search` (semantic search, backed by Ollama).
+- **read_search_traffic** — 1 VU hitting `GET /api/search?types=department` through the gateway
+  (SearchService, hybrid keyword + semantic). It targeted DirectoryService's own semantic endpoint
+  until that was retired (ADR 0020).
 - **write_traffic** — 1 VU, paced under the matching 30/60s-per-IP write limiter, running
   the full hire chain end to end: create a location, a department, a position, then hire an
   employee through the nginx gateway. Exercises the outbox → Kafka path through the real

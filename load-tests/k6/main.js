@@ -31,12 +31,10 @@ export const options = {
       duration: "30s",
       startTime: "5s",
     },
-    // Semantic search (GET /api/departments/search) is rate-limited to 30/60s per IP
-    // (DirectoryService's "search" policy - it calls Ollama, expensive enough to protect).
-    // One VU, spaced comfortably under that budget: this measures genuine search latency,
-    // not how fast 429s come back once several concurrent VUs blow through 30 requests in
-    // the scenario's first two seconds. See docs/benchmarks/baseline.md for the throughput
-    // ceiling this limiter itself implies.
+    // Department search through SearchService (GET /api/search, hybrid: keyword + semantic, one model call per
+    // request). It used to be DirectoryService's own semantic endpoint, rate-limited to 30/60s per IP; that endpoint
+    // is gone (ADR 0020), so this scenario now measures the service that answers it. One VU, kept as it was so the
+    // numbers stay comparable in shape; they are not comparable in value (different service, different work).
     read_search_traffic: {
       executor: "constant-vus",
       exec: "readSearchTraffic",
@@ -109,14 +107,12 @@ export function readSearchTraffic(data) {
   const headers = authHeaders(data.token);
 
   const searchRes = http.get(
-    `${DIRECTORY_BASE_URL}/api/departments/search?query=engineering%20teams&limit=5`,
+    `${GATEWAY_BASE_URL}/api/search?q=engineering%20teams&types=department&limit=5`,
     { headers },
   );
   check(searchRes, { "search: 200": (r) => r.status === 200 });
 
-  // 30/60s budget over 1 VU means one call every 2s at most; 2.5s leaves headroom instead
-  // of running the limiter's fixed window right up against its edge.
-  sleep(2.5);
+  sleep(1);
 }
 
 // try/finally, not a bare sequence of early-returns: DirectoryService's own write-path
