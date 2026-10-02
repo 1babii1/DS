@@ -1,4 +1,4 @@
-﻿using Shared.Ops;
+using Shared.Ops;
 using System.Threading.RateLimiting;
 using DirectoryService.Application.Database;
 using Polly;
@@ -27,6 +27,7 @@ using Microsoft.Extensions.Options;
 using Serilog;
 using Shared;
 using Shared.Avro;
+using Shared.Consistency;
 using Shared.Cors;
 using Shared.HealthChecks;
 using Shared.Middlewares;
@@ -96,7 +97,10 @@ builder.Services.Configure<ClearDbOptions>(builder.Configuration.GetSection("Cle
 
 builder.Services.AddHostedService<ClearDbOfDeletedEntities>();
 
-builder.Services.AddSingleton<IDbConnectionFactory, NpgsqlConnectionFactory>();
+builder.Services.AddSingleton<DirectoryDataSources>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<Shared.Consistency.ReadConsistencyContext>();
+builder.Services.AddScoped<IDbConnectionFactory, NpgsqlConnectionFactory>();
 Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
 
 builder.Services.AddScoped<ITransactionManager, TransactionManager>();
@@ -211,6 +215,9 @@ app.MapOpenApi("/openapi/v1/swagger.json");
 app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1/swagger.json", "DirectoryService"));
 
 app.ConfigureCors();
+
+// Read-your-writes on the replica (ADR 0025): picks up the caller's token and stamps one on every successful write.
+app.UseConsistencyTokens(app.Services.GetRequiredService<DirectoryDataSources>().Primary);
 
 app.UseAuthentication();
 app.UseAuthorization();

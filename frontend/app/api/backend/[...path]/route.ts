@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { AuthenticationRequiredError, getAccessToken } from "@/shared/auth/access-token";
 import { authConfiguration } from "@/shared/auth/config";
+import { consistencyCookie, consistencyCookieHeader, consistencyHeader, newerToken, parseLsn, readCookie } from "@/shared/api/consistency-token";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,11 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
     }
     requestHeaders.set("authorization", `Bearer ${accessToken}`);
 
+    // Read-your-writes (ADR 0025): present the position of this browser's latest write, if it has one, so a service that
+    // reads from a replica waits for it. Re-validated here; the cookie is only ever something this proxy set.
+    const knownPosition = readCookie(request.headers.get("cookie"), consistencyCookie);
+    if (parseLsn(knownPosition) !== null) requestHeaders.set(consistencyHeader, knownPosition as string);
+
     const response = await fetch(new URL(`${upstreamPath}${new URL(request.url).search}`, authConfiguration.backendApiOrigin), {
       method: request.method,
       headers: requestHeaders,
@@ -49,6 +55,11 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
     for (const header of forwardedResponseHeaders) {
       const value = response.headers.get(header);
       if (value) responseHeaders.set(header, value);
+    }
+    const newPosition = response.headers.get(consistencyHeader);
+    const latest = newerToken(knownPosition, newPosition);
+    if (latest !== null && latest !== newerToken(knownPosition, null)) {
+      responseHeaders.append("set-cookie", consistencyCookieHeader(latest, authConfiguration.applicationUrl.protocol === "https:"));
     }
     return new Response(response.body, { status: response.status, headers: responseHeaders });
   } catch (error) {

@@ -13,6 +13,8 @@ services:
       # Events are Avro (ADR 0023): the schema registry is required, the Kafka topics are the *.events.v2 ones.
       # and every event is also encoded in Avro and published to the *.events.v2 topic. Empty keeps the JSON topics only.
       - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}
+      # Optional read replica (ADR 0025, `--profile ha`): e.g. DIRECTORY_READ_DB="Server=postgres_replica;Port=5432;Database=platform;User Id=postgres;Password=...;Search Path=directory,public". Empty = reads use the primary.
+      - ConnectionStrings__DirectoryServiceReadDb=${DIRECTORY_READ_DB:-}
       - ConnectionStrings__DirectoryServiceDb=Server=pgbouncer;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=directory,public
       - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:-changeme-redis}
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
@@ -534,17 +536,47 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: platform
+    # hba_file: the image's rules plus one that lets a standby stream WAL (ADR 0025).
+    command: ["postgres", "-c", "hba_file=/etc/postgresql/pg_hba.conf"]
     ports:
       - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
       - ./docker/postgres/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+      - ./docker/postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  # Read replica of `postgres` (ADR 0025): a streaming standby. Opt-in, `--profile ha`. Services that can read from it are
+  # pointed at it with <Service>ReadDb connection strings; nothing else changes. REPLICA_APPLY_DELAY holds replay back on
+  # purpose (e.g. 5s) to make lag visible.
+  postgres_replica:
+    container_name: postgres_replica
+    profiles: ["ha"]
+    image: pgvector/pgvector:pg18
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      REPLICA_APPLY_DELAY: ${REPLICA_APPLY_DELAY:-0}
+    entrypoint: ["/bin/sh", "/replica-entrypoint.sh"]
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql
+      - ./docker/postgres/replica-entrypoint.sh:/replica-entrypoint.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   # Connection pooler in front of Postgres (ADR 0024). Services hold many client connections (each instance has its own
   # Npgsql pool); Postgres can only afford a few real ones, each a whole process. In transaction mode a server connection
@@ -765,6 +797,7 @@ configs:
 
 volumes:
   postgres_data:
+  postgres_replica_data:
   redis_data:
   tempo_data:
   loki_data:
