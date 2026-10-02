@@ -17,4 +17,8 @@
       <ProjectReference Include="..\..\Shared\Shared.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <EmbeddedResource Include="IntegrationEvents\Schemas\*.avsc" />
+    </ItemGroup>
+
 </Project>

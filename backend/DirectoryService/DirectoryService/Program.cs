@@ -26,6 +26,7 @@ using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Shared;
+using Shared.Avro;
 using Shared.Cors;
 using Shared.HealthChecks;
 using Shared.Middlewares;
@@ -101,6 +102,7 @@ Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
 builder.Services.AddScoped<ITransactionManager, TransactionManager>();
 
 builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
+builder.Services.AddEventAvroEncoder(builder.Configuration, "directory.events.v2", typeof(DirectoryService.Application.IntegrationEvents.DepartmentCreatedEvent).Assembly);
 builder.Services.AddOutboxPublisher<DirectoryServiceDbContext>(builder.Configuration, "directory.events");
 
 builder.Services.AddKafkaHealthCheck(

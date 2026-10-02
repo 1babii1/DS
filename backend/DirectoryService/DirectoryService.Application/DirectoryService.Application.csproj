@@ -25,4 +25,8 @@
       <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
     </ItemGroup>
 
+    <ItemGroup>
+        <EmbeddedResource Include="IntegrationEvents\Schemas\*.avsc" />
+    </ItemGroup>
+
 </Project>

@@ -1,3 +1,4 @@
+using Shared.Avro;
 using Shared.Ops;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -34,6 +35,7 @@ builder.Services.AddPlatformJwtAuthentication(builder.Configuration, builder.Env
 builder.Services.AddCanEditPolicy();
 
 builder.Services.AddRewardsInfrastructure(builder.Configuration);
+builder.Services.AddEventAvroEncoder(builder.Configuration, "rewards.events.v2", typeof(RewardsService.Infrastructure.IntegrationEvents.CurrencyGrantedEvent).Assembly);
 builder.Services.AddOutboxPublisher<RewardsDbContext>(builder.Configuration, "rewards.events");
 
 builder.Services.AddDatabaseHealthCheck<RewardsDbContext>();

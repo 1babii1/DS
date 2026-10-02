@@ -12,6 +12,7 @@ using Polly.CircuitBreaker;
 using Polly.Retry;
 using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
+using Shared.Avro;
 using Shared.Cors;
 using Shared.HealthChecks;
 using Shared.Middlewares;
@@ -152,6 +153,7 @@ builder.Services.AddHttpClient<IPasswordBreachChecker, HaveIBeenPwnedPasswordChe
     });
 
 builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
+builder.Services.AddEventAvroEncoder(builder.Configuration, "auth.events.v2", typeof(AuthService.Application.IntegrationEvents.AccountProvisionedEvent).Assembly);
 builder.Services.AddOutboxPublisher<AuthDbContext>(builder.Configuration, "auth.events");
 
 var kafkaBootstrapServers = builder.Configuration["Kafka:BootstrapServers"]
