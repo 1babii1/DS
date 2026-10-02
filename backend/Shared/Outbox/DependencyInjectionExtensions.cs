@@ -9,7 +9,8 @@ public static class DependencyInjectionExtensions
     public static IServiceCollection AddOutboxPublisher<TContext>(
         this IServiceCollection services,
         IConfiguration configuration,
-        string topic)
+        string topic,
+        string? avroTopic = null)
         where TContext : DbContext
     {
         services.Configure<OutboxPublisherOptions>(options =>
@@ -20,6 +21,7 @@ public static class DependencyInjectionExtensions
             options.BootstrapServers = bootstrapServers;
             options.Security = KafkaSecurityOptions.FromConfiguration(configuration);
             options.Topic = topic;
+            options.AvroTopic = avroTopic;
         });
 
         services.AddHostedService<OutboxPublisher<TContext>>();

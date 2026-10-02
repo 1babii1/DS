@@ -8,6 +8,9 @@ public class OutboxPublisherOptions
 
     public string Topic { get; set; } = null!;
 
+    // The Avro topic that rows owed to it go to as well (ADR 0023); null when no registry is configured.
+    public string? AvroTopic { get; set; }
+
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(2);
 
     public int BatchSize { get; set; } = 20;

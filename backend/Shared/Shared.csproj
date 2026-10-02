@@ -25,4 +25,8 @@
       <PackageReference Include="Serilog.Sinks.OpenTelemetry" />
     </ItemGroup>
 
+    <ItemGroup>
+        <EmbeddedResource Include="IntegrationEvents\Schemas\*.avsc" />
+    </ItemGroup>
+
 </Project>

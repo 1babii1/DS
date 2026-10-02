@@ -15,6 +15,7 @@ public class ProducerSchemaTests
         typeof(AuthService.Application.IntegrationEvents.AccountProvisionedEvent).Assembly,
         typeof(DirectoryService.Application.IntegrationEvents.DepartmentCreatedEvent).Assembly,
         typeof(RewardsService.Infrastructure.IntegrationEvents.CurrencyGrantedEvent).Assembly,
+        typeof(Shared.IntegrationEvents.OutboxMessageRedrivenEvent).Assembly,
     ];
 
     private static readonly NullabilityInfoContext Nullability = new();
@@ -53,7 +54,7 @@ public class ProducerSchemaTests
     public void The_discovery_finds_every_producer_event()
     {
         // Guards the test itself: a changed namespace convention must not silently match nothing.
-        Assert.True(Events().Count() >= 22);
+        Assert.True(Events().Count() >= 23);
     }
 
     [Theory]

@@ -22,7 +22,11 @@ public class CurrencyGrantedAvroTests : IClassFixture<RewardsTestWebFactory>, IA
 
     private sealed class StubEncoder(bool ready) : IEventAvroEncoder
     {
+        public bool IsConfigured => true;
+
         public bool IsReady => ready;
+
+        public Task<byte[]> EncodeJsonAsync(string eventType, string json, CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public List<(string Type, object Payload)> Seen { get; } = [];
 
@@ -57,6 +61,7 @@ public class CurrencyGrantedAvroTests : IClassFixture<RewardsTestWebFactory>, IA
 
         var row = await OnlyOutboxRow();
         Assert.Null(row.AvroPayload);
+        Assert.True(row.AvroExpected);
         Assert.Contains("CurrencyGranted", row.Type);
     }
 

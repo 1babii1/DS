@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Shared.Avro;
 
 namespace Shared.Outbox;
 
@@ -13,16 +14,19 @@ namespace Shared.Outbox;
 public class OutboxPublisher<TContext>(
     IServiceScopeFactory scopeFactory,
     IOptions<OutboxPublisherOptions> options,
-    ILogger<OutboxPublisher<TContext>> logger) : BackgroundService
+    ILogger<OutboxPublisher<TContext>> logger,
+    IEventAvroEncoder? avro = null) : BackgroundService
     where TContext : DbContext
 {
     private readonly OutboxPublisherOptions _options = options.Value;
     private IProducer<string, string>? _producer;
+    private IProducer<string, byte[]>? _avroProducer;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await KafkaTopicProvisioner.WaitForTopicsAsync(
-            _options.BootstrapServers, _options.Security, logger, stoppingToken, _options.Topic);
+            _options.BootstrapServers, _options.Security, logger, stoppingToken,
+            AvroOn ? [_options.Topic, _options.AvroTopic!] : [_options.Topic]);
 
         if (stoppingToken.IsCancellationRequested)
         {
@@ -32,6 +36,10 @@ public class OutboxPublisher<TContext>(
         var producerConfig = new ProducerConfig { BootstrapServers = _options.BootstrapServers };
         _options.Security.ApplyTo(producerConfig);
         _producer = new ProducerBuilder<string, string>(producerConfig).Build();
+        if (AvroOn)
+        {
+            _avroProducer = new ProducerBuilder<string, byte[]>(producerConfig).Build();
+        }
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -63,7 +71,7 @@ public class OutboxPublisher<TContext>(
         var dbContext = scope.ServiceProvider.GetRequiredService<TContext>();
 
         var pending = await dbContext.Set<OutboxMessage>()
-            .Where(m => m.ProcessedAt == null && m.ParkedAt == null)
+            .Where(OutboxRowPublisher.Pending(AvroOn))
             .OrderBy(m => m.OccurredAt)
             .Take(_options.BatchSize)
             .ToListAsync(cancellationToken);
@@ -75,12 +83,13 @@ public class OutboxPublisher<TContext>(
 
         var result = await OutboxBatch.ProcessAsync(
             pending,
-            async (message, ct) =>
-            {
-                var kafkaMessage = OutboxMessageHeaders.ToKafkaMessage(message);
-
-                await _producer!.ProduceAsync(_options.Topic, kafkaMessage, ct);
-            },
+            (message, ct) => OutboxRowPublisher.PublishAsync(
+                message,
+                (m, token) => _producer!.ProduceAsync(_options.Topic, OutboxMessageHeaders.ToKafkaMessage(m), token),
+                (m, bytes, token) => _avroProducer!.ProduceAsync(_options.AvroTopic, OutboxMessageHeaders.ToAvroKafkaMessage(m, bytes), token),
+                avro,
+                _options.AvroTopic,
+                ct),
             _options.MaxAttempts,
             logger,
             cancellationToken);
@@ -95,9 +104,13 @@ public class OutboxPublisher<TContext>(
             "Published {Succeeded}/{Total} outbox message(s) to {Topic}", result.Succeeded, pending.Count, _options.Topic);
     }
 
+    // Avro goes out only when a registry is configured and an Avro topic is named.
+    private bool AvroOn => _options.AvroTopic is not null && avro is { IsConfigured: true };
+
     public override void Dispose()
     {
         _producer?.Dispose();
+        _avroProducer?.Dispose();
         base.Dispose();
     }
 }

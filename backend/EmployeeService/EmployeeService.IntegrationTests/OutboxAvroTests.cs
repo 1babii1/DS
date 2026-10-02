@@ -21,7 +21,11 @@ public class OutboxAvroTests : IClassFixture<EmployeeTestWebFactory>, IAsyncLife
 
     private sealed class StubEncoder(bool ready) : IEventAvroEncoder
     {
+        public bool IsConfigured => true;
+
         public bool IsReady => ready;
+
+        public Task<byte[]> EncodeJsonAsync(string eventType, string json, CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public bool TryEncode(string eventType, object payload, out byte[] bytes)
         {
@@ -46,6 +50,7 @@ public class OutboxAvroTests : IClassFixture<EmployeeTestWebFactory>, IAsyncLife
         await using var read = _services.CreateAsyncScope();
         var row = await read.ServiceProvider.GetRequiredService<EmployeeDbContext>().Set<OutboxMessage>().AsNoTracking().SingleAsync();
         Assert.Equal(ready ? new byte[] { 0, 0, 0, 0, 3, 8 } : null, row.AvroPayload);
+        Assert.True(row.AvroExpected);
         Assert.Contains("maria@example.com", row.Payload);
     }
 

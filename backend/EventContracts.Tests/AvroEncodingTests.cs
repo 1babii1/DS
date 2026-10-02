@@ -37,6 +37,7 @@ public class AvroEncodingTests(RegistryFixture registry) : IClassFixture<Registr
         typeof(AuthService.Application.IntegrationEvents.AccountProvisionedEvent).Assembly,
         typeof(DirectoryService.Application.IntegrationEvents.DepartmentCreatedEvent).Assembly,
         typeof(RewardsService.Infrastructure.IntegrationEvents.CurrencyGrantedEvent).Assembly,
+        typeof(Shared.IntegrationEvents.OutboxMessageRedrivenEvent).Assembly,
     ];
 
     private static readonly NullabilityInfoContext Nullability = new();
@@ -78,6 +79,22 @@ public class AvroEncodingTests(RegistryFixture registry) : IClassFixture<Registr
         }
     }
 
+    [Theory]
+    [MemberData(nameof(Events))]
+    public async Task The_bytes_made_from_the_stored_json_are_identical_to_the_bytes_made_from_the_live_event(Type eventType, bool fillOptionals)
+    {
+        // A row written while the registry was down is encoded at publish time from its JSON; a consumer must not be able
+        // to tell which path made it.
+        var (encoder, _) = await Warmed(eventType.Assembly, "contracts-test.json.v2");
+        var payload = Sample(eventType, fillOptionals);
+        var name = eventType.Name[..^"Event".Length];
+
+        Assert.True(encoder.TryEncode(name, payload, out var live));
+        var fromJson = await encoder.EncodeJsonAsync(name, System.Text.Json.JsonSerializer.Serialize(payload, eventType), CancellationToken.None);
+
+        Assert.Equal(live, fromJson);
+    }
+
     [Fact]
     public void Every_producer_assembly_carries_the_schemas_of_its_events_as_embedded_resources()
     {
@@ -85,6 +102,7 @@ public class AvroEncodingTests(RegistryFixture registry) : IClassFixture<Registr
         foreach (var assembly in Producers)
         {
             var expected = EventTypes().Where(t => t.Assembly == assembly).Select(t => t.Name[..^"Event".Length]).Order();
+            // The shared assembly's schema is in every service's catalog too, so its own is the whole of what it carries.
             Assert.Equal(expected, new EventSchemaCatalog(assembly).EventTypes.Order());
         }
     }

@@ -19,15 +19,29 @@ namespace Shared.Avro;
 /// </summary>
 public interface IEventAvroEncoder
 {
+    /// <summary>A registry is configured: rows are owed to the Avro topic, whether or not their bytes could be made yet.</summary>
+    bool IsConfigured { get; }
+
     bool IsReady { get; }
 
     bool TryEncode(string eventType, object payload, out byte[] bytes);
+
+    /// <summary>
+    /// Encodes an event from the JSON the outbox stored, registering the schemas first if that has not happened.
+    /// Throws while the registry is unreachable; the caller retries later.
+    /// </summary>
+    Task<byte[]> EncodeJsonAsync(string eventType, string json, CancellationToken cancellationToken);
 }
 
 /// <summary>What a service without a registry configured gets: nothing is ever encoded.</summary>
 public sealed class NullEventAvroEncoder : IEventAvroEncoder
 {
+    public bool IsConfigured => false;
+
     public bool IsReady => false;
+
+    public Task<byte[]> EncodeJsonAsync(string eventType, string json, CancellationToken cancellationToken) =>
+        throw new InvalidOperationException("No schema registry is configured");
 
     public bool TryEncode(string eventType, object payload, out byte[] bytes)
     {
@@ -40,6 +54,8 @@ public sealed class EventAvroEncoder(EventSchemaCatalog catalog, ISchemaRegistry
     : IEventAvroEncoder
 {
     private readonly ConcurrentDictionary<string, int> _ids = new(StringComparer.Ordinal);
+
+    public bool IsConfigured => true;
 
     public bool IsReady => catalog.EventTypes.All(_ids.ContainsKey);
 
@@ -75,7 +91,28 @@ public sealed class EventAvroEncoder(EventSchemaCatalog catalog, ISchemaRegistry
             return false;
         }
 
-        var record = AvroRecordMapper.ToGenericRecord(schema, payload);
+        bytes = Write(schema, id, AvroRecordMapper.ToGenericRecord(schema, payload));
+        return true;
+    }
+
+    public async Task<byte[]> EncodeJsonAsync(string eventType, string json, CancellationToken cancellationToken)
+    {
+        if (!catalog.TryGet(eventType, out var schema, out _))
+        {
+            throw new InvalidOperationException($"No schema is known for event type '{eventType}'");
+        }
+
+        if (!_ids.ContainsKey(eventType))
+        {
+            await WarmUpAsync(cancellationToken);
+        }
+
+        using var document = System.Text.Json.JsonDocument.Parse(json);
+        return Write(schema, _ids[eventType], AvroRecordMapper.ToGenericRecord(schema, document.RootElement));
+    }
+
+    private static byte[] Write(global::Avro.RecordSchema schema, int id, GenericRecord record)
+    {
         using var stream = new MemoryStream();
         stream.WriteByte(0);
         Span<byte> header = stackalloc byte[4];
@@ -84,8 +121,7 @@ public sealed class EventAvroEncoder(EventSchemaCatalog catalog, ISchemaRegistry
         var encoder = new BinaryEncoder(stream);
         new GenericDatumWriter<GenericRecord>(schema).Write(record, encoder);
         encoder.Flush();
-        bytes = stream.ToArray();
-        return true;
+        return stream.ToArray();
     }
 }
 
@@ -137,7 +173,8 @@ public static class AvroServiceCollectionExtensions
             return services;
         }
 
-        services.AddSingleton(new EventSchemaCatalog(schemaAssembly));
+        // The service's own events, and the shared ones (the operator redrive event) that every service can publish.
+        services.AddSingleton(new EventSchemaCatalog(schemaAssembly, typeof(EventSchemaCatalog).Assembly));
         services.AddSingleton<ISchemaRegistryClient>(_ => new CachedSchemaRegistryClient(new SchemaRegistryConfig { Url = url }));
         services.AddSingleton(sp => new EventAvroEncoder(
             sp.GetRequiredService<EventSchemaCatalog>(),

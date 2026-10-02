@@ -1,0 +1,10 @@
+{
+  "type": "record",
+  "name": "OutboxMessageRedriven",
+  "namespace": "ds.ops",
+  "fields": [
+    { "name": "MessageId", "type": { "type": "string", "logicalType": "uuid" } },
+    { "name": "MessageType", "type": "string" },
+    { "name": "RedrivenBy", "type": "string" }
+  ]
+}

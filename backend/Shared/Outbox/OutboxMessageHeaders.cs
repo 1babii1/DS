@@ -15,12 +15,22 @@ public static class OutboxMessageHeaders
     {
         Key = message.AggregateId,
         Value = message.Payload,
-        Headers = new Headers
-        {
-            { "message-id", Encoding.UTF8.GetBytes(message.Id.ToString()) },
-            { "message-type", Encoding.UTF8.GetBytes(message.Type) },
-            { OccurredAt, Encoding.UTF8.GetBytes(message.OccurredAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)) },
-        },
+        Headers = HeadersOf(message),
+    };
+
+    // The same envelope for the Avro topic: same key, same headers, the Avro bytes as the value.
+    public static Message<string, byte[]> ToAvroKafkaMessage(OutboxMessage message, byte[] avro) => new()
+    {
+        Key = message.AggregateId,
+        Value = avro,
+        Headers = HeadersOf(message),
+    };
+
+    private static Headers HeadersOf(OutboxMessage message) => new()
+    {
+        { "message-id", Encoding.UTF8.GetBytes(message.Id.ToString()) },
+        { "message-type", Encoding.UTF8.GetBytes(message.Type) },
+        { OccurredAt, Encoding.UTF8.GetBytes(message.OccurredAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)) },
     };
 
     // A header that is missing, malformed or the default date is "no usable time": the caller falls back to its own clock.
