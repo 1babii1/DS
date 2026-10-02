@@ -1,0 +1,30 @@
+@page "/auth/passkeys/manage"
+@attribute [Authorize(AuthenticationSchemes = "Identity.Application")]
+@attribute [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+@attribute [ExcludeFromInteractiveRouting]
+@inject UserManager<Account> UserManager
+@inject IHttpContextAccessor HttpContextAccessor
+
+<PageTitle>Passkeys · DS</PageTitle>
+
+<h1 id="page-title">Passkeys</h1>
+<p>Sign in to <strong>@Email</strong> with a fingerprint, face, or security key instead of a password. A passkey works from the sign-in page without an email address.</p>
+<div data-passkeys-message></div>
+<p class="auth-link"><a href="/auth/2fa/manage">Manage two-factor authentication</a> · <a href="/auth/sessions/manage">View active sessions</a> · <a href="/auth/account/settings">Account settings</a></p>
+<h2>Your passkeys</h2>
+<div data-passkeys-list><p class="message--empty">Loading…</p></div>
+<h2>Add a passkey</h2>
+<label for="passkey-label">Name this passkey</label>
+<input id="passkey-label" type="text" placeholder="e.g. MacBook Touch ID" maxlength="100" autocomplete="off" />
+<button type="button" data-passkeys-register>Register a new passkey</button>
+
+@code {
+    private string Email { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var user = await UserManager.GetUserAsync(HttpContextAccessor.HttpContext?.User ?? new ClaimsPrincipal())
+            ?? throw new InvalidOperationException("Signed-in user not found.");
+        Email = user.Email ?? string.Empty;
+    }
+}

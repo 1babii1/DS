@@ -1,0 +1,39 @@
+@page "/auth/account/settings"
+@attribute [Authorize(AuthenticationSchemes = "Identity.Application")]
+@attribute [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+@attribute [ExcludeFromInteractiveRouting]
+@inject UserManager<Account> UserManager
+@inject IHttpContextAccessor HttpContextAccessor
+
+<PageTitle>Account settings · DS</PageTitle>
+
+<h1 id="page-title">Account settings</h1>
+<p>Signed in as <strong>@Email</strong>.</p>
+<h2>Change email</h2>
+<p>We’ll send a confirmation link to the new address. Nothing changes until you follow it.</p>
+<div data-email-message></div>
+<label for="new-email">New email address</label>
+<input id="new-email" type="email" autocomplete="email" />
+<label for="email-password">Current password</label>
+<PasswordField Id="email-password" Name="email-password" Autocomplete="current-password" />
+<button type="button" data-change-email>Send confirmation link</button>
+<h2>Danger zone</h2>
+<div class="danger-zone">
+    <p>Deleting your account is permanent. Your passkeys, sessions, and sign-in history are removed.</p>
+    <div data-delete-message></div>
+    <label for="delete-password">Current password</label>
+    <PasswordField Id="delete-password" Name="delete-password" Autocomplete="current-password" />
+    <button type="button" class="button-danger" data-delete-account>Delete my account</button>
+</div>
+<p class="auth-link"><a href="/auth/2fa/manage">Two-factor authentication</a> · <a href="/auth/passkeys/manage">Passkeys</a> · <a href="/auth/sessions/manage">Sessions</a></p>
+
+@code {
+    private string Email { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var user = await UserManager.GetUserAsync(HttpContextAccessor.HttpContext?.User ?? new ClaimsPrincipal())
+            ?? throw new InvalidOperationException("Signed-in user not found.");
+        Email = user.Email ?? string.Empty;
+    }
+}

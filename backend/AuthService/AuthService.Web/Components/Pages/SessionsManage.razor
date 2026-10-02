@@ -1,0 +1,11 @@
+@page "/auth/sessions/manage"
+@attribute [Authorize(AuthenticationSchemes = "Identity.Application")]
+@attribute [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+@attribute [ExcludeFromInteractiveRouting]
+
+<PageTitle>Sessions · DS</PageTitle>
+
+<h1 id="page-title">Sessions</h1>
+<p>Every browser currently signed in to your account. Revoking one signs it out immediately, without affecting the others.</p>
+<div data-session-list><p class="message--empty">Loading…</p></div>
+<p class="auth-link"><a href="/auth/account/settings">Account settings</a></p>

@@ -1,0 +1,47 @@
+@page "/auth/email/confirm-change"
+@attribute [AllowAnonymous]
+@attribute [EnableRateLimiting("auth")]
+@attribute [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+@inject EmailChangeService EmailChange
+@inject IHttpContextAccessor HttpContextAccessor
+
+<PageTitle>Confirm new email · DS</PageTitle>
+
+@if (Confirmed)
+{
+    <h1 id="page-title">Email updated.</h1>
+    <p>Your account's email address has changed. You have been signed out everywhere — sign in again with your new email.</p>
+}
+else
+{
+    <h1 id="page-title">Link invalid or expired.</h1>
+    <p>This confirmation link no longer works. Request the email change again from your account settings.</p>
+}
+
+<p class="auth-link"><a href="/auth/sign-in">Sign in</a></p>
+
+@code {
+    [SupplyParameterFromQuery(Name = "userId")]
+    private string? UserId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "newEmail")]
+    private string? NewEmail { get; set; }
+
+    [SupplyParameterFromQuery(Name = "token")]
+    private string? Token { get; set; }
+
+    private bool Confirmed { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrWhiteSpace(UserId) || string.IsNullOrWhiteSpace(NewEmail)
+            || string.IsNullOrWhiteSpace(Token) || !Guid.TryParse(UserId, out var accountId))
+        {
+            HttpContextAccessor.HttpContext?.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
+        }
+
+        var clientIpAddress = HttpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
+        Confirmed = await EmailChange.CompleteChangeAsync(accountId, NewEmail, Token, clientIpAddress, CancellationToken.None);
+    }
+}
