@@ -55,9 +55,9 @@ Use Node.js 20.9 or newer. The public configuration contract is in [.env.example
 1. Create the required values interactively in the project vault with `~/.local/bin/secrets-edit ds-portfolio-dev`.
 2. Apply the idempotent `web_auth` migration:
 
-   ```bash
-   ~/.local/bin/secrets-run ds-portfolio-dev -- npm run migrate:auth-db
-   ```
+    ```bash
+    ~/.local/bin/secrets-run ds-portfolio-dev -- npm run migrate:auth-db
+    ```
 
 3. Start the backend and frontend with the required configuration injected through the vault runner.
 
@@ -70,3 +70,13 @@ npm run migrate:auth-db
 ```
 
 A full browser sign-in, refresh, and logout check requires the project vault and `web_auth` migration to be available locally.
+
+## Browser checks
+
+Playwright covers browser-visible BFF and session behavior. It starts the Next.js application through the vault runner; it never reads or writes an `.env` file. Start the backend dependencies first with the normal project runtime, then run:
+
+```bash
+~/.local/bin/secrets-run ds-portfolio-dev -- npm run test:e2e
+```
+
+The first, deliberately narrow UI smoke check proves an anonymous visitor gets a prompt sign-in state on a protected workspace route. Failed browser checks retain a screenshot and trace in `playwright-report/` and `test-results/`; do not commit those artifacts because an authenticated future scenario could contain session-specific data.
