@@ -35,11 +35,19 @@ public static class KafkaTopicProvisioner
                 Configs = new Dictionary<string, string> { ["retention.ms"] = DefaultRetentionMs.ToString() },
             }));
         }
-        catch (CreateTopicsException ex) when (ex.Results.All(r => r.Error.Code == ErrorCode.TopicAlreadyExists))
+        catch (CreateTopicsException ex) when (OnlyAlreadyExisted(ex.Results))
         {
             // Fine - another service instance created it first.
         }
     }
+
+    /// <summary>
+    /// True when every topic that failed to be created failed because it was already there. Topics that were created in
+    /// the same request report success, so a request for several topics, some of which exist, is still fine; the
+    /// check used to demand that all of them existed, which looped forever on a mixed set.
+    /// </summary>
+    public static bool OnlyAlreadyExisted(IEnumerable<CreateTopicReport> results) =>
+        results.Where(r => r.Error.IsError).All(r => r.Error.Code == ErrorCode.TopicAlreadyExists);
 
     /// <summary>
     /// Повторяет провижининг, пока брокер не ответит. Вызывается первой строкой

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Shared.Avro;
 using Shared.Outbox;
 
 namespace Shared.Kafka;
@@ -35,19 +36,26 @@ public abstract class KafkaRetryConsumer<TDbContext> : BackgroundService
     /// </summary>
     protected const int MaxAttempts = 3;
 
+    /// <summary>Added to the headers a handler sees when the message was Avro: the id of the schema it was written with.</summary>
+    public const string AvroSchemaIdHeader = "avro-schema-id";
+
     private static readonly TimeSpan[] RetryDelays = [TimeSpan.FromMilliseconds(200), TimeSpan.FromSeconds(1)];
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger _logger;
 
+    private readonly IEventAvroDecoder? _avro;
+
     protected KafkaRetryConsumer(
         IServiceScopeFactory scopeFactory,
         KafkaConsumerOptions options,
-        ILogger logger)
+        ILogger logger,
+        IEventAvroDecoder? avro = null)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
         Options = options;
+        _avro = avro;
     }
 
     protected KafkaConsumerOptions Options { get; }
@@ -152,15 +160,18 @@ public abstract class KafkaRetryConsumer<TDbContext> : BackgroundService
         };
         Options.Security.ApplyTo(config);
 
-        using var consumer = new ConsumerBuilder<string, string>(config).Build();
+        // The value is read as bytes so that one consumer can read a JSON topic and an Avro topic alike (ADR 0023): a message
+        // whose first byte is zero is Avro in the Confluent wire format (JSON never starts with it) and is turned back into
+        // the JSON the handlers have always been given.
+        using var consumer = new ConsumerBuilder<string, byte[]>(config).Build();
         consumer.Subscribe(Options.Topics);
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            ConsumeResult<string, string>? result;
+            ConsumeResult<string, byte[]>? raw;
             try
             {
-                result = consumer.Consume(stoppingToken);
+                raw = consumer.Consume(stoppingToken);
             }
             catch (OperationCanceledException)
             {
@@ -173,14 +184,48 @@ public abstract class KafkaRetryConsumer<TDbContext> : BackgroundService
                 continue;
             }
 
-            if (result?.Message is null)
+            if (raw?.Message is null)
             {
+                continue;
+            }
+
+            ConsumeResult<string, string> result;
+            try
+            {
+                result = AsText(raw, out var undecodable);
+                if (undecodable is not null)
+                {
+                    // Nothing a retry can fix: park it with its bytes and move on.
+                    if (TryDeadLetter(result, undecodable))
+                    {
+                        consumer.Commit(raw);
+                        continue;
+                    }
+
+                    throw undecodable;
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // The registry could not be asked (down, slow): the message is not lost, the consumer stalls on it
+                // and asks again, the same way it waits for a database that is down.
+                _logger.LogError(ex, "Could not decode a message on {Topic}; will try again", raw.Topic);
+                consumer.Seek(raw.TopicPartitionOffset);
+                try
+                {
+                    Task.Delay(TimeSpan.FromSeconds(5), stoppingToken).GetAwaiter().GetResult();
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+
                 continue;
             }
 
             if (HandleWithRetryAndDeadLetter(result, stoppingToken))
             {
-                consumer.Commit(result);
+                consumer.Commit(raw);
             }
             else
             {
@@ -191,7 +236,7 @@ public abstract class KafkaRetryConsumer<TDbContext> : BackgroundService
                 // far is lost: earlier offsets are already committed, and this message gets
                 // replayed - safely, since every handler here is idempotent by message id -
                 // once the database recovers.
-                consumer.Seek(result.TopicPartitionOffset);
+                consumer.Seek(raw.TopicPartitionOffset);
 
                 try
                 {
@@ -205,6 +250,62 @@ public abstract class KafkaRetryConsumer<TDbContext> : BackgroundService
         }
 
         consumer.Close();
+    }
+
+    /// <summary>
+    /// The message as the handlers see it. JSON bytes become a string. An Avro message is decoded; when that cannot ever
+    /// succeed (not Avro after all, a corrupt body) <paramref name="undecodable"/> says why and the
+    /// value is the raw bytes in base64, so the dead letter keeps them. Registry or network failures are not caught here:
+    /// they are for the caller to wait out.
+    /// </summary>
+    public ConsumeResult<string, string> AsText(ConsumeResult<string, byte[]> raw, out Exception? undecodable)
+    {
+        undecodable = null;
+        var bytes = raw.Message.Value ?? [];
+        string value;
+        var headers = new Headers();
+        foreach (var header in raw.Message.Headers)
+        {
+            headers.Add(header.Key, header.GetValueBytes());
+        }
+
+        if (bytes.Length > 0 && bytes[0] == 0)
+        {
+            try
+            {
+                var decoder = _avro
+                    ?? throw new InvalidOperationException("An Avro message arrived but no schema registry is configured for this consumer");
+                var decoded = decoder.Decode(bytes, GetHeader(raw.Message.Headers, "message-type"));
+                value = decoded.Json;
+
+                // Which writer schema the event was written with, for a consumer that records it (AuditService).
+                headers.Add(AvroSchemaIdHeader, Encoding.UTF8.GetBytes(decoded.SchemaId.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            }
+            catch (Exception ex) when (ex is FormatException or global::Avro.AvroException or IndexOutOfRangeException or EndOfStreamException)
+            {
+                undecodable = ex;
+                value = "avro-undecodable:" + Convert.ToBase64String(bytes);
+            }
+        }
+        else
+        {
+            value = Encoding.UTF8.GetString(bytes);
+        }
+
+        return new ConsumeResult<string, string>
+        {
+            Topic = raw.Topic,
+            Partition = raw.Partition,
+            Offset = raw.Offset,
+            IsPartitionEOF = raw.IsPartitionEOF,
+            Message = new Message<string, string>
+            {
+                Key = raw.Message.Key,
+                Value = value,
+                Headers = headers,
+                Timestamp = raw.Message.Timestamp,
+            },
+        };
     }
 
     private bool TryDeadLetter(ConsumeResult<string, string> result, Exception error)

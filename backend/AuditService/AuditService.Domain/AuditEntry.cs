@@ -21,6 +21,10 @@ public class AuditEntry
 
     public DateTime ReceivedAt { get; private set; }
 
+    // The id of the Avro schema the event was written with, when it arrived on an Avro topic (ADR 0023); null for JSON.
+    // The Payload is always JSON, so the log outlives the schema registry.
+    public int? SchemaId { get; private set; }
+
     private AuditEntry()
     {
     }
@@ -31,7 +35,8 @@ public class AuditEntry
         string eventType,
         string aggregateId,
         string payloadJson,
-        DateTime occurredAt) => new()
+        DateTime occurredAt,
+        int? schemaId = null) => new()
         {
             Id = Guid.CreateVersion7(),
             MessageId = messageId,
@@ -41,5 +46,6 @@ public class AuditEntry
             Payload = payloadJson,
             OccurredAt = occurredAt,
             ReceivedAt = DateTime.UtcNow,
+            SchemaId = schemaId,
         };
 }

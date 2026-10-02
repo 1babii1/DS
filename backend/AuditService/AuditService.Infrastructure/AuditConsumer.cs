@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Shared.Avro;
 using Shared.Kafka;
 using Shared.Outbox;
 
@@ -18,8 +19,9 @@ namespace AuditService.Infrastructure;
 public class AuditConsumer(
     IServiceScopeFactory scopeFactory,
     IOptions<AuditConsumerOptions> options,
-    ILogger<AuditConsumer> logger)
-    : KafkaRetryConsumer<AuditDbContext>(scopeFactory, options.Value, logger)
+    ILogger<AuditConsumer> logger,
+    IEventAvroDecoder? avro = null)
+    : KafkaRetryConsumer<AuditDbContext>(scopeFactory, options.Value, logger, avro)
 {
     protected override string MessageKind => "audit";
 
@@ -52,14 +54,18 @@ public class AuditConsumer(
             return Task.CompletedTask;
         }
 
-        var sourceService = result.Topic.Replace(".events", string.Empty, StringComparison.Ordinal);
+        // "directory.events" and "directory.events.v2" are the same source.
+        var sourceService = result.Topic.Replace(".v2", string.Empty, StringComparison.Ordinal)
+            .Replace(".events", string.Empty, StringComparison.Ordinal);
+        var schemaId = int.TryParse(GetHeader(result.Message.Headers, AvroSchemaIdHeader), out var id) ? id : (int?)null;
         var entry = AuditEntry.Create(
             messageGuid,
             sourceService,
             messageType ?? "Unknown",
             result.Message.Key,
             result.Message.Value,
-            EventTime(result));
+            EventTime(result),
+            schemaId);
 
         dbContext.Entries.Add(entry);
 
