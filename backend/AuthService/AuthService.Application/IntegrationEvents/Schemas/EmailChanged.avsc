@@ -1,0 +1,37 @@
+{
+  "type": "record",
+  "name": "EmailChanged",
+  "namespace": "ds.auth",
+  "fields": [
+    {
+      "name": "AccountId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "OldEmail",
+      "type": "string"
+    },
+    {
+      "name": "NewEmail",
+      "type": "string"
+    },
+    {
+      "name": "IpAddress",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "OccurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    }
+  ]
+}

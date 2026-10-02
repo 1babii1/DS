@@ -1,0 +1,14 @@
+{
+  "type": "record",
+  "name": "DepartmentDeleted",
+  "namespace": "ds.directory",
+  "fields": [
+    {
+      "name": "DepartmentId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    }
+  ]
+}

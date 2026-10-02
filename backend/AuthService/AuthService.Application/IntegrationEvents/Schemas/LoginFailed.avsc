@@ -1,0 +1,31 @@
+{
+  "type": "record",
+  "name": "LoginFailed",
+  "namespace": "ds.auth",
+  "fields": [
+    {
+      "name": "Email",
+      "type": "string"
+    },
+    {
+      "name": "Reason",
+      "type": "string",
+      "doc": "invalid_credentials, email_not_confirmed, two_factor_invalid or recovery_code_invalid"
+    },
+    {
+      "name": "IpAddress",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "OccurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    }
+  ]
+}

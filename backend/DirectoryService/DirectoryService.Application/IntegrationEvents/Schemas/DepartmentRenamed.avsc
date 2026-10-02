@@ -1,0 +1,22 @@
+{
+  "type": "record",
+  "name": "DepartmentRenamed",
+  "namespace": "ds.directory",
+  "fields": [
+    {
+      "name": "DepartmentId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "Name",
+      "type": "string"
+    },
+    {
+      "name": "Identifier",
+      "type": "string"
+    }
+  ]
+}

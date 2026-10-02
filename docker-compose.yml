@@ -560,6 +560,15 @@ services:
   # otel-collector unconditionally, but the OTel SDK degrades gracefully
   # (retries quietly, never crashes the host) when it isn't running, so nothing
   # here is required for the rest of the stack to work.
+  # Schema registry for the event contracts (ADR 0023). Nothing depends on it at runtime; it is the arbiter that
+  # scripts/check_schemas.py (and CI) ask whether a schema change is compatible. In memory: a restart forgets everything.
+  schema_registry:
+    container_name: schema_registry
+    profiles: ["contracts"]
+    image: quay.io/apicurio/apicurio-registry:3.0.7
+    ports:
+      - "127.0.0.1:8081:8080"
+
   otel-collector:
     container_name: otel-collector
     profiles: ["obs"]

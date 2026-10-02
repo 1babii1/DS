@@ -1,0 +1,33 @@
+{
+  "type": "record",
+  "name": "AccountLockedOut",
+  "namespace": "ds.auth",
+  "fields": [
+    {
+      "name": "AccountId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "Email",
+      "type": "string"
+    },
+    {
+      "name": "IpAddress",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "OccurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    }
+  ]
+}

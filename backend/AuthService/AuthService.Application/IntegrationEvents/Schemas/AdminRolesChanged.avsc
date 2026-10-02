@@ -1,0 +1,47 @@
+{
+  "type": "record",
+  "name": "AdminRolesChanged",
+  "namespace": "ds.auth",
+  "fields": [
+    {
+      "name": "TargetAccountId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "TargetEmail",
+      "type": "string"
+    },
+    {
+      "name": "Roles",
+      "type": {
+        "type": "array",
+        "items": "string"
+      }
+    },
+    {
+      "name": "PerformedByAccountId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "IpAddress",
+      "type": [
+        "null",
+        "string"
+      ],
+      "default": null
+    },
+    {
+      "name": "OccurredAt",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    }
+  ]
+}
