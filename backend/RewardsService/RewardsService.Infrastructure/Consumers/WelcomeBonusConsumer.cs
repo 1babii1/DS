@@ -58,7 +58,7 @@ public class WelcomeBonusConsumer(
 
         using var scope = ScopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<RewardsDbContext>();
-        var writer = new CurrencyGrantWriter(dbContext);
+        var writer = new CurrencyGrantWriter(dbContext, scope.ServiceProvider.GetService<Shared.Avro.IEventAvroEncoder>());
 
         // Idempotency: an EmployeeHired event redelivered after this already ran must not grant a
         // second welcome bonus. On its own this check is check-then-act (confirmed by reproducing

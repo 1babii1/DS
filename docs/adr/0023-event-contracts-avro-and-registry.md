@@ -28,7 +28,12 @@ mis-fold last March.
   - *Changing a type:* widen it with a union (`["int","string"]`) for the transition.
   - New fields always have a default, usually `null` through `["null", T]`.
 - **The encoding happens when the outbox row is written**, in the same transaction; the publisher (and later a CDC
-  connector) relays bytes without changing them. *(Later steps.)*
+  connector) relays bytes without changing them. The outbox row gains a nullable `AvroPayload` (bytea) next to the JSON
+  `Payload`, which stays during the migration. The encoder is **synchronous** (it runs where the row is staged, inside
+  the domain transaction) and can only use schema ids it already knows: a background warm-up registers the service's
+  schemas, retrying until the registry answers, and until it has, `TryEncode` says no and the row carries only the JSON.
+  So a registry outage never fails a hire or a grant; it only delays Avro. The publishing step encodes such rows from
+  their JSON when it publishes. It is off unless `SchemaRegistry:Url` is configured. *(Step 2; publishing is step 3.)*
 - **Consumers own a reader schema** beside their local record copy; CI checks it against the producer's latest. *(Later
   steps.)*
 - **AuditService decodes and stores JSON plus the schema version**, so the log outlives the registry and `OrgReplay`
@@ -68,6 +73,22 @@ without a default (HTTP 409). The gate was mutation-checked: a required field ad
 schema deleted are each rejected; an additive optional field passes. The schema/record test fails on a renamed field, a
 flipped optionality, a missing schema and an orphan schema file.
 
-Not verified yet: encoding inside the outbox, dual publishing, consumers on reader schemas, AuditService on decoded
-events, retiring the old topics. The registry is in-memory (a restart forgets it); CI starts a fresh one per run, so what
+Step 2 (encoding, nothing published yet): every one of the 22 events is encoded by the code the outbox writers use and
+decoded by the real Confluent deserializer against a real registry, with optional fields both empty and filled; the schema
+id in the bytes is the one registered under `<topic>-<namespace>.<Record>`; nothing is encoded before the schemas are
+registered; money comes back exactly whatever scale it was written with and more than two decimals is refused, not
+rounded; each producing assembly carries its schemas as embedded resources; each of the four outbox writers stores the
+Avro bytes next to the JSON when the encoder is ready and only the JSON when it is not (mutation-checked: scale padding,
+id byte order, the refusal, the attach in each writer, the embedded resources). The four migrations are generated and add
+one nullable column.
+
+A finding worth keeping: the Avro .NET writer applies logical types itself and expects their natural CLR values (`Guid`,
+`DateTime`, `AvroDecimal`), not the base representation; passing the base values fails at write time with a cast error.
+
+Known gap, to close in step 3: `OutboxMessageRedriven` (written by every service when an operator redrives a parked message)
+goes through the same outbox but has no schema; it needs one, owned by the shared ops code, before the Avro topics can
+carry everything the old ones do.
+
+Not verified yet: the warm-up retry loop (simple, untested), dual publishing, consumers on reader schemas, AuditService on decoded
+events, retiring the old topics, a running service with a registry configured. The registry is in-memory (a restart forgets it); CI starts a fresh one per run, so what
 the gate compares against is the base branch's files, not a persistent registry.

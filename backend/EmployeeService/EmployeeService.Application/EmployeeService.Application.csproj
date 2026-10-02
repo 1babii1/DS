@@ -11,4 +11,8 @@
       <ProjectReference Include="..\EmployeeService.Contracts\EmployeeService.Contracts.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <EmbeddedResource Include="IntegrationEvents\Schemas\*.avsc" />
+    </ItemGroup>
+
 </Project>

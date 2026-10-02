@@ -9,6 +9,7 @@ using EmployeeService.Web.Consumers;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
+using Shared.Avro;
 using Shared.Cors;
 using Shared.HealthChecks;
 using Shared.Middlewares;
@@ -47,6 +48,7 @@ builder.Services.AddInfrastructurePostgres(builder.Configuration);
 builder.Services.AddDirectoryGrpcClient(builder.Configuration);
 
 builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
+builder.Services.AddEventAvroEncoder(builder.Configuration, "employee.events.v2", typeof(EmployeeService.Application.IntegrationEvents.EmployeeHiredEvent).Assembly);
 builder.Services.AddOutboxPublisher<EmployeeDbContext>(builder.Configuration, "employee.events");
 
 builder.Services.Configure<EmployeeConsumerOptions>(options =>

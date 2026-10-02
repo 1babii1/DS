@@ -1,6 +1,7 @@
 using System.Text.Json;
 using RewardsService.Domain;
 using RewardsService.Infrastructure.IntegrationEvents;
+using Shared.Avro;
 using Shared.Outbox;
 
 namespace RewardsService.Infrastructure;
@@ -9,7 +10,7 @@ namespace RewardsService.Infrastructure;
 // so the wallet-update + ledger-write + outbox-enqueue sequence exists in exactly one
 // place. Does not call SaveChanges itself - the caller owns the transaction boundary,
 // same as HireEmployeeHandler enqueues its outbox message and saves once at the end.
-public class CurrencyGrantWriter(RewardsDbContext dbContext)
+public class CurrencyGrantWriter(RewardsDbContext dbContext, IEventAvroEncoder? avro = null)
 {
     public Transaction Grant(Guid employeeId, decimal amount, string reason, TransactionSource source, Guid? grantedByAccountId)
     {
@@ -26,10 +27,16 @@ public class CurrencyGrantWriter(RewardsDbContext dbContext)
         dbContext.Transactions.Add(transaction);
 
         var @event = new CurrencyGrantedEvent(employeeId, amount, reason, wallet.Balance);
-        dbContext.OutboxMessages.Add(OutboxMessage.Create(
+        var message = OutboxMessage.Create(
             RewardsEventTypes.CurrencyGranted,
             employeeId.ToString(),
-            JsonSerializer.Serialize(@event)));
+            JsonSerializer.Serialize(@event));
+        if (avro is not null && avro.TryEncode(RewardsEventTypes.CurrencyGranted, @event, out var bytes))
+        {
+            message.AttachAvro(bytes);
+        }
+
+        dbContext.OutboxMessages.Add(message);
 
         return transaction;
     }

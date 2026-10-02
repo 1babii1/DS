@@ -17,6 +17,10 @@ public class OutboxMessage
 
     public string Payload { get; private set; } = null!;
 
+    // The same event in the Confluent Avro wire format (ADR 0023), staged in the same transaction as the JSON when the
+    // schema registry was reachable. Null otherwise; the JSON payload is always there during the migration.
+    public byte[]? AvroPayload { get; private set; }
+
     public DateTime OccurredAt { get; private set; }
 
     public DateTime? ProcessedAt { get; private set; }
@@ -48,6 +52,8 @@ public class OutboxMessage
         Payload = payloadJson,
         OccurredAt = DateTime.UtcNow,
     };
+
+    public void AttachAvro(byte[] avro) => AvroPayload = avro;
 
     public void MarkProcessed() => ProcessedAt = DateTime.UtcNow;
 

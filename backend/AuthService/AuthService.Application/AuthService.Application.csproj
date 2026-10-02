@@ -4,4 +4,8 @@
       <ProjectReference Include="..\AuthService.Domain\AuthService.Domain.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <EmbeddedResource Include="IntegrationEvents\Schemas\*.avsc" />
+    </ItemGroup>
+
 </Project>
