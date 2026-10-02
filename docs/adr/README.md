@@ -29,6 +29,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0021](0021-sign-out-revokes-the-refresh-token.md) | Sign-out clears the BFF's tokens and revokes the refresh token at the issuer |
 | [0022](0022-hub-tickets.md) | A short-lived ticket opens the notification hub; the OAuth token never reaches the browser |
 | [0023](0023-event-contracts-avro-and-registry.md) | Event contracts: Avro schemas, a registry as the compatibility arbiter, additive-only evolution |
+| [0024](0024-connection-pooling.md) | A connection pooler in front of Postgres |
 
 Not yet written up, though each decision is already live in the codebase and explained
 in its own commit messages: gRPC for internal calls, local JWT validation via JWKS,
