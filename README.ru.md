@@ -59,6 +59,9 @@
 
 ## Архитектура
 
+Полная карта (контекст системы, контейнеры, путь найма, карта контекстов DDD и event storming найма) — в
+[`docs/architecture/`](docs/architecture/README.md) (на английском). Обзор:
+
 ```mermaid
 flowchart TB
     Client["Браузер / API-клиент"] --> Nginx["nginx — единственная точка входа"]
@@ -94,7 +97,7 @@ flowchart TB
     Rewards --> PG
     Notification --> PG
     Search --> PG
-    Directory -- эмбеддинги --> Ollama[("Ollama<br/>локально, без внешнего API")]
+    Search -- эмбеддинги --> Ollama[("Ollama<br/>локально, без внешнего API")]
 ```
 
 Каждая стрелка в Kafka — это **транзакционный outbox**: запись домена и запись "сообщить

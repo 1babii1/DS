@@ -140,6 +140,9 @@ silently ate 5-6 seconds per request under Docker.
 
 ## Architecture
 
+The full map (system context, containers, the hire path, a DDD context map and an event storm of hiring) is in
+[`docs/architecture/`](docs/architecture/README.md). The overview:
+
 ```mermaid
 flowchart TB
     Client["Browser / API client"] --> Nginx["nginx — the only way in"]
@@ -175,7 +178,7 @@ flowchart TB
     Rewards --> PG
     Notification --> PG
     Search --> PG
-    Directory -- embeddings --> Ollama[("Ollama<br/>local, no external API")]
+    Search -- embeddings --> Ollama[("Ollama<br/>local, no external API")]
 ```
 
 Every arrow into Kafka is a **transactional outbox** — the domain write and the "tell the
