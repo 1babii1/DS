@@ -17,6 +17,8 @@ public class RewardsDbContext(DbContextOptions<RewardsDbContext> options) : DbCo
 
     public DbSet<DeadLetterEntry> DeadLetters => Set<DeadLetterEntry>();
 
+    public DbSet<WalletEvent> WalletEvents => Set<WalletEvent>();
+
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
@@ -31,6 +33,17 @@ public class RewardsDbContext(DbContextOptions<RewardsDbContext> options) : DbCo
             entity.HasKey(e => e.EmployeeId);
 
             entity.Property(e => e.Balance).HasColumnType("numeric(18,2)");
+        });
+
+        builder.Entity<WalletEvent>(entity =>
+        {
+            entity.ToTable("wallet_events");
+
+            // (stream, version) is the concurrency control: two writers both appending version N cannot both succeed.
+            entity.HasKey(e => new { e.StreamId, e.Version });
+
+            entity.Property(e => e.EventType).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Data).HasColumnType("jsonb").IsRequired();
         });
 
         builder.Entity<Transaction>(entity =>

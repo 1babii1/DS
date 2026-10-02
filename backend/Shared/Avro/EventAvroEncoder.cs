@@ -7,6 +7,7 @@ using Confluent.SchemaRegistry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Shared.Outbox;
 
 namespace Shared.Avro;
 
@@ -23,6 +24,12 @@ public interface IEventAvroEncoder
     bool IsConfigured { get; }
 
     bool IsReady { get; }
+
+    /// <summary>
+    /// Events leave through change data capture (Debezium reading the outbox table's write-ahead log), not through the
+    /// publisher: a row can only be delivered as the bytes staged when it was written, so staging must succeed (ADR 0030).
+    /// </summary>
+    bool DeliveredByCdc => false;
 
     bool TryEncode(string eventType, object payload, out byte[] bytes);
 
@@ -184,7 +191,14 @@ public static class AvroServiceCollectionExtensions
             sp.GetRequiredService<ISchemaRegistryClient>(),
             topic,
             sp.GetRequiredService<ILogger<EventAvroEncoder>>()));
-        services.AddSingleton<IEventAvroEncoder>(sp => sp.GetRequiredService<EventAvroEncoder>());
+        if (configuration.OutboxMode() == OutboxMode.Cdc)
+        {
+            services.AddSingleton<IEventAvroEncoder>(sp => new CdcEventAvroEncoder(sp.GetRequiredService<EventAvroEncoder>()));
+        }
+        else
+        {
+            services.AddSingleton<IEventAvroEncoder>(sp => sp.GetRequiredService<EventAvroEncoder>());
+        }
         services.AddHostedService<SchemaWarmUpService>();
         return services;
     }

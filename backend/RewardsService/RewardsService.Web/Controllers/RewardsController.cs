@@ -78,7 +78,30 @@ public class RewardsController(RewardsDbContext dbContext, CurrencyGrantWriter w
         return result;
     }
 
+    // Two grants to the same wallet at once collide on the wallet's event history; the loser re-reads the wallet and decides
+    // again (ADR 0031), a few times, rather than failing a request that was fine.
     private Result<Guid, Error> HandleGrant(
+        string idempotencyKey, GrantCurrencyRequest request, string idempotencyScope, TransactionSource source)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return HandleGrantOnce(idempotencyKey, request, idempotencyScope, source);
+            }
+            catch (GrantConflictException) when (attempt < GrantConflicts.MaxAttempts)
+            {
+                dbContext.ChangeTracker.Clear();
+                Thread.Sleep(Random.Shared.Next(5, 25) * attempt);
+            }
+        }
+    }
+
+    private sealed class GrantConflictException : Exception
+    {
+    }
+
+    private Result<Guid, Error> HandleGrantOnce(
         string idempotencyKey, GrantCurrencyRequest request, string idempotencyScope, TransactionSource source)
     {
         if (request.Amount <= 0)
@@ -135,6 +158,12 @@ public class RewardsController(RewardsDbContext dbContext, CurrencyGrantWriter w
         {
             dbContext.SaveChanges();
             quotaTransaction?.Commit();
+        }
+        catch (DbUpdateException ex) when (GrantConflicts.IsConcurrencyConflict(ex))
+        {
+            // Another grant to this wallet committed first. Nothing of this attempt was written (the quota transaction is
+            // disposed uncommitted), so it is simply tried again against the new state.
+            throw new GrantConflictException();
         }
         catch (DbUpdateException ex) when (ex.IsUniqueViolation())
         {

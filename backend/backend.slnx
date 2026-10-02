@@ -59,6 +59,7 @@
   </Folder>
   <Project Path="Shared/Shared.csproj" />
   <Project Path="ChaosTests/ChaosTests.csproj" />
+  <Project Path="Evolution.Tests/Evolution.Tests.csproj" />
   <Project Path="EventContracts.Tests/EventContracts.Tests.csproj" />
   <Project Path="Shared.UnitTests/Shared.UnitTests.csproj" />
 </Solution>

@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -21,6 +21,14 @@ public static class DependencyInjectionExtensions
             options.Security = KafkaSecurityOptions.FromConfiguration(configuration);
             options.Topic = topic;
         });
+
+        if (configuration.OutboxMode() == OutboxMode.Cdc)
+        {
+            // Debezium delivers the rows; this process only clears out the ones that are long gone (nothing marks them in a way
+            // a table scan would find, and they would otherwise grow without end).
+            services.AddHostedService<OutboxCleaner<TContext>>();
+            return services;
+        }
 
         services.AddHostedService<OutboxPublisher<TContext>>();
 
