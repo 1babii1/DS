@@ -33,6 +33,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0025](0025-read-replica-and-read-your-writes.md) | A read replica, and reading your own writes from it |
 | [0026](0026-failover-rpo-rto.md) | Failing over to the standby: what is lost, what it costs to lose nothing |
 | [0027](0027-audit-entries-partitioned-by-month.md) | The audit log, partitioned by month |
+| [0028](0028-no-kafka-transactions.md) | Kafka transactions are not used: the outbox and idempotent consumers are the exactly-once story |
 | [0030](0030-change-data-capture-with-debezium.md) | Change data capture with Debezium instead of the polling publisher |
 
 Not yet written up, though each decision is already live in the codebase and explained
