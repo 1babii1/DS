@@ -564,16 +564,16 @@ services:
     ports:
       - "127.0.0.1:8081:8080"
 
-  otel-collector:
-    container_name: otel-collector
-    profiles: ["obs"]
-    image: otel/opentelemetry-collector-contrib:latest
-    command: ["--config", "/etc/otelcol/otel-collector-config.yaml"]
   # Distributed tracing/metrics/log-correlation stack. Opt-in via
   # `docker compose --profile obs up`: the main services already point at
   # otel-collector unconditionally, but the OTel SDK degrades gracefully
   # (retries quietly, never crashes the host) when it isn't running, so nothing
   # here is required for the rest of the stack to work.
+  otel-collector:
+    container_name: otel-collector
+    profiles: ["obs"]
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config", "/etc/otelcol/otel-collector-config.yaml"]
     volumes:
       - ./docker/otel-collector/otel-collector-config.yaml:/etc/otelcol/otel-collector-config.yaml:ro
     ports:
