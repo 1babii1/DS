@@ -35,6 +35,8 @@ public static class DependencyInjectionExtensions
         services.AddEventAvroDecoder(configuration);
         services.Configure<AuditPartitionOptions>(configuration.GetSection(AuditPartitionOptions.SectionName));
         services.AddSingleton(TimeProvider.System);
+        services.Configure<PiiVaultOptions>(configuration.GetSection(PiiVaultOptions.SectionName));
+        services.AddScoped<PiiVault>();
         services.AddHostedService<AuditPartitionMaintainer>();
         services.AddHostedService<AuditConsumer>();
         services.AddKafkaHealthCheck(bootstrapServers, security);

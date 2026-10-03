@@ -1,4 +1,4 @@
-﻿using System.Data.Common;
+using System.Data.Common;
 using AuditService.Infrastructure;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -50,7 +50,11 @@ public class AuditTestWebFactory : WebApplicationFactory<Program>, IAsyncLifetim
 
     public async Task ResetDatabaseAsync() => await _respawner.ResetAsync(_dbConnection);
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.ConfigureTestServices(services =>
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        // A master key, so the personal fields of audit payloads are encrypted in these tests (ADR 0046).
+        builder.UseSetting("Audit:PiiMasterKeyBase64", Convert.ToBase64String(Enumerable.Repeat((byte)7, 32).ToArray()));
+        builder.ConfigureTestServices(services =>
     {
         // AuditConsumer itself is an IHostedService - removing it means tests construct
         // and call it directly instead of racing against the host's own auto-started
@@ -62,6 +66,7 @@ public class AuditTestWebFactory : WebApplicationFactory<Program>, IAsyncLifetim
         services.RemoveAll<AuditDbContext>();
         services.AddDbContext<AuditDbContext>(options => options.UseNpgsql(_dbContainer.GetConnectionString()));
     });
+    }
 
     private async Task InitializeRespawner()
     {

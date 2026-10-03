@@ -8,6 +8,8 @@ public class AuditDbContext(DbContextOptions<AuditDbContext> options) : DbContex
 {
     public DbSet<AuditEntry> Entries => Set<AuditEntry>();
 
+    public DbSet<SubjectKey> SubjectKeys => Set<SubjectKey>();
+
     public DbSet<RecordedMessage> RecordedMessages => Set<RecordedMessage>();
 
     public DbSet<DeadLetterEntry> DeadLetters => Set<DeadLetterEntry>();
@@ -31,6 +33,14 @@ public class AuditDbContext(DbContextOptions<AuditDbContext> options) : DbContex
             entity.HasIndex(e => e.MessageId);
             entity.HasIndex(e => e.AggregateId);
             entity.HasIndex(e => e.OccurredAt);
+        });
+
+        builder.Entity<SubjectKey>(entity =>
+        {
+            entity.ToTable("subject_keys");
+            entity.HasKey(e => e.SubjectId);
+            entity.Property(e => e.SubjectId).HasMaxLength(200);
+            entity.Ignore(e => e.IsErased);
         });
 
         builder.Entity<RecordedMessage>(entity =>

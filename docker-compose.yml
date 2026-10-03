@@ -203,6 +203,8 @@ services:
       - Kafka__Topics__1=employee.events.v2
       - ASPNETCORE_URLS=http://*:5132
       - ConnectionStrings__AuditServiceDb=Server=pgbouncer;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=audit,public
+      # Personal fields of audit payloads are stored encrypted per person when this is set (ADR 0046).
+      - Audit__PiiMasterKeyBase64=${AUDIT_PII_MASTER_KEY_BASE64:-}
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
       - Kafka__SaslUsername=kafka
       - Kafka__SaslPassword=${KAFKA_PASSWORD:-changeme-kafka}

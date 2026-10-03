@@ -27,7 +27,9 @@ is wrong** (`PiiInventoryTests`, in the contract tests that already run in CI).
   target's address). `LoginFailed` can name an address that belongs to no account.
 - **`AccountDeleted` carries the deleted person's email and IP address.** The account is deleted; its description is written
   into an event, stored by the audit log as JSON, and kept. The right to erasure and an append-only log that is the source of the
-  org time machine pull in opposite directions, and today the log wins by default.
+  org time machine pull in opposite directions, and today the log wins by default. (Corrected later, see
+  [0046](0046-erasing-a-person-from-the-audit-log.md): in the default stack the audit service does not subscribe to AuthService's
+  events, so what it keeps is `EmployeeHired`'s name and email; the account events would be kept if it were subscribed to them.)
 - The directory's names and the office addresses are organisational, not personal, and are listed as such so that the decision
   is visible.
 

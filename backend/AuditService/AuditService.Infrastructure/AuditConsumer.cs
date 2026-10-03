@@ -48,6 +48,7 @@ public class AuditConsumer(
 
         using var scope = ScopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+        var vault = scope.ServiceProvider.GetRequiredService<PiiVault>();
 
         if (dbContext.RecordedMessages.Any(m => m.MessageId == messageGuid))
         {
@@ -63,7 +64,9 @@ public class AuditConsumer(
             sourceService,
             messageType ?? "Unknown",
             result.Message.Key,
-            result.Message.Value,
+
+            // The personal fields of the payload are stored encrypted under a key of the subject the event is about (ADR 0046).
+            vault.Protect(result.Message.Key, messageType ?? "Unknown", result.Message.Value),
             EventTime(result),
             schemaId);
 
