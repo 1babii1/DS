@@ -42,6 +42,12 @@ public class WelcomeBonusConsumer(
             return Task.CompletedTask;
         }
 
+        if (messageType == HireCompensationRequestedEvent.MessageType)
+        {
+            ReverseWelcomeBonus(result.Message.Value);
+            return Task.CompletedTask;
+        }
+
         if (messageType != EmployeeHiredEvent.MessageType)
         {
             // Nothing else on these topics affects a wallet.
@@ -92,6 +98,23 @@ public class WelcomeBonusConsumer(
             // to the specific constraint so an unrelated failure (a genuine connectivity problem,
             // say) surfaces and retries instead of being swallowed as if it were this.
         }
+    }
+
+    // The undo of "grant the welcome bonus" in the onboarding process (ADR 0032). A repeat finds the reversal in the wallet's
+    // history and does nothing; a collision with another writer on the same wallet throws, and the consumer's retry re-reads.
+    private void ReverseWelcomeBonus(string payload)
+    {
+        var compensation = JsonSerializer.Deserialize<HireCompensationRequestedEvent>(payload)
+            ?? throw new InvalidOperationException($"Could not deserialize {HireCompensationRequestedEvent.MessageType} payload");
+        if (!compensation.ReverseBonus)
+        {
+            return;
+        }
+
+        using var scope = ScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<RewardsDbContext>();
+        new CurrencyGrantWriter(dbContext).ReverseWelcomeBonus(compensation.EmployeeId);
+        dbContext.SaveChanges();
     }
 
     // Wallets are keyed by EmployeeId, but a caller's JWT only carries their AccountId.

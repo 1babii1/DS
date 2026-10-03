@@ -135,6 +135,72 @@ public class WelcomeBonusConsumerTests : IClassFixture<RewardsTestWebFactory>, I
         Assert.Equal(0, count);
     }
 
+    [Fact]
+    public async Task A_compensation_reverses_the_welcome_bonus_in_the_history_the_ledger_and_the_balance()
+    {
+        var employeeId = Guid.NewGuid();
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(BuildResult(Guid.NewGuid(), employeeId), CancellationToken.None));
+        var outboxBefore = await ExecuteInDb(db => db.OutboxMessages.CountAsync(m => m.AggregateId == employeeId.ToString()));
+
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(BuildCompensation(employeeId, reverseBonus: true), CancellationToken.None));
+
+        Assert.Equal(0, (await ExecuteInDb(db => db.Wallets.SingleAsync(w => w.EmployeeId == employeeId))).Balance);
+        var ledger = await ExecuteInDb(db => db.Transactions.Where(t => t.EmployeeId == employeeId).OrderBy(t => t.CreatedAt).ToListAsync());
+        Assert.Equal([TransactionSource.WelcomeBonus, TransactionSource.WelcomeBonusReversal], ledger.Select(t => t.Source));
+        Assert.Equal(-100, ledger[1].Amount);
+        Assert.Equal(2, await ExecuteInDb(db => db.WalletEvents.CountAsync(e => e.StreamId == employeeId)));
+        // The reversal is bookkeeping, not news: nothing is published about it.
+        Assert.Equal(outboxBefore, await ExecuteInDb(db => db.OutboxMessages.CountAsync(m => m.AggregateId == employeeId.ToString())));
+    }
+
+    [Fact]
+    public async Task A_repeated_or_simultaneous_compensation_reverses_the_bonus_exactly_once_on_a_wallet_with_history()
+    {
+        var employeeId = Guid.NewGuid();
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(BuildResult(Guid.NewGuid(), employeeId), CancellationToken.None));
+        const int concurrency = 8;
+
+        using var barrier = new Barrier(concurrency);
+        var threads = Enumerable.Range(0, concurrency).Select(_ => new Thread(() =>
+        {
+            barrier.SignalAndWait();
+            _sut.HandleWithRetryAndDeadLetter(BuildCompensation(employeeId, reverseBonus: true), CancellationToken.None);
+        })).ToList();
+        threads.ForEach(t => t.Start());
+        threads.ForEach(t => t.Join());
+
+        Assert.Equal(1, await ExecuteInDb(db => db.Transactions.CountAsync(t => t.EmployeeId == employeeId && t.Source == TransactionSource.WelcomeBonusReversal)));
+        Assert.Equal(0, (await ExecuteInDb(db => db.Wallets.SingleAsync(w => w.EmployeeId == employeeId))).Balance);
+    }
+
+    [Fact]
+    public async Task A_compensation_that_does_not_ask_for_the_bonus_or_finds_none_changes_nothing()
+    {
+        var kept = Guid.NewGuid();
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(BuildResult(Guid.NewGuid(), kept), CancellationToken.None));
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(BuildCompensation(kept, reverseBonus: false), CancellationToken.None));
+        Assert.Equal(100, (await ExecuteInDb(db => db.Wallets.SingleAsync(w => w.EmployeeId == kept))).Balance);
+
+        var never = Guid.NewGuid();
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(BuildCompensation(never, reverseBonus: true), CancellationToken.None));
+        Assert.Equal(0, await ExecuteInDb(db => db.WalletEvents.CountAsync(e => e.StreamId == never)));
+    }
+
+    private static ConsumeResult<string, string> BuildCompensation(Guid employeeId, bool reverseBonus)
+    {
+        var headers = new Headers
+        {
+            { "message-id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) },
+            { "message-type", Encoding.UTF8.GetBytes("HireCompensationRequested") },
+        };
+        var payload = $$"""{"EmployeeId":"{{employeeId}}","Reason":"deadline","RevokeAccount":false,"ReverseBonus":{{reverseBonus.ToString().ToLowerInvariant()}}}""";
+        return new ConsumeResult<string, string>
+        {
+            Topic = "employee.events",
+            Message = new Message<string, string> { Key = employeeId.ToString(), Value = payload, Headers = headers },
+        };
+    }
+
     public Task InitializeAsync() => Task.CompletedTask;
 
     public async Task DisposeAsync() => await _resetDatabase();

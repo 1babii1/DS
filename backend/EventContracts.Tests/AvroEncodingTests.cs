@@ -211,6 +211,11 @@ public class AvroEncodingTests(RegistryFixture registry) : IClassFixture<Registr
             return 1234.56m;
         }
 
+        if (t == typeof(bool))
+        {
+            return true;
+        }
+
         if (t == typeof(Guid[]))
         {
             return new[] { Guid.NewGuid(), Guid.NewGuid() };
