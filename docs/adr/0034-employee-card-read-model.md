@@ -29,7 +29,7 @@ only the balance is a copy, so only the balance can be stale, and the card says 
   and twelve instances applying one employee's events at once end at the highest version. No lock, no read-then-write.
 - **The way around staleness is a version the writer hands back and the reader waits for** (the same idea as 0025's LSN, with the
   wallet version in place of an LSN). A grant answers with `X-Wallet-Version`. A card request carrying `X-Min-Wallet-Version: n`
-  polls the copy (every 25 ms, up to 2 s) until it has reached `n`. If it has not, the card is returned anyway, **marked behind**
+  polls the copy (every 25 ms, up to 5 s) until it has reached `n`. If it has not, the card is returned anyway, **marked behind**
   (`consistent: false`, header `X-Card-Consistent: false`) instead of hanging or lying. Every card also states the version and the
   time its balance is as of.
 - **What it is not:** the other services' facts are not authoritative here. Rebuilding the wallet copy means replaying
@@ -62,7 +62,21 @@ publishes it; the reversal is published with the source and the version. Notific
 All event contracts through the registry. Mutation-checked: no version guard in the statement (three tests fail), no waiting
 for the version (two fail), no reversal recognition in Notification (fails).
 
-Not verified: **the lag on the live stack.** The copy stores when the balance changed at the source and when it was taken, so
-the lag is measurable from the data, but it was not measured end to end through Kafka here; the figure of "milliseconds" is the
-expectation, not a result. Also not verified: the frontend passing the header, several EmployeeService instances consuming
-(the statement is safe by construction, nothing ran two), and the replay of a long history.
+**The lag, measured through Kafka** (`scripts/card-lag-drill.sh`: the real RewardsService and EmployeeService from this code, a private Kafka
+configured like the stack's single broker, a schema registry and a Postgres; 200 grants to 200 employees at random moments, each followed at once by
+a card read that asks for its own write):
+
+| | Result |
+|---|---|
+| Delay between the grant committing and the card's copy taking it (the copy's own two timestamps) | **p50 1.08 s, p95 1.94 s, max 2.03 s** |
+| What a read that asked for its own write waited | avg 1.03 s, p95 1.94 s, max 2.03 s; all 200 came back consistent |
+
+The delay is the outbox publisher's polling cycle, **2 s**, almost entirely: grants land at random points in the cycle, so the lag is spread
+evenly over it (median about half), and Kafka and the consumer add milliseconds. This is why my expectation of "milliseconds", written when the ADR
+was, was wrong, and why the wait limit moved from 2 s to **5 s**: a limit equal to the cycle marks some reads behind for no reason (the maximum above
+exceeds 2 s). A first run of the same measure, with the load generator granting again the moment the last card came back, showed a steady 2.0 s:
+it had locked itself to the cycle and measured the cycle, which is why the shipped script pauses randomly. Delivery through Debezium
+(ADR 0030) would remove the polling and is not measured here.
+
+Not verified: the frontend passing the header, several EmployeeService instances consuming (the statement is safe by construction, nothing ran
+two), and the replay of a long history.

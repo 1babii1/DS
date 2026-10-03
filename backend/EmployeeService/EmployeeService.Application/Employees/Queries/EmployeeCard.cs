@@ -8,8 +8,8 @@ public sealed class EmployeeCardOptions
 {
     public const string SectionName = "EmployeeCard";
 
-    /// <summary>How long a read that asked to see a given wallet version waits for the copy to reach it.</summary>
-    public TimeSpan MaxWait { get; set; } = TimeSpan.FromSeconds(2);
+    /// <summary>How long a read that asked to see a given wallet version waits for the copy to reach it. Longer than the outbox's polling cycle (2 s), which is most of the lag (ADR 0034).</summary>
+    public TimeSpan MaxWait { get; set; } = TimeSpan.FromSeconds(5);
 
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromMilliseconds(25);
 }
