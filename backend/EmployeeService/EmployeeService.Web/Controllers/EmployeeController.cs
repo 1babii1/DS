@@ -21,6 +21,7 @@ public class EmployeeController : ControllerBase
     public async Task<EndpointResult<Guid>> Hire(
         [FromServices] HireEmployeeHandler handler,
         HireEmployeeCommand command,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken cancellationToken)
     {
         // Always the caller's own identity, never whatever the request body
@@ -28,7 +29,7 @@ public class EmployeeController : ControllerBase
         // this" later (e.g. notifying them if account provisioning fails), not
         // as client-supplied data.
         var hiredBy = Guid.Parse(User.FindFirstValue("sub")!);
-        command = command with { HiredByAccountId = hiredBy };
+        command = command with { HiredByAccountId = hiredBy, IdempotencyKey = idempotencyKey };
         return await handler.Handle(command, cancellationToken);
     }
 

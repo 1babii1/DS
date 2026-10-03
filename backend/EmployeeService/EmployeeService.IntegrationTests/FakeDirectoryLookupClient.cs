@@ -1,4 +1,4 @@
-﻿using EmployeeService.Application.Directory;
+using EmployeeService.Application.Directory;
 
 namespace EmployeeService.IntegrationTests;
 
@@ -22,6 +22,9 @@ public sealed class FakeDirectoryLookupClient : IDirectoryLookupClient
 
     public AssignmentValidationResult NextValidation { get; set; } = ValidAssignment;
 
+    /// <summary>Holds every assignment check for this long, so that concurrent requests are all inside the handler together.</summary>
+    public TimeSpan Delay { get; set; } = TimeSpan.Zero;
+
     public Task<DepartmentLookupResult> GetDepartmentAsync(Guid departmentId, CancellationToken cancellationToken) =>
         Task.FromResult(new DepartmentLookupResult(
             NextValidation.DepartmentExists, NextValidation.DepartmentName, NextValidation.DepartmentActive));
@@ -30,9 +33,16 @@ public sealed class FakeDirectoryLookupClient : IDirectoryLookupClient
         Task.FromResult(new PositionLookupResult(
             NextValidation.PositionExists, NextValidation.PositionName, NextValidation.PositionActive));
 
-    public Task<AssignmentValidationResult> ValidateAssignmentAsync(
+    public async Task<AssignmentValidationResult> ValidateAssignmentAsync(
         Guid departmentId,
         Guid positionId,
-        CancellationToken cancellationToken) =>
-        Task.FromResult(NextValidation);
+        CancellationToken cancellationToken)
+    {
+        if (Delay > TimeSpan.Zero)
+        {
+            await Task.Delay(Delay, cancellationToken);
+        }
+
+        return NextValidation;
+    }
 }

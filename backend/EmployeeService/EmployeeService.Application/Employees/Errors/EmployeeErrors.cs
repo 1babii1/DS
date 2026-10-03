@@ -1,9 +1,15 @@
-﻿using Shared;
+using Shared;
 
 namespace EmployeeService.Application.Employees.Errors;
 
 public static class EmployeeErrors
 {
+    /// <summary>The code of the internal signal that the unique (Scope, Key) of an idempotency record was lost to a concurrent request.</summary>
+    public const string IdempotencyRaceCode = "employee.idempotency_key.race";
+
+    public static Error IdempotencyRace() =>
+        Error.Conflict(IdempotencyRaceCode, "Another request with the same Idempotency-Key is in progress");
+
     public static Error DepartmentNotFound() =>
         Error.NotFound("employee.department.not_found", "Department does not exist", "departmentId");
 
@@ -35,6 +41,14 @@ public static class EmployeeErrors
         Error.Conflict(
             "employee.concurrency_conflict",
             "This employee was modified by another request - reload and try again");
+
+    public static Error IdempotencyKeyReused() =>
+        Error.Conflict(
+            "employee.idempotency_key.reused",
+            "This Idempotency-Key was already used for a different request");
+
+    public static Error IdempotencyKeyInvalid() =>
+        Error.Validation("employee.idempotency_key.invalid", "Idempotency-Key must be 1 to 200 characters", "idempotencyKey");
 
     public static Error EmailAlreadyExists(string email) =>
         Error.Conflict("employee.email.already_exists", $"An employee with email '{email}' already exists", "email");
