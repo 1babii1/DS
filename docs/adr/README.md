@@ -42,6 +42,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0042](0042-row-level-security-multi-tenancy.md) | Row-level security for multi-tenancy: what it gives, what bypasses it, the pooler trap (drilled, not applied) |
 | [0043](0043-personal-data-inventory.md) | Personal data: an inventory that is checked, and the erasure problem it exposes |
 | [0044](0044-mutual-tls-between-services.md) | Mutual TLS on the internal gRPC call |
+| [0045](0045-bulkheads-and-measured-limits.md) | Bulkheads, and what a real service's limit looks like when measured |
 | [0046](0046-erasing-a-person-from-the-audit-log.md) | Erasing a person from the audit log: a key per subject, destroyed on request |
 | [0038](0038-load-shedding.md) | Load shedding: turn requests away quickly instead of answering all of them slowly |
 | [0039](0039-rate-limiting-at-the-edge.md) | Rate limits at the one ingress, not in Redis |
