@@ -46,5 +46,7 @@ For both: the application's own authorization setup resolves every policy its co
 never registered that policy, so the endpoint would have failed for everyone at request time. The tests call controllers directly and
 could not see it. Both new services register it, and each has a test that asks the real authorization setup for every policy a controller names.
 
-Not verified: the endpoints through HTTP with a real token and step-up; the delete-by-query on an index of real size; Notification's
+Through HTTP on the running stack (dev admin, sign-in, e-mail step-up code, refreshed token): before step-up all three endpoints answer 403, after it 200 and a repeat 200 (Audit `newly` 1). Nothing to delete was seeded, so the counts of removed documents are 0; only the authorization path is shown.
+
+Not verified: the delete-by-query on an index of real size; Notification's
 dead letters; the three calls as one operation (they are three calls, and if one fails the others have already happened).
