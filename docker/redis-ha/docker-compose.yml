@@ -1,0 +1,57 @@
+# Redis with Sentinel for the failover drill (ADR 0036): one master, two replicas, three sentinels (quorum 2). Separate from
+# the main stack, which runs one Redis. Run with scripts/redis-ha-drill.sh.
+name: redis-ha
+
+x-redis: &redis
+  image: redis:8-alpine
+
+x-sentinel: &sentinel
+  image: redis:8-alpine
+  depends_on: [redis-master, redis-replica1, redis-replica2]
+  command:
+    - sh
+    - -c
+    - |
+      cat > /tmp/sentinel.conf <<EOF
+      port 26379
+      sentinel monitor mymaster 10.77.0.10 6379 2
+      sentinel auth-pass mymaster drillpass
+      sentinel down-after-milliseconds mymaster 3000
+      sentinel failover-timeout mymaster 10000
+      sentinel parallel-syncs mymaster 1
+      EOF
+      exec redis-sentinel /tmp/sentinel.conf
+
+services:
+  redis-master:
+    <<: *redis
+    container_name: redis_master
+    networks: {default: {ipv4_address: 10.77.0.10}}
+    command: redis-server --requirepass drillpass --masterauth drillpass
+  redis-replica1:
+    <<: *redis
+    container_name: redis_replica1
+    networks: {default: {ipv4_address: 10.77.0.11}}
+    command: redis-server --requirepass drillpass --masterauth drillpass --replicaof 10.77.0.10 6379
+  redis-replica2:
+    <<: *redis
+    container_name: redis_replica2
+    networks: {default: {ipv4_address: 10.77.0.12}}
+    command: redis-server --requirepass drillpass --masterauth drillpass --replicaof 10.77.0.10 6379
+  sentinel1:
+    <<: *sentinel
+    container_name: redis_sentinel1
+  sentinel2:
+    <<: *sentinel
+    container_name: redis_sentinel2
+  sentinel3:
+    <<: *sentinel
+    container_name: redis_sentinel3
+
+# Fixed addresses on purpose: Sentinel is told the master by address, and with a host name a master whose container has gone
+# stops resolving at all, which sends every sentinel into TILT mode instead of failing over (found in the drill, ADR 0036).
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.77.0.0/24
