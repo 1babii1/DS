@@ -60,6 +60,21 @@ The flood was refused 4,425 times by its own class and the overall limit refused
 ## What is and is not verified
 The bulkhead behaviour by two tests (the starvation comparison above, and a request outside every class limited only by the overall
 limit); mutation-checked (ignoring the classes brings the starvation back). The shipped Auth configuration by two tests. The capacity
-table above: one run per row, so the differences between the first two rows are indications. Not verified: the credentials class
-under a real login flood; classes in the other services; the tight limit with a larger `MaxQueueWait`, which might behave differently;
-a service whose bottleneck is the database rather than the CPU.
+table above: one run per row, so the differences between the first two rows are indications.
+
+**The credentials class under a real login flood** (`CredentialsFloodTests`: the real AuthService on a real Postgres, 24 clients logging
+in with the right password of a confirmed account, so that every request hashes it, for 5 seconds, while a probe asks for the discovery
+document every 30 ms; the overall limit set to 8 so that it can be reached, the class shrunk to 3 so that it fits inside it):
+
+| | Discovery document served | Refused | Logins completed |
+|---|---|---|---|
+| No class (its limit set so high it is none) | **1** | 141 | 245 |
+| The credentials class | **142** | 0 | 103 |
+
+Without the class the flood used every place and the discovery document, which every other service and client fetches, was refused 99%
+of the time. With it, nothing was refused. The price is paid where intended: the logins themselves ran at about 21 a second against 49,
+because at most 3 hash at once. The shipped class allows 16, not 3, and the right number for logins is the same question as every other
+limit in this ADR: found by measurement, not by this test, whose numbers only show the direction.
+
+Not verified: classes in the other services; the tight limit with a larger `MaxQueueWait`, which might behave differently; a service
+whose bottleneck is the database rather than the CPU.
