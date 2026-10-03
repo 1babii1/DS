@@ -80,8 +80,35 @@ test('a confirmed viewer returns to the requested workspace without browser-visi
 		await page.getByRole('button', { name: 'Continue to sign in' }).click()
 		await page.locator('#email').fill(email)
 		await page.locator('#password').fill(password)
+		const viewerCapabilities = page.waitForResponse(
+			response =>
+				new URL(response.url()).pathname ===
+					'/api/session/capabilities' &&
+				response.request().method() === 'GET'
+		)
 		await page.getByRole('button', { name: 'Sign in' }).click()
 		await expect(page).toHaveURL(/\/departments$/)
+		await expect((await viewerCapabilities).json()).resolves.toEqual({
+			canEdit: false
+		})
+		const departmentMutationRequests: string[] = []
+		page.on('request', request => {
+			if (
+				request.method() === 'POST' &&
+				new URL(request.url()).pathname ===
+					'/api/backend/api/departments'
+			)
+				departmentMutationRequests.push(request.url())
+		})
+		await page.getByRole('button', { name: 'New department' }).click()
+		await expect(
+			page
+				.getByRole('alert')
+				.filter({ hasText: 'Your viewer role can browse' })
+		).toHaveText(
+			'Your viewer role can browse the organization but cannot create departments. Ask an administrator for editor access.'
+		)
+		await expect.poll(() => departmentMutationRequests).toEqual([])
 		await expect
 			.poll(() =>
 				page.evaluate(() =>
