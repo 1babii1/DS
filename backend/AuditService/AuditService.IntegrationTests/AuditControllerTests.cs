@@ -140,7 +140,7 @@ public class AuditControllerTests : IClassFixture<AuditTestWebFactory>, IAsyncLi
     {
         await using var scope = _services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
-        var controller = new AuditController(dbContext)
+        var controller = new AuditController(dbContext, scope.ServiceProvider.GetRequiredService<PiiVault>())
         {
             ControllerContext = new ControllerContext
             {

@@ -111,7 +111,9 @@ public class OrgHistorySeedTests : IClassFixture<AuditTestWebFactory>, IAsyncLif
     private async Task<OrgChartResponse> At(string? at)
     {
         await using var scope = _services.CreateAsyncScope();
-        var controller = new AuditController(scope.ServiceProvider.GetRequiredService<AuditDbContext>());
+        var controller = new AuditController(
+            scope.ServiceProvider.GetRequiredService<AuditDbContext>(),
+            TestVault.Disabled(scope.ServiceProvider.GetRequiredService<AuditDbContext>()));
         var result = await controller.OrgChart(at, CancellationToken.None);
         return result.Value ?? throw new InvalidOperationException("The endpoint refused the date.");
     }

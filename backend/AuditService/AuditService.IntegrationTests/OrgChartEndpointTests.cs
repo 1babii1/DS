@@ -127,7 +127,7 @@ public class OrgChartEndpointTests : IClassFixture<AuditTestWebFactory>, IAsyncL
         Assert.DoesNotContain("secret.example", body);
         Assert.DoesNotContain("@", body);
 
-        var feed = await new AuditController(Db())
+        var feed = await new AuditController(Db(), TestVault.Disabled(Db()))
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = User(RoleNames.Viewer) } },
         }.List(null, null, null, CancellationToken.None);
@@ -165,6 +165,7 @@ public class OrgChartEndpointTests : IClassFixture<AuditTestWebFactory>, IAsyncL
         await using var scope = _services.CreateAsyncScope();
         var controller = new AuditController(
             scope.ServiceProvider.GetRequiredService<AuditDbContext>(),
+            TestVault.Disabled(scope.ServiceProvider.GetRequiredService<AuditDbContext>()),
             Options.Create(new OrgChartOptions { MaxEvents = maxEvents }))
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user ?? User(RoleNames.Viewer) } },
