@@ -1,4 +1,4 @@
-﻿using EmployeeService.Application.Directory;
+using EmployeeService.Application.Directory;
 using EmployeeService.Application.Employees.Commands;
 using EmployeeService.Domain;
 using Microsoft.EntityFrameworkCore;
@@ -46,6 +46,49 @@ public class HireAndTransferTests : IClassFixture<EmployeeTestWebFactory>, IAsyn
 
         var count = await ExecuteInDb(db => db.Employees.CountAsync());
         Assert.Equal(0, count);
+    }
+
+    // DirectoryService is the one synchronous dependency of a hire. When it is down the hire is refused with a retryable error
+    // and nothing is written, rather than guessing at an assignment or hanging.
+    [Theory]
+    [InlineData(DirectoryLookupFailure.Unavailable, "employee.directory.unavailable")]
+    [InlineData(DirectoryLookupFailure.Unauthorized, "employee.directory.unauthorized")]
+    public async Task Hire_while_the_directory_cannot_be_used_is_refused_and_writes_nothing(DirectoryLookupFailure failure, string code)
+    {
+        _factory.DirectoryLookup.FailWith = failure;
+        try
+        {
+            var result = await ExecuteHireAsync(NewHireCommand());
+
+            Assert.True(result.IsFailure);
+            Assert.Equal(code, result.Error.Messages[0].Code);
+            Assert.Equal(0, await ExecuteInDb(db => db.Employees.CountAsync()));
+            Assert.Equal(0, await ExecuteInDb(db => db.HireSagas.CountAsync()));
+        }
+        finally
+        {
+            _factory.DirectoryLookup.FailWith = null;
+        }
+    }
+
+    [Fact]
+    public async Task Transfer_while_the_directory_is_down_is_refused_and_leaves_the_employee_where_they_were()
+    {
+        var hired = await ExecuteHireAsync(NewHireCommand());
+        _factory.DirectoryLookup.FailWith = DirectoryLookupFailure.Unavailable;
+        try
+        {
+            var result = await ExecuteTransferAsync(new TransferEmployeeCommand(hired.Value, Guid.NewGuid(), Guid.NewGuid()));
+
+            Assert.True(result.IsFailure);
+            Assert.Equal("employee.directory.unavailable", result.Error.Messages[0].Code);
+            var stored = await ExecuteInDb(db => db.Employees.SingleAsync(e => e.Id == hired.Value));
+            Assert.Equal("Engineering", stored.DepartmentName);
+        }
+        finally
+        {
+            _factory.DirectoryLookup.FailWith = null;
+        }
     }
 
     [Fact]

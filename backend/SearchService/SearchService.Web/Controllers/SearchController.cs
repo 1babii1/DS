@@ -140,9 +140,21 @@ public class SearchController(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Search query failed for {Query}", query);
-            return Result.Failure<SearchResponse, Error>(
-                Error.Unavailable("search.index.unavailable", "Search is temporarily unavailable"));
+            // The keyword index is down, but the semantic side lives in Postgres and may be fine: answer from it, and say so
+            // (mode "semantic"), instead of failing the whole search for want of one of its two halves.
+            logger.LogError(ex, "Keyword search failed for {Query}; trying the semantic side alone", query);
+            try
+            {
+                var onlySemantic = await semanticTask;
+                return Success(
+                    query, SearchModes.Semantic, onlySemantic.Take(size).Select(h => ToDto(h)).ToList());
+            }
+            catch (Exception semanticEx)
+            {
+                logger.LogError(semanticEx, "Semantic search failed too for {Query}", query);
+                return Result.Failure<SearchResponse, Error>(
+                    Error.Unavailable("search.index.unavailable", "Search is temporarily unavailable"));
+            }
         }
 
         IReadOnlyList<SemanticHit> semanticHits;

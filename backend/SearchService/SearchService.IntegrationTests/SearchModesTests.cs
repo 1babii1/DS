@@ -1,4 +1,5 @@
 using System.Text;
+using Elastic.Clients.Elasticsearch;
 using Confluent.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -54,6 +55,39 @@ public class SearchModesTests : IClassFixture<SearchTestWebFactory>, IAsyncLifet
         Assert.Equal("semantic", semantic.Mode);
         Assert.Equal("hybrid", hybrid.Mode);
         Assert.Contains("semantic", hybrid.Results.Single(r => r.Id == billing).MatchedFields);
+    }
+
+    [Fact]
+    public async Task With_the_keyword_index_down_keyword_mode_is_unavailable_and_hybrid_answers_from_the_semantic_side()
+    {
+        var billing = await Department("Billing team", "bill-desk");
+        await Embed();
+
+        var keyword = await SearchRaw("invoices", "keyword", index: DeadIndex());
+        var hybrid = await SearchRaw("invoices", "hybrid", index: DeadIndex());
+
+        Assert.Equal("search.index.unavailable", keyword.ErrorCode);
+        Assert.Null(hybrid.ErrorCode);
+        Assert.Equal("semantic", hybrid.Value!.Mode);
+        Assert.Contains(hybrid.Value.Results, r => r.Id == billing);
+    }
+
+    [Fact]
+    public async Task With_both_halves_down_hybrid_is_unavailable()
+    {
+        await Department("Billing team", "bill-desk");
+        await Embed();
+        FakeEmbeddingClient.Fail = true;
+        try
+        {
+            var hybrid = await SearchRaw("invoices", "hybrid", index: DeadIndex());
+
+            Assert.Equal("search.index.unavailable", hybrid.ErrorCode);
+        }
+        finally
+        {
+            FakeEmbeddingClient.Fail = false;
+        }
     }
 
     [Fact]
@@ -240,11 +274,16 @@ public class SearchModesTests : IClassFixture<SearchTestWebFactory>, IAsyncLifet
         return outcome.Value!;
     }
 
-    private async Task<Outcome> SearchRaw(string query, string? mode, string? types = null)
+    // An index client for an Elasticsearch nothing listens to: the keyword half of the search is gone.
+    private static SearchIndexClient DeadIndex() => new(
+        new ElasticsearchClient(new ElasticsearchClientSettings(new Uri("http://127.0.0.1:1")).RequestTimeout(TimeSpan.FromSeconds(2))),
+        Options.Create(new ElasticsearchOptions { IndexName = "search-entries", Uri = "http://127.0.0.1:1" }));
+
+    private async Task<Outcome> SearchRaw(string query, string? mode, string? types = null, SearchIndexClient? index = null)
     {
         await using var scope = _services.CreateAsyncScope();
         var controller = new SearchController(
-            _indexClient, scope.ServiceProvider.GetRequiredService<SemanticSearch>(), NullLogger<SearchController>.Instance);
+            index ?? _indexClient, scope.ServiceProvider.GetRequiredService<SemanticSearch>(), NullLogger<SearchController>.Instance);
         var endpoint = await controller.Search(query, types, 20, mode, CancellationToken.None);
 
         // EndpointResult is an IResult: running it is the real contract, so the answer is read from the response.
