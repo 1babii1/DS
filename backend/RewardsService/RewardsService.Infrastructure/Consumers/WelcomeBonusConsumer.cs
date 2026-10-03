@@ -67,6 +67,12 @@ public class WelcomeBonusConsumer(
         var dbContext = scope.ServiceProvider.GetRequiredService<RewardsDbContext>();
         var writer = new CurrencyGrantWriter(dbContext, scope.ServiceProvider.GetService<Shared.Avro.IEventAvroEncoder>());
 
+        // Someone whose ledger was anonymised (ADR 0050) gets no new wallet from an event that arrives, or is replayed, later.
+        if (dbContext.ErasedSubjects.Any(e => e.SubjectId == hired.EmployeeId.ToString()))
+        {
+            return;
+        }
+
         // Idempotency: an EmployeeHired event redelivered after this already ran must not grant a
         // second welcome bonus. On its own this check is check-then-act (confirmed by reproducing
         // a 16x duplicate grant with only this check and no database constraint) - what actually
@@ -127,6 +133,13 @@ public class WelcomeBonusConsumer(
 
         using var scope = ScopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<RewardsDbContext>();
+
+        var employeeMark = @event.EmployeeId.ToString();
+        var accountMark = @event.AccountId.ToString();
+        if (dbContext.ErasedSubjects.Any(e => e.SubjectId == employeeMark || e.SubjectId == accountMark))
+        {
+            return;
+        }
 
         if (dbContext.AccountLookups.Any(l => l.EmployeeId == @event.EmployeeId))
         {
