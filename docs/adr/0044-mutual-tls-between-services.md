@@ -54,7 +54,26 @@ client certificate fails the "another authority" and "expired" cases; skipping t
   only EmployeeService to call DirectoryService would need the server to check the client's name, which it does not.
 
 ## What is and is not verified
-Not verified: the compose override against the running services (the images in the running stack predate this change and the
-call was not exercised end to end); gRPC over this transport with the real client and the Polly handlers (the tests use plain HTTP
-requests over the same TLS settings); NotificationService, the MCP server and the other callers, which are not covered; HTTP/2
-specifically (the test server allows both HTTP versions); certificate rotation.
+**Run end to end on the stack's network** (`scripts/mtls-live-drill.sh`: a second DirectoryService and two second EmployeeServices built
+from this code, beside the stack's own, with the real gRPC client, its retry and circuit-breaker handlers, and the real HTTP/2 port):
+
+| | Result |
+|---|---|
+| gRPC port, no client certificate | Refused at the handshake |
+| gRPC port, certificate of another authority | Refused |
+| gRPC port, certificate of the platform | Reaches the application (it answers 404 for a path it does not serve) |
+| Hire through Employee with mutual TLS on both sides | **200**, the employee created; Employee asked Directory over gRPC to validate the assignment |
+| Hire through an Employee speaking plain http to the same Directory | **503** `employee.directory.unavailable`, nothing created |
+
+EmployeeService ran on a database of its own and with no Kafka, so its hires did not reach the real stack; the three reference
+rows the hire chain needs (location, department, position) were added to the development database, as the k6 hire chain does.
+
+**A thing found on the way, not explained:** `./efbundle` of the EmployeeService image, run with `docker run` against a fresh database,
+exits 1 and applies nothing: the host it starts runs the outbox publisher, whose startup check ("SchemaRegistry:Url must be set") aborts
+it before the migrations; with the registry configured the process never exits. The same image's bundle migrated successfully in the
+Kubernetes run (ADR 0040), and the stack's own migration container has been exiting 0 against an already-migrated database. Whether a
+`docker compose up` on an empty database has the same problem was not tested (it would change the development schema). The drill therefore
+applies the migrations as SQL (`dotnet ef migrations script`) instead. This deserves its own look.
+
+Not verified: NotificationService, the MCP server and the other callers, which are not covered; certificate rotation; revocation;
+the compose override file itself (the drill starts containers with the same settings but not through it).

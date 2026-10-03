@@ -491,3 +491,5 @@ $RECYCLE.BIN/
 .llm-models/
 tools/redis-failover-probe/out/
 docker/certs/
+docker/employee-schema.sql
+docker/certs-rogue/

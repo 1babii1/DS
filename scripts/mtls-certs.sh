@@ -3,6 +3,7 @@
 # the authority's key sits next to the certificates and nothing rotates anything.
 #
 #   scripts/mtls-certs.sh [directory]          # default docker/certs (ignored by git)
+#   DIRECTORY_HOST=dir_mtls scripts/mtls-certs.sh   # the name DirectoryService's certificate is issued for (default directory_service)
 #
 # Writes ca.pem, and <service>.pem + <service>.key for each service named below. The server certificates carry the service's
 # docker-compose / cluster host name as a subject alternative name: a client checks the name as well as the signature.
@@ -33,7 +34,7 @@ issue() {
   rm "$name.csr" "$name.ext"
 }
 
-issue directory_service directory_service
+issue directory_service "${DIRECTORY_HOST:-directory_service}"
 issue employee_service ""
 
 rm -f ca.srl
