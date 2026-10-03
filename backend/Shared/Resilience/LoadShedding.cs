@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -7,6 +8,17 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Shared.Resilience;
+
+/// <summary>A kind of request that gets a limit of its own, so that a flood of it cannot use up the places meant for everything else.</summary>
+public sealed class LoadClassOptions
+{
+    /// <summary>The paths that belong to the class (each matched as a path prefix: <c>/api/search</c> covers <c>/api/search/x</c>).</summary>
+    public string[] PathPrefixes { get; set; } = [];
+
+    public int MaxConcurrentRequests { get; set; } = 32;
+
+    public int QueueLimit { get; set; } = 16;
+}
 
 public sealed class LoadSheddingOptions
 {
@@ -28,6 +40,12 @@ public sealed class LoadSheddingOptions
     /// at the worst moment) and the long-lived connections, which would hold a place for as long as they last.
     /// </summary>
     public string[] ExemptPrefixes { get; set; } = ["/health", "/metrics", "/hubs", "/mcp"];
+
+    /// <summary>
+    /// Bulkheads (ADR 0045): classes of request with their own limit, inside the overall one. A request of a class needs a place in
+    /// its class <b>and</b> a place overall. Configured as <c>LoadShedding:Classes:&lt;name&gt;:PathPrefixes:0</c> and so on.
+    /// </summary>
+    public Dictionary<string, LoadClassOptions> Classes { get; set; } = [];
 }
 
 /// <summary>
@@ -37,6 +55,8 @@ public sealed class LoadSheddingOptions
 /// and the rest are refused at once with 503 and a Retry-After, which a client can act on.
 /// The queue serves the newest request first: when the queue is full it is the oldest waiter (the one whose caller is closest to
 /// giving up anyway) that is turned away.
+/// A class (ADR 0045) is a bulkhead: expensive or unreliable work gets a small limit of its own, so that when it backs up it fills
+/// its own compartment and not the whole ship.
 /// </summary>
 public static class LoadSheddingExtensions
 {
@@ -52,47 +72,106 @@ public static class LoadSheddingExtensions
 
 public sealed class LoadShedder : IDisposable
 {
-    private readonly ConcurrencyLimiter _limiter;
-    private long _shed;
+    public const string Overall = "overall";
+
+    private sealed record Compartment(string Name, string[] Prefixes, ConcurrencyLimiter Limiter);
+
+    private readonly ConcurrencyLimiter _overall;
+    private readonly List<Compartment> _classes = [];
+    private readonly ConcurrentDictionary<string, long> _shed = new();
 
     public LoadShedder(IOptions<LoadSheddingOptions> options)
     {
         Options = options.Value;
-        _limiter = new ConcurrencyLimiter(new ConcurrencyLimiterOptions
+        _overall = NewLimiter(Options.MaxConcurrentRequests, Options.QueueLimit);
+        foreach (var (name, settings) in Options.Classes)
         {
-            PermitLimit = Options.MaxConcurrentRequests,
-            QueueLimit = Options.QueueLimit,
-            QueueProcessingOrder = QueueProcessingOrder.NewestFirst,
-        });
+            _classes.Add(new Compartment(name, settings.PathPrefixes, NewLimiter(settings.MaxConcurrentRequests, settings.QueueLimit)));
+        }
     }
 
     public LoadSheddingOptions Options { get; }
 
-    public async ValueTask<RateLimitLease?> TryEnterAsync(CancellationToken cancellationToken)
+    /// <summary>How many requests were turned away, by the class that turned them away (or "overall").</summary>
+    public IReadOnlyDictionary<string, long> ShedBy => _shed;
+
+    public long ShedCount => _shed.Values.Sum();
+
+    /// <summary>
+    /// A place for a request to this path: one in its class if it belongs to one, then one overall, or null (with <paramref name="refusedBy"/>
+    /// naming who said no) when it waited as long as allowed. Dispose the result to give the places back.
+    /// </summary>
+    public async ValueTask<IDisposable?> TryEnterAsync(PathString path, CancellationToken cancellationToken)
     {
+        var compartment = _classes.FirstOrDefault(c => c.Prefixes.Any(p => path.StartsWithSegments(p, StringComparison.OrdinalIgnoreCase)));
+
         using var wait = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         wait.CancelAfter(Options.MaxQueueWait);
 
+        RateLimitLease? classLease = null;
+        if (compartment is not null)
+        {
+            classLease = await TryAcquireAsync(compartment.Limiter, compartment.Name, wait.Token, cancellationToken);
+            if (classLease is null)
+            {
+                return null;
+            }
+        }
+
+        var overallLease = await TryAcquireAsync(_overall, Overall, wait.Token, cancellationToken);
+        if (overallLease is null)
+        {
+            classLease?.Dispose();
+            return null;
+        }
+
+        return new Places(classLease, overallLease);
+    }
+
+    public void Dispose()
+    {
+        _overall.Dispose();
+        foreach (var compartment in _classes)
+        {
+            compartment.Limiter.Dispose();
+        }
+    }
+
+    private static ConcurrencyLimiter NewLimiter(int permits, int queue) => new(new ConcurrencyLimiterOptions
+    {
+        PermitLimit = permits,
+        QueueLimit = queue,
+        QueueProcessingOrder = QueueProcessingOrder.NewestFirst,
+    });
+
+    private async ValueTask<RateLimitLease?> TryAcquireAsync(
+        ConcurrencyLimiter limiter, string name, CancellationToken waitToken, CancellationToken requestToken)
+    {
         try
         {
-            var lease = await _limiter.AcquireAsync(1, wait.Token);
+            var lease = await limiter.AcquireAsync(1, waitToken);
             if (lease.IsAcquired)
             {
                 return lease;
             }
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (!requestToken.IsCancellationRequested)
         {
             // Waited as long as it is allowed to.
         }
 
-        Interlocked.Increment(ref _shed);
+        _shed.AddOrUpdate(name, 1, (_, count) => count + 1);
         return null;
     }
 
-    public long ShedCount => Interlocked.Read(ref _shed);
-
-    public void Dispose() => _limiter.Dispose();
+    private sealed class Places(RateLimitLease? inClass, RateLimitLease overall) : IDisposable
+    {
+        public void Dispose()
+        {
+            overall.Dispose();
+            inClass?.Dispose();
+        }
+    }
 }
 
 public sealed class LoadSheddingMiddleware(RequestDelegate next, LoadShedder shedder, ILogger<LoadSheddingMiddleware> logger)
@@ -106,8 +185,8 @@ public sealed class LoadSheddingMiddleware(RequestDelegate next, LoadShedder she
             return;
         }
 
-        var lease = await shedder.TryEnterAsync(context.RequestAborted);
-        if (lease is null)
+        var places = await shedder.TryEnterAsync(path, context.RequestAborted);
+        if (places is null)
         {
             if (context.RequestAborted.IsCancellationRequested)
             {
@@ -123,7 +202,7 @@ public sealed class LoadSheddingMiddleware(RequestDelegate next, LoadShedder she
             return;
         }
 
-        using (lease)
+        using (places)
         {
             await next(context);
         }
