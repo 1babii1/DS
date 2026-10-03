@@ -27,6 +27,10 @@ public static class RewardsErrors
     public static Error CannotGrantToSelf() =>
         Error.Authorization("rewards.grant.self", "You cannot grant currency to yourself", "employeeId");
 
+    // The person's ledger was anonymised on request (ADR 0050); a grant would start a new wallet under the id that was erased.
+    public static Error EmployeeErased() =>
+        Error.Conflict("rewards.grant.employee_erased", "This person's data was erased; nothing can be granted to them", "employeeId");
+
     // Same key reused with a different request body - not a retry, a caller bug (or, worst
     // case, two different callers colliding on a client-generated key). 422, per the IETF
     // Idempotency-Key draft, not a silent "here's the first grant's result".

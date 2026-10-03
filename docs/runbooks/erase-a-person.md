@@ -28,7 +28,8 @@ Body: `{"subjects": ["<employee id>", "<account id>", "<address>"]}`. Through ng
   address are replaced, the row stays ([ADR 0048](../adr/0048-erasing-a-person-at-the-employee-record.md)). Active employees are refused.
 - **AuthService** owns the account and its sessions. Account deletion exists (`AccountDeletionService`); it removes the account, and
   its security events had already been published.
-- **RewardsService** owns the wallet and its ledger. A ledger is kept for accounting; nothing here removes or anonymises it.
+- **RewardsService** owns the wallet and its ledger. `POST /api/rewards/subjects/erase` (administrator, fresh step-up; employee or account ids) moves the wallet's
+  history to an id nobody holds, blanks the reasons and removes a grantor's id; amounts and totals stay ([ADR 0050](../adr/0050-anonymising-the-ledger.md)).
 
 ## What stays, whatever you do
 

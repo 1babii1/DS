@@ -127,6 +127,12 @@ public class RewardsController(RewardsDbContext dbContext, CurrencyGrantWriter w
             return RewardsErrors.CannotGrantToSelf();
         }
 
+        var erasedMark = request.EmployeeId.ToString();
+        if (dbContext.ErasedSubjects.Any(e => e.SubjectId == erasedMark))
+        {
+            return RewardsErrors.EmployeeErased();
+        }
+
         var requestHash = HashRequest(request);
 
         var existing = dbContext.IdempotencyRecords
