@@ -81,6 +81,17 @@ public class EmployeeController : ControllerBase
         CancellationToken cancellationToken) =>
         await handler.Handle(new TerminateEmployeeCommand(employeeId), cancellationToken);
 
+    // Erasing a person's data (ADR 0048): the record this service owns. Irreversible, so it takes the same step-up as terminating.
+    [HttpPost("{employeeId:guid}/erase")]
+    [RequireCanEdit]
+    [RequireStepUp]
+    [EnableRateLimiting("write")]
+    public async Task<EndpointResult> Erase(
+        [FromRoute] Guid employeeId,
+        [FromServices] EraseEmployeeHandler handler,
+        CancellationToken cancellationToken) =>
+        await handler.Handle(new EraseEmployeeCommand(employeeId), cancellationToken);
+
     [HttpGet("{employeeId:guid}")]
     public async Task<ActionResult<EmployeeDto>> GetById(
         [FromRoute] Guid employeeId,

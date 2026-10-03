@@ -155,4 +155,24 @@ public class Employee
 
         return UnitResult.Success<Error>();
     }
+
+    public const string ErasedName = "[erased]";
+
+    // Erasure of the person's data at the service that owns it (ADR 0048). The row stays, so ids held elsewhere still point at something
+    // and the history of what happened (status, department, dates) is intact; what identifies the person is replaced. The address stays
+    // unique per person by carrying the id. Only for someone no longer working here, and idempotent.
+    public UnitResult<Error> Erase()
+    {
+        if (Status is not (EmployeeStatus.Terminated or EmployeeStatus.ProvisioningFailed))
+        {
+            return Error.Conflict("employee.erase.still_active", "Only an employee who has left (or whose hire failed) can be erased; terminate first");
+        }
+
+        FullName = ErasedName;
+        Email = $"erased-{Id:N}@erased.invalid";
+        ProvisioningFailureReason = null;
+        UpdatedAt = DateTime.UtcNow;
+
+        return UnitResult.Success<Error>();
+    }
 }
