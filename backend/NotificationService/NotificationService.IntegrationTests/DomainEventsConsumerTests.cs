@@ -75,6 +75,24 @@ public class DomainEventsConsumerTests : IClassFixture<NotificationTestWebFactor
     }
 
     [Fact]
+    public async Task A_reversed_welcome_bonus_changes_the_balance_but_announces_nothing()
+    {
+        var employeeId = Guid.NewGuid();
+        await ExecuteInDb(async db =>
+        {
+            db.AccountLookups.Add(AccountLookup.Create(employeeId, Guid.NewGuid()));
+            await db.SaveChangesAsync();
+            return true;
+        });
+        var payload = $$"""{"EmployeeId":"{{employeeId}}","Amount":-100,"Reason":"Welcome bonus reversed","NewBalance":0,"Source":"WelcomeBonusReversal","WalletVersion":2}""";
+
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(
+            BuildResult(Guid.NewGuid(), "rewards.events", employeeId.ToString(), "CurrencyGranted", payload), CancellationToken.None));
+
+        Assert.Equal(0, await ExecuteInDb(db => db.Notifications.CountAsync()));
+    }
+
+    [Fact]
     public async Task CurrencyGranted_with_no_account_lookup_yet_is_skipped_without_error()
     {
         var employeeId = Guid.NewGuid();

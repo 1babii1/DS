@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -39,8 +39,7 @@ public class OutboxPublisher<TContext>(
             return;
         }
 
-        var producerConfig = new ProducerConfig { BootstrapServers = _options.BootstrapServers };
-        _options.Security.ApplyTo(producerConfig);
+        var producerConfig = KafkaProducerSettings.For(_options);
         _producer = new ProducerBuilder<string, byte[]>(producerConfig).Build();
 
         while (!stoppingToken.IsCancellationRequested)
