@@ -1,4 +1,4 @@
-﻿using CSharpFunctionalExtensions;
+using CSharpFunctionalExtensions;
 using EmployeeService.Application.Database;
 using EmployeeService.Application.Employees.Errors;
 using EmployeeService.Domain;
@@ -33,6 +33,11 @@ public class EmployeeRepository(EmployeeDbContext dbContext) : IEmployeeReposito
             // a change to the same row first. The caller lost the race and needs to see
             // that as a conflict, not as an opaque 500.
             return EmployeeErrors.ConcurrencyConflict();
+        }
+        catch (DbUpdateException ex) when (ex.IsUniqueViolationOf("IX_idempotency_records_Scope_Key"))
+        {
+            // The same Idempotency-Key lost a race: the winner's hire stands and this one wrote nothing.
+            return EmployeeErrors.IdempotencyRace();
         }
         catch (DbUpdateException ex) when (ex.IsUniqueViolation())
         {

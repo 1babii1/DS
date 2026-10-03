@@ -12,6 +12,8 @@ public class EmployeeDbContext(DbContextOptions<EmployeeDbContext> options) : Db
 
     public DbSet<EmployeeWallet> EmployeeWallets => Set<EmployeeWallet>();
 
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+
     public DbSet<HireSaga> HireSagas => Set<HireSaga>();
 
     public DbSet<DeadLetterEntry> DeadLetters => Set<DeadLetterEntry>();
@@ -60,6 +62,20 @@ public class EmployeeDbContext(DbContextOptions<EmployeeDbContext> options) : Db
             entity.ToTable("employee_wallets");
             entity.HasKey(e => e.EmployeeId);
             entity.Property(e => e.Balance).HasPrecision(18, 2);
+        });
+
+        builder.Entity<IdempotencyRecord>(entity =>
+        {
+            entity.ToTable("idempotency_records");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Scope).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Key).HasMaxLength(200).IsRequired();
+            entity.Property(e => e.RequestHash).HasMaxLength(64).IsRequired();
+
+            // What makes a retry idempotent: a second record for the same (Scope, Key) fails the whole SaveChanges, taking the
+            // second hire with it.
+            entity.HasIndex(e => new { e.Scope, e.Key }).IsUnique();
         });
 
         builder.Entity<HireSaga>(entity =>

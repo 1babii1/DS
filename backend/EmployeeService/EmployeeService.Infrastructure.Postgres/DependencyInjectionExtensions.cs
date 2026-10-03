@@ -18,6 +18,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<IReadDbContext>(sp => sp.GetRequiredService<EmployeeDbContext>());
         services.AddScoped<IEmployeeRepository, EmployeeRepository>();
         services.AddScoped<IHireSagaRepository, HireSagaRepository>();
+        services.AddScoped<IIdempotencyRepository, IdempotencyRepository>();
 
         return services;
     }
