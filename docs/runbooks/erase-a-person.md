@@ -26,8 +26,9 @@ Body: `{"subjects": ["<employee id>", "<account id>", "<address>"]}`. Through ng
 
 - **EmployeeService** owns the employee record (name, email). Terminate first, then `POST /api/employees/{id}/erase` (administrator, fresh step-up): name and
   address are replaced, the row stays ([ADR 0048](../adr/0048-erasing-a-person-at-the-employee-record.md)). Active employees are refused.
-- **AuthService** owns the account and its sessions. Account deletion exists (`AccountDeletionService`); it removes the account, and
-  its security events had already been published.
+- **AuthService** owns the account and its sessions. `POST /admin/accounts/{id}/erase` (administrator, fresh step-up) revokes its tokens, removes
+  the account, passkeys and sessions, and publishes a deletion event without the address ([ADR 0049](../adr/0049-erasing-an-account.md)). Do step 1
+  for the account id first or after; its earlier events keep the address until then.
 - **RewardsService** owns the wallet and its ledger. A ledger is kept for accounting; nothing here removes or anonymises it.
 
 ## What stays, whatever you do

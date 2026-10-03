@@ -196,6 +196,84 @@ public class AdminAccountTests : IClassFixture<AuthTestWebFactory>, IAsyncLifeti
         Assert.Null(afterUnlock!.LockoutEnd);
     }
 
+    [Fact]
+    public async Task Erasing_an_account_removes_it_and_kills_its_tokens()
+    {
+        var (targetEmail, targetPassword) = await CreateConfirmedAccountAsync();
+        var (targetId, _, targetRefresh) = await SignInAndAuthorizeAsync(targetEmail, targetPassword);
+        var (adminEmail, adminPassword) = await CreateConfirmedAccountAsync();
+        await PromoteToAdminAsync(adminEmail);
+        var elevatedToken = await SignInAndStepUpAsync(adminEmail, adminPassword);
+
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", elevatedToken);
+        var response = await client.PostAsync($"/admin/accounts/{targetId}/erase", content: null);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        await using var scope = _factory.Services.CreateAsyncScope();
+        Assert.False(await scope.ServiceProvider.GetRequiredService<AuthDbContext>().Users.AnyAsync(u => u.Id == targetId));
+
+        using var anon = _factory.CreateClient();
+        var refreshAttempt = await anon.PostAsync("/connect/token", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "refresh_token",
+            ["refresh_token"] = targetRefresh,
+            ["client_id"] = "portfolio-frontend",
+        }));
+        Assert.Equal(HttpStatusCode.BadRequest, refreshAttempt.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_event_that_records_an_erasure_does_not_carry_the_address_or_the_ip()
+    {
+        var (targetEmail, _) = await CreateConfirmedAccountAsync();
+        var targetId = await GetAccountIdAsync(targetEmail);
+        var (adminEmail, adminPassword) = await CreateConfirmedAccountAsync();
+        await PromoteToAdminAsync(adminEmail);
+        var elevatedToken = await SignInAndStepUpAsync(adminEmail, adminPassword);
+
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", elevatedToken);
+        await client.PostAsync($"/admin/accounts/{targetId}/erase", content: null);
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var payload = (await scope.ServiceProvider.GetRequiredService<AuthDbContext>().Set<Shared.Outbox.OutboxMessage>()
+            .SingleAsync(m => m.Type == "AccountDeleted" && m.AggregateId == targetId.ToString())).Payload;
+        Assert.DoesNotContain(targetEmail, payload);
+        Assert.Contains(targetId.ToString(), payload);
+    }
+
+    [Fact]
+    public async Task Erasing_needs_a_fresh_step_up()
+    {
+        var (targetEmail, _) = await CreateConfirmedAccountAsync();
+        var targetId = await GetAccountIdAsync(targetEmail);
+        var (adminEmail, adminPassword) = await CreateConfirmedAccountAsync();
+        await PromoteToAdminAsync(adminEmail);
+        var (_, accessToken, _) = await SignInAndAuthorizeAsync(adminEmail, adminPassword);
+
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        var response = await client.PostAsync($"/admin/accounts/{targetId}/erase", content: null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.True(await GetAccountIdAsync(targetEmail) == targetId);
+    }
+
+    [Fact]
+    public async Task An_admin_cannot_erase_their_own_account_and_an_unknown_one_is_not_found()
+    {
+        var (adminEmail, adminPassword) = await CreateConfirmedAccountAsync();
+        var adminId = await PromoteToAdminAsync(adminEmail);
+        var elevatedToken = await SignInAndStepUpAsync(adminEmail, adminPassword);
+
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", elevatedToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync($"/admin/accounts/{adminId}/erase", content: null)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync($"/admin/accounts/{Guid.NewGuid()}/erase", content: null)).StatusCode);
+    }
+
     public Task InitializeAsync() => Task.CompletedTask;
 
     public async Task DisposeAsync() => await _resetDatabase();

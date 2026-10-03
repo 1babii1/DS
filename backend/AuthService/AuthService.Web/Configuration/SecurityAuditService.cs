@@ -15,6 +15,9 @@ namespace AuthService.Web.Configuration;
 /// </summary>
 public class SecurityAuditService(IOutboxWriter outboxWriter, AuthDbContext dbContext, IEmailSender emailSender)
 {
+    // What stands in the address field of the deletion event, whose contract still has the field (ADR 0049).
+    public const string ErasedMarker = "[erased]";
+
     public async Task RecordLoginSucceededAsync(Account user, string? ipAddress, CancellationToken cancellationToken)
     {
         outboxWriter.Enqueue(
@@ -112,12 +115,12 @@ public class SecurityAuditService(IOutboxWriter outboxWriter, AuthDbContext dbCo
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task RecordAccountDeletedAsync(Guid accountId, string email, string? ipAddress, CancellationToken cancellationToken)
+    public async Task RecordAccountDeletedAsync(Guid accountId, CancellationToken cancellationToken)
     {
         outboxWriter.Enqueue(
             AuthEventTypes.AccountDeleted,
             accountId.ToString(),
-            new AccountDeletedEvent(accountId, email, ipAddress, DateTime.UtcNow));
+            new AccountDeletedEvent(accountId, ErasedMarker, null, DateTime.UtcNow));
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 }
