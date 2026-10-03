@@ -1,0 +1,26 @@
+# Mutual TLS on the one internal gRPC call, EmployeeService -> DirectoryService (ADR 0044). An override, not part of the default stack:
+#
+#   scripts/mtls-certs.sh                  # writes docker/certs (ignored by git)
+#   docker compose -f docker-compose.yml -f docker-compose.mtls.yml up -d directory_service employee_service
+#
+# DirectoryService's gRPC port then requires a client certificate signed by the platform's authority and EmployeeService presents
+# one; a caller without it is refused at the TLS handshake, before any request is read. The REST port (through nginx) is unchanged.
+services:
+  directory_service:
+    volumes:
+      - ./docker/certs:/certs:ro
+    environment:
+      - MutualTls__Enabled=true
+      - MutualTls__CertificatePath=/certs/directory_service.pem
+      - MutualTls__KeyPath=/certs/directory_service.key
+      - MutualTls__CaPath=/certs/ca.pem
+
+  employee_service:
+    volumes:
+      - ./docker/certs:/certs:ro
+    environment:
+      - Directory__GrpcAddress=https://directory_service:5179
+      - MutualTls__Enabled=true
+      - MutualTls__CertificatePath=/certs/employee_service.pem
+      - MutualTls__KeyPath=/certs/employee_service.key
+      - MutualTls__CaPath=/certs/ca.pem
