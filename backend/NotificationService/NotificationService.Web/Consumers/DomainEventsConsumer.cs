@@ -83,6 +83,11 @@ public class DomainEventsConsumer(
         var @event = JsonSerializer.Deserialize<CurrencyGrantedEvent>(payload)
             ?? throw new InvalidOperationException($"Could not deserialize {CurrencyGrantedEvent.MessageType} payload");
 
+        if (@event.Source == CurrencyGrantedEvent.WelcomeBonusReversalSource)
+        {
+            return null;
+        }
+
         var accountId = FindAccountId(dbContext, @event.EmployeeId);
         if (accountId is null)
         {

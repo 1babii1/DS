@@ -64,6 +64,7 @@ public class AuthEventsConsumer(
             {
                 var evt = JsonSerializer.Deserialize<CurrencyGrantedEvent>(result.Message.Value)
                     ?? throw new InvalidOperationException($"Could not deserialize {CurrencyGrantedEvent.MessageType} payload");
+                ProjectWallet(scope, evt, result, cancellationToken);
                 if (evt.Source == CurrencyGrantedEvent.WelcomeBonusSource)
                 {
                     saga.OnBonusGranted(evt.EmployeeId, cancellationToken).GetAwaiter().GetResult();
@@ -78,6 +79,26 @@ public class AuthEventsConsumer(
         }
 
         return Task.CompletedTask;
+    }
+
+    // The employee card's copy of the wallet (ADR 0034). An event from before wallets carried a version cannot be ordered
+    // against the others and is left out; the next one brings the card up to date.
+    private static void ProjectWallet(
+        IServiceScope scope, CurrencyGrantedEvent evt, ConsumeResult<string, string> result, CancellationToken cancellationToken)
+    {
+        if (evt.WalletVersion is null)
+        {
+            return;
+        }
+
+        var occurredHeader = result.Message.Headers.TryGetLastBytes(Shared.Outbox.OutboxMessageHeaders.OccurredAt, out var bytes)
+            && Shared.Outbox.OutboxMessageHeaders.TryReadOccurredAt(bytes, out var parsed)
+                ? parsed
+                : DateTime.UtcNow;
+
+        var db = scope.ServiceProvider.GetRequiredService<EmployeeDbContext>();
+        EmployeeWalletProjection.ApplyAsync(db, evt.EmployeeId, evt.NewBalance, evt.WalletVersion.Value, occurredHeader, cancellationToken)
+            .GetAwaiter().GetResult();
     }
 
     private static void CompleteProvisioning(

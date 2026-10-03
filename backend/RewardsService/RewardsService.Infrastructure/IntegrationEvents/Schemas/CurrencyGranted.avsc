@@ -36,6 +36,11 @@
       "name": "Source",
       "type": ["null", "string"],
       "default": null
+    },
+    {
+      "name": "WalletVersion",
+      "type": ["null", "int"],
+      "default": null
     }
   ]
 }

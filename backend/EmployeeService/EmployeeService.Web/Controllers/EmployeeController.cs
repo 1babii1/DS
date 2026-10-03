@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using EmployeeService.Application.Employees.Commands;
 using EmployeeService.Application.Employees.Queries;
 using Microsoft.AspNetCore.Authorization;
@@ -30,6 +30,26 @@ public class EmployeeController : ControllerBase
         var hiredBy = Guid.Parse(User.FindFirstValue("sub")!);
         command = command with { HiredByAccountId = hiredBy };
         return await handler.Handle(command, cancellationToken);
+    }
+
+    // The employee with their wallet, read from this service's copy of it (ADR 0034). A caller that has just changed the
+    // wallet passes the version it was given (X-Wallet-Version on the grant) in X-Min-Wallet-Version and the read waits for the
+    // copy to reach it; if it does not within the limit, the card still comes back, marked as behind.
+    [HttpGet("{employeeId:guid}/card")]
+    public async Task<ActionResult<EmployeeCardDto>> Card(
+        [FromRoute] Guid employeeId,
+        [FromServices] GetEmployeeCardHandler handler,
+        [FromHeader(Name = "X-Min-Wallet-Version")] int? minWalletVersion,
+        CancellationToken cancellationToken)
+    {
+        var card = await handler.Handle(employeeId, minWalletVersion, cancellationToken);
+        if (card is null)
+        {
+            return NotFound();
+        }
+
+        Response.Headers["X-Card-Consistent"] = card.Consistent ? "true" : "false";
+        return card;
     }
 
     [HttpPut("{employeeId:guid}/transfer")]

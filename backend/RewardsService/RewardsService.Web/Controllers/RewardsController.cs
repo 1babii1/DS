@@ -183,6 +183,9 @@ public class RewardsController(RewardsDbContext dbContext, CurrencyGrantWriter w
                 : RewardsErrors.IdempotencyKeyReused();
         }
 
+        // Where this grant put the wallet's history: a reader that must see its own write (the employee card) asks to wait for it.
+        Response.Headers["X-Wallet-Version"] = dbContext.WalletEvents.AsNoTracking()
+            .Where(e => e.StreamId == request.EmployeeId).Max(e => e.Version).ToString();
         return transaction.Id;
     }
 
