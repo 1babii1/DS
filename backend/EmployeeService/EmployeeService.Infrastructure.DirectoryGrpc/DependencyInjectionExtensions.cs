@@ -1,4 +1,4 @@
-﻿using DirectoryService.Grpc;
+using DirectoryService.Grpc;
 using EmployeeService.Application.Directory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,12 +21,23 @@ public static class DependencyInjectionExtensions
         services.AddHttpContextAccessor();
         services.AddTransient<TokenForwardingHandler>();
 
-        services
+        var mutualTls = Shared.Security.MutualTlsOptions.From(configuration);
+
+        var grpc = services
             .AddGrpcClient<DirectoryLookup.DirectoryLookupClient>(options =>
             {
                 options.Address = new Uri(address);
             })
-            .AddHttpMessageHandler<TokenForwardingHandler>()
+            .AddHttpMessageHandler<TokenForwardingHandler>();
+
+        // With mutual TLS on (ADR 0044) this service presents its own certificate to DirectoryService and accepts DirectoryService
+        // only if its certificate was signed by the platform's authority. The address must then be https and name the host in the certificate.
+        if (mutualTls.Enabled)
+        {
+            grpc.ConfigurePrimaryHttpMessageHandler(() => Shared.Security.MutualTls.CreateClientHandler(mutualTls));
+        }
+
+        grpc
 
             // Retries and circuit-breaking on a call that crosses a network boundary:
             // DirectoryService being briefly unavailable shouldn't fail every hire attempt outright.

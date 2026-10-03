@@ -47,10 +47,20 @@ var builder = WebApplication.CreateBuilder(args);
 // controlled here.
 var restPort = builder.Configuration.GetValue("Kestrel:RestPort", 5129);
 var grpcPort = builder.Configuration.GetValue("Kestrel:GrpcPort", 5179);
+// The gRPC port, and only it, can require mutual TLS (ADR 0044): REST arrives through nginx with a user's token, gRPC arrives from another
+// service, which proves who it is with a certificate. Off unless MutualTls:Enabled is true.
+var mutualTls = MutualTlsOptions.From(builder.Configuration);
 builder.WebHost.ConfigureKestrel(options =>
 {
     options.ListenAnyIP(restPort, listenOptions => listenOptions.Protocols = HttpProtocols.Http1);
-    options.ListenAnyIP(grpcPort, listenOptions => listenOptions.Protocols = HttpProtocols.Http2);
+    options.ListenAnyIP(grpcPort, listenOptions =>
+    {
+        listenOptions.Protocols = HttpProtocols.Http2;
+        if (mutualTls.Enabled)
+        {
+            listenOptions.UseMutualTls(mutualTls);
+        }
+    });
 });
 
 builder.Logging.ClearProviders();
