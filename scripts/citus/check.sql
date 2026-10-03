@@ -1,0 +1,4 @@
+EXPLAIN (COSTS OFF) SELECT "EventType" FROM entries WHERE "AggregateId" = 'agg-7' ORDER BY "OccurredAt" DESC LIMIT 50;
+EXPLAIN (COSTS OFF) SELECT count(*) FROM entries WHERE "OccurredAt" >= '2026-06-01+00' AND "OccurredAt" < '2026-06-08+00';
+INSERT INTO recorded_messages VALUES ('00000000-0000-0000-0000-000000000001', now());
+INSERT INTO recorded_messages VALUES ('00000000-0000-0000-0000-000000000001', now());
