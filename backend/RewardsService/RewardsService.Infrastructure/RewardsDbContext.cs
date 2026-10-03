@@ -23,6 +23,8 @@ public class RewardsDbContext(DbContextOptions<RewardsDbContext> options) : DbCo
 
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
+    public DbSet<ErasedSubject> ErasedSubjects => Set<ErasedSubject>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         builder.HasDefaultSchema("rewards");
@@ -75,6 +77,13 @@ public class RewardsDbContext(DbContextOptions<RewardsDbContext> options) : DbCo
             entity.HasKey(e => new { e.GrantedByAccountId, e.Day });
 
             entity.Property(e => e.Used).HasColumnType("numeric(18,2)");
+        });
+
+        builder.Entity<ErasedSubject>(entity =>
+        {
+            entity.ToTable("erased_subjects");
+            entity.HasKey(e => e.SubjectId);
+            entity.Property(e => e.SubjectId).HasMaxLength(200);
         });
 
         builder.Entity<AccountLookup>(entity =>

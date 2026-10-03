@@ -29,7 +29,8 @@ Body: `{"subjects": ["<employee id>", "<account id>", "<address>"]}`. Through ng
 - **AuthService** owns the account and its sessions. `POST /admin/accounts/{id}/erase` (administrator, fresh step-up) revokes its tokens, removes
   the account, passkeys and sessions, and publishes a deletion event without the address ([ADR 0049](../adr/0049-erasing-an-account.md)). Do step 1
   for the account id first or after; its earlier events keep the address until then.
-- **RewardsService** owns the wallet and its ledger. A ledger is kept for accounting; nothing here removes or anonymises it.
+- **RewardsService** owns the wallet and its ledger. `POST /api/rewards/subjects/erase` (administrator, fresh step-up; employee or account ids) moves the wallet's
+  history to an id nobody holds, blanks the reasons and removes a grantor's id; amounts and totals stay ([ADR 0050](../adr/0050-anonymising-the-ledger.md)).
 
 ## What stays, whatever you do
 

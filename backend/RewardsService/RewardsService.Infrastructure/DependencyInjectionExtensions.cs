@@ -33,6 +33,7 @@ public static class DependencyInjectionExtensions
         });
 
         services.AddScoped<CurrencyGrantWriter>();
+        services.AddScoped<LedgerErasure>();
         Shared.Avro.AvroDecoderServiceCollectionExtensions.AddEventAvroDecoder(services, configuration, typeof(WelcomeBonusConsumer).Assembly);
         services.AddHostedService<WelcomeBonusConsumer>();
         services.AddHostedService<WalletInvariantReporter>();
