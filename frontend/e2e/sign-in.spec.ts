@@ -82,6 +82,10 @@ test('a confirmed viewer returns to the requested workspace without browser-visi
 		await page.locator('#password').fill(password)
 		await page.getByRole('button', { name: 'Sign in' }).click()
 		await expect(page).toHaveURL(/\/departments$/)
+		await page.getByRole('button', { name: 'New department' }).click()
+		await expect(page.getByRole('alert')).toHaveText(
+			'Your viewer role can browse the organization but cannot create departments. Ask an administrator for editor access.'
+		)
 		await expect
 			.poll(() =>
 				page.evaluate(() =>
