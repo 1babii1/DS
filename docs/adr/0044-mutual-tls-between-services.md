@@ -75,5 +75,19 @@ the same image applies all migrations to an empty database and exits 0 (7 tables
 overrides `entrypoint` for its migration container and Kubernetes did the same, which is why those worked. The drill still applies the migrations
 as SQL, which is fine but no longer needed for this reason.
 
+**The other callers, looked at and left alone.** The gRPC call was "the one internal call that exists" only in the sense of service to
+service over gRPC. McpServer also calls EmployeeService, DirectoryService, SearchService, AuditService and RewardsService over REST,
+forwarding the user's token (six typed clients in `McpServer/Program.cs`). Mutual TLS on that path is not the same small step:
+- The REST port is the one nginx proxies to, in cleartext, for every user request. Requiring a client certificate there would reject
+  nginx unless nginx also presented one to every upstream; the gRPC port was separate, which is why it could be done alone.
+- So it needs **a second listener per service** (an internal HTTPS port that requires the certificate, used by McpServer) or nginx
+  made a mutual-TLS client for all upstreams. Both are changes to every service's startup and to the ingress, and both add six
+  certificates to rotate by hand with the script above.
+- The client side would be small (the same handler on each typed client). The cost is entirely on the servers and the ingress.
+- What McpServer sends is already the user's token, checked by each service; the certificate would add "the caller is a platform
+  member", which matters if the network is hostile. In the compose network it is not, and on Kubernetes this is what a mesh does for
+  all of it without application code (0010). **Decision: not built.** If the mesh is adopted, it covers these calls, the gRPC call,
+  Kafka clients and the database connection alike; doing it per call in the application is the wrong place to grow.
+
 Not verified: NotificationService, the MCP server and the other callers, which are not covered; certificate rotation; revocation;
 the compose override file itself (the drill starts containers with the same settings but not through it).
