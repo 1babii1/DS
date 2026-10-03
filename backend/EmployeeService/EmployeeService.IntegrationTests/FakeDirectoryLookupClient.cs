@@ -22,6 +22,9 @@ public sealed class FakeDirectoryLookupClient : IDirectoryLookupClient
 
     public AssignmentValidationResult NextValidation { get; set; } = ValidAssignment;
 
+    /// <summary>When set, every call fails the way the real client does when DirectoryService cannot be used.</summary>
+    public DirectoryLookupFailure? FailWith { get; set; }
+
     /// <summary>Holds every assignment check for this long, so that concurrent requests are all inside the handler together.</summary>
     public TimeSpan Delay { get; set; } = TimeSpan.Zero;
 
@@ -38,11 +41,20 @@ public sealed class FakeDirectoryLookupClient : IDirectoryLookupClient
         Guid positionId,
         CancellationToken cancellationToken)
     {
+        ThrowIfFailing();
         if (Delay > TimeSpan.Zero)
         {
             await Task.Delay(Delay, cancellationToken);
         }
 
         return NextValidation;
+    }
+
+    private void ThrowIfFailing()
+    {
+        if (FailWith is { } failure)
+        {
+            throw new DirectoryLookupException(failure, "DirectoryService is not usable (test double)");
+        }
     }
 }
