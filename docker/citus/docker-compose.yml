@@ -1,0 +1,37 @@
+# A Citus cluster for the sharding experiment (ADR 0033): one coordinator and workers. Separate from the main stack on
+# purpose: the platform's services do not use it. Run with scripts/citus-drill.sh.
+name: citus-drill
+
+x-citus: &citus
+  image: citusdata/citus:14.2.0
+  environment: &env
+    POSTGRES_PASSWORD: citus
+    POSTGRES_HOST_AUTH_METHOD: trust
+    CITUS_HOST: ""
+
+services:
+  coordinator:
+    <<: *citus
+    container_name: citus_coordinator
+    command: postgres -c shared_buffers=512MB -c max_connections=200
+  worker1:
+    <<: *citus
+    container_name: citus_worker1
+    command: postgres -c shared_buffers=512MB
+  worker2:
+    <<: *citus
+    container_name: citus_worker2
+    command: postgres -c shared_buffers=512MB
+  worker3:
+    <<: *citus
+    container_name: citus_worker3
+    profiles: [scale]
+    command: postgres -c shared_buffers=512MB
+  # one plain Postgres of the same size, the baseline everything is compared with
+  single:
+    image: pgvector/pgvector:pg18
+    container_name: citus_single
+    environment:
+      POSTGRES_PASSWORD: citus
+      POSTGRES_HOST_AUTH_METHOD: trust
+    command: postgres -c shared_buffers=512MB
