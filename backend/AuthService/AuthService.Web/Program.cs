@@ -1,3 +1,4 @@
+using Shared.Resilience;
 using System.Threading.RateLimiting;
 using AuthService.Application;
 using AuthService.Application.Database;
@@ -206,12 +207,16 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddOpsPolicy();
 builder.Services.AddOpsMetrics<AuthDbContext>("auth-service");
 
+// Turn requests away quickly past capacity instead of answering all of them slowly (ADR 0038).
+builder.Services.AddLoadShedding(builder.Configuration);
+
 var app = builder.Build();
 
 app.UseProxyForwardedHeaders();
 
 app.UseRequestCorrelationId();
 app.UseExceptionMiddleware();
+app.UseLoadShedding();
 
 app.UseSerilogRequestLogging();
 

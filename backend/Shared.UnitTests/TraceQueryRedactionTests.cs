@@ -17,6 +17,8 @@ namespace Shared.UnitTests;
 // incoming-request span records the query string, so the token would be written to the trace backend unless the
 // instrumentation redacts it (it does, by default - this pins that). Runs a real request through the real instrumentation and reads what the
 // exported span says.
+// Listens to every activity in the process, so it must not run beside a test that hosts a real web server (its list would change under it).
+[Collection("ProcessWideActivities")]
 public class TraceQueryRedactionTests
 {
     private const string Secret = "eyJ-SECRET-TOKEN-VALUE";

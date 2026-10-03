@@ -1,3 +1,4 @@
+using Shared.Resilience;
 using Shared.Avro;
 using Shared.Ops;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -71,10 +72,14 @@ builder.Services.AddKafkaHealthCheck(
 builder.Services.AddOpsPolicy();
 builder.Services.AddOpsMetrics<SearchDbContext>("search-service");
 
+// Turn requests away quickly past capacity instead of answering all of them slowly (ADR 0038).
+builder.Services.AddLoadShedding(builder.Configuration);
+
 var app = builder.Build();
 
 app.UseRequestCorrelationId();
 app.UseExceptionMiddleware();
+app.UseLoadShedding();
 
 app.UseSerilogRequestLogging();
 
