@@ -29,6 +29,9 @@ builder.Services.AddPlatformJwtAuthentication(builder.Configuration, builder.Env
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy("IsAdmin", policy => policy.RequireRole(RoleNames.Admin));
 
+// [RequireStepUp] on the erase endpoint (ADR 0046) names this policy; without it the endpoint fails for everyone at request time.
+builder.Services.AddStepUpPolicy();
+
 builder.Services.AddAuditInfrastructure(builder.Configuration);
 
 builder.Services.AddDatabaseHealthCheck<AuditDbContext>();
