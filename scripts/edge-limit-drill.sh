@@ -12,6 +12,7 @@ count() { # method path n -> "status count" lines
 }
 echo "100 GET /api/employees:        $(count GET /api/employees 100)"
 echo "100 POST /api/employees:       $(count POST /api/employees 100)"
+echo "100 POST /api/rewards (its own budget):  $(count POST /api/rewards 100)"
 echo "20 POST /auth/login:           $(count POST /auth/login 20)"
 echo "20 GET /auth/login (not a POST): $(count GET /auth/login 20)"
 $compose down -v >/dev/null 2>&1

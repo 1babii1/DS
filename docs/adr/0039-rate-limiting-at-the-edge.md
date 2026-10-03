@@ -14,7 +14,7 @@ item was "distributed rate limiting through Redis".
 so a limit there is a limit on the whole fleet whatever the number of instances. The services keep their own limiter as a
 second layer (it is what protects one instance from traffic that does not come through nginx, and what the tests exercise).
 
-- Writes (any method but GET, HEAD, OPTIONS) to any path share one budget per client address: 30 a minute with a burst of 10.
+- Writes (any method but GET, HEAD, OPTIONS) share one budget per client address **per service** (`/api/employees`, `/api/rewards`, ...), as when each service counted its own: 30 a minute with a burst of 10.
 - POSTs to `/auth` and `/connect` get a tighter one: 5 a minute, burst 3. Other methods there are not limited.
 - Over the limit: **429**. The numbers repeat the services' defaults and have to be kept in step by hand; that duplication is the
   price of the approach.
@@ -34,6 +34,7 @@ The real `nginx.conf` in front of stub upstreams (`scripts/edge-limit-drill.sh`)
 |---|---|
 | 100 GET /api/employees | 100 passed (reads are not limited) |
 | 100 POST /api/employees | 11 passed (one plus the burst of 10), 89 were 429 |
+| 100 POST /api/rewards, straight after | 11 passed the limiter (the 502s are the missing stub upstream), 89 were 429: its own budget |
 | 20 POST /auth/login | 4 passed (one plus the burst of 3), 16 were 429 |
 | 20 GET /auth/login | 20 passed (only POSTs are limited there) |
 
@@ -48,6 +49,6 @@ The real `nginx.conf` in front of stub upstreams (`scripts/edge-limit-drill.sh`)
 - **nginx is one process on one machine here;** a second nginx would have its own counters (the same problem one level up).
 
 ## What is and is not verified
-The drill above, once: the four rows. Not verified: the limit with several service instances behind nginx (the argument is
+The drill above, once: the five rows. Not verified: the limit with several service instances behind nginx (the argument is
 structural, nothing ran two); the interaction with the frontend's real traffic pattern (see the consequence above); the log line a
 limited request produces.
