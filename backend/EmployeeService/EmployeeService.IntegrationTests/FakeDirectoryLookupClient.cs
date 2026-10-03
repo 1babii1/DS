@@ -1,4 +1,4 @@
-﻿using EmployeeService.Application.Directory;
+using EmployeeService.Application.Directory;
 
 namespace EmployeeService.IntegrationTests;
 
@@ -22,6 +22,17 @@ public sealed class FakeDirectoryLookupClient : IDirectoryLookupClient
 
     public AssignmentValidationResult NextValidation { get; set; } = ValidAssignment;
 
+    /// <summary>When set, every call fails the way the real client does when DirectoryService cannot be used.</summary>
+    public DirectoryLookupFailure? FailWith { get; set; }
+
+    private void ThrowIfFailing()
+    {
+        if (FailWith is { } failure)
+        {
+            throw new DirectoryLookupException(failure, "DirectoryService is not usable (test double)");
+        }
+    }
+
     public Task<DepartmentLookupResult> GetDepartmentAsync(Guid departmentId, CancellationToken cancellationToken) =>
         Task.FromResult(new DepartmentLookupResult(
             NextValidation.DepartmentExists, NextValidation.DepartmentName, NextValidation.DepartmentActive));
@@ -33,6 +44,9 @@ public sealed class FakeDirectoryLookupClient : IDirectoryLookupClient
     public Task<AssignmentValidationResult> ValidateAssignmentAsync(
         Guid departmentId,
         Guid positionId,
-        CancellationToken cancellationToken) =>
-        Task.FromResult(NextValidation);
+        CancellationToken cancellationToken)
+    {
+        ThrowIfFailing();
+        return Task.FromResult(NextValidation);
+    }
 }
