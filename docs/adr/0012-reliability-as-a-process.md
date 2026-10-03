@@ -7,8 +7,9 @@ multiwindow burn-rate alerts ([docs/slo.md](../slo.md), generated into
 ([docs/postmortems/](../postmortems/)); failure drills and fault-injection tests with their
 results recorded in ADRs 0026, 0035 and 0036 and in the degradation matrix
 ([docs/architecture/degradation-matrix.md](../architecture/degradation-matrix.md)).
-**Not live:** a canary delivery pipeline (Argo Rollouts) and an OpenFeature-based flag
-service. The text below is the original proposal, kept as written. Wave 3 of the reliability-roadmap planning
+OpenFeature flags, read from a ConfigMap, and a replica-ratio canary track in the Helm chart
+([0041](0041-feature-flags-and-canary.md)). **Not live:** automated canary analysis and rollback
+(Argo Rollouts), and a hosted flag service. The text below is the original proposal, kept as written. Wave 3 of the reliability-roadmap planning
 artifact. Unlike Waves 1-2, this one needs no new stateful infrastructure to start - it
 needs a Kubernetes control plane for the delivery half (Argo CD/Rollouts), but the
 measurement half (SLOs, burn-rate alerting) can start on the current OTel/Prometheus stack

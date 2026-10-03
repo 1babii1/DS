@@ -38,6 +38,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0030](0030-change-data-capture-with-debezium.md) | Change data capture with Debezium instead of the polling publisher |
 | [0031](0031-event-sourced-wallets.md) | Wallets are event-sourced |
 | [0040](0040-kubernetes-helm-chart.md) | Kubernetes: a hand-written Helm chart, tried on a real cluster |
+| [0041](0041-feature-flags-and-canary.md) | Feature flags with OpenFeature, and a canary track in the chart |
 | [0038](0038-load-shedding.md) | Load shedding: turn requests away quickly instead of answering all of them slowly |
 | [0039](0039-rate-limiting-at-the-edge.md) | Rate limits at the one ingress, not in Redis |
 | [0037](0037-idempotency-key-on-hire.md) | Idempotency-Key on the hire |
