@@ -46,6 +46,15 @@ public class DomainEventsConsumer(
             return;
         }
 
+        // A subject whose data was erased (ADR 0047) is not indexed again, by a late or a replayed event either.
+        using (var erasedScope = ScopeFactory.CreateScope())
+        {
+            if (await erasedScope.ServiceProvider.GetRequiredService<SubjectErasure>().IsErasedAsync(result.Message.Key, cancellationToken))
+            {
+                return;
+            }
+        }
+
         // "directory.events.v2" and "directory.events" are the same source.
         var sourceService = result.Topic.Replace(".v2", string.Empty, StringComparison.Ordinal)
             .Replace(".events", string.Empty, StringComparison.Ordinal);

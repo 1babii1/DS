@@ -15,6 +15,8 @@ public static class DependencyInjectionExtensions
 
         services.AddDbContext<NotificationDbContext>(options => options.UseNpgsql(connectionString));
 
+        services.AddScoped<SubjectErasure>();
+
         return services;
     }
 }

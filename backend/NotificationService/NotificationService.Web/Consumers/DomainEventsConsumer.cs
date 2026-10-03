@@ -47,6 +47,12 @@ public class DomainEventsConsumer(
             return Task.CompletedTask;
         }
 
+        // A subject whose data was erased (ADR 0047) gets nothing created for them again, by a late or replayed event either.
+        if (dbContext.ErasedSubjects.Any(e => e.SubjectId == result.Message.Key))
+        {
+            return Task.CompletedTask;
+        }
+
         Notification? notification = messageType switch
         {
             CurrencyGrantedEvent.MessageType => HandleCurrencyGranted(dbContext, messageGuid, result.Message.Value),
@@ -57,6 +63,12 @@ public class DomainEventsConsumer(
         };
 
         if (notification is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        // The event's own key is the subject it is about; the notification may be for someone else (the person who hired them), or for an account that was erased.
+        if (dbContext.ErasedSubjects.Any(e => e.SubjectId == notification.RecipientAccountId.ToString()))
         {
             return Task.CompletedTask;
         }
