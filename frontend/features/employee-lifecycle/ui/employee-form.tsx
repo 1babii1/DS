@@ -3,12 +3,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { LoaderCircle } from 'lucide-react'
-import { cloneElement, useEffect } from 'react'
+import { cloneElement, useEffect, useRef } from 'react'
 import type { ReactElement } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
 import { applyEnvelopeErrors } from '@/shared/api/validation-error'
+import { idempotencyKeyFor } from '@/shared/api/idempotency-key'
 import { useNotice } from '@/shared/ui/notice-provider'
 import { mutationErrorMessage } from '@/shared/api/mutation-error'
 import { employeesApi } from '@/entities/employees/api/employees.api'
@@ -23,13 +24,14 @@ function Field({ children, error, label, name }: { children: ReactElement<{ 'ari
 export function EmployeeForm({ employee, onClose, positions }: { employee?: { id: string; name: string }; onClose: () => void; positions: Position[] }) {
 	const queryClient = useQueryClient()
 	const { showSuccess } = useNotice()
+	const hireKey = useRef<ReturnType<typeof idempotencyKeyFor> | null>(null)
 	const departments = Array.from(new Map(positions.flatMap(position => position.departments).map(department => [department.id, { id: department.id, name: department.name }])).values()).sort((a, b) => a.name.localeCompare(b.name)) as DepartmentOption[]
 	const form = useForm<EmployeeFormValues>({ resolver: zodResolver(employeeSchema), mode: 'onSubmit', defaultValues: { fullName: '', email: '', departmentId: '', positionId: '' } })
 	useEffect(() => { form.setFocus(employee ? 'departmentId' : 'fullName') }, [employee, form])
 	const departmentId = useWatch({ control: form.control, name: 'departmentId', defaultValue: '' })
 	const availablePositions = positions.filter(position => position.departments.some(department => department.id === departmentId))
 	useEffect(() => { form.setValue('positionId', '') }, [departmentId, form])
-	const mutation = useMutation({ mutationFn: async (values: EmployeeFormValues) => employee ? employeesApi.transfer(employee.id, values) : employeesApi.hire({ ...values, fullName: values.fullName ?? '', email: values.email ?? '' }), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['employees'] }); showSuccess(employee ? 'Employee transfer confirmed.' : 'Employee hired.'); onClose() }, onError: error => { if (!applyEnvelopeErrors(error, ['fullName', 'email', 'departmentId', 'positionId'], form.setError)) form.setError('root', { message: mutationErrorMessage(error, 'The request') }) } })
+	const mutation = useMutation({ mutationFn: async (values: EmployeeFormValues) => { if (employee) return employeesApi.transfer(employee.id, values); const input = { ...values, fullName: values.fullName ?? '', email: values.email ?? '' }; const key = idempotencyKeyFor(hireKey.current, input, crypto.randomUUID); hireKey.current = key; return employeesApi.hire(input, key.key) }, onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['employees'] }); showSuccess(employee ? 'Employee transfer confirmed.' : 'Employee hired.'); onClose() }, onError: error => { if (!applyEnvelopeErrors(error, ['fullName', 'email', 'departmentId', 'positionId'], form.setError)) form.setError('root', { message: mutationErrorMessage(error, 'The request') }) } })
 	const submit = (values: EmployeeFormValues) => { if (!employee && (!values.fullName || values.fullName.length < 2 || !values.email || !z.string().email().safeParse(values.email).success)) { form.setError('root', { message: 'Enter a full name and a valid work email.' }); return } mutation.mutate(values) }
 	return <section aria-labelledby='employee-form-title' className='employee-form-panel'><div className='employee-form-panel__heading'><div><p className='eyebrow'>{employee ? 'Employee transfer' : 'New employee'}</p><h2 id='employee-form-title'>{employee ? `Transfer ${employee.name}` : 'Hire employee'}</h2></div><button aria-label='Close form' className='icon-button' onClick={onClose} type='button'>×</button></div><form className='employee-form' onSubmit={form.handleSubmit(submit)}>{!employee ? <><Field error={form.formState.errors.fullName?.message} label='Full name' name='full-name'><input {...form.register('fullName')} autoComplete='name' placeholder='Alex Morgan' /></Field><Field error={form.formState.errors.email?.message} label='Work email' name='work-email'><input {...form.register('email')} autoComplete='email' placeholder='alex@company.com' type='email' /></Field></> : null}<Field error={form.formState.errors.departmentId?.message} label='Department' name='department'><select {...form.register('departmentId')}><option value=''>Choose department</option>{departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}</select></Field><Field error={form.formState.errors.positionId?.message} label='Position' name='position'><select {...form.register('positionId')} disabled={!departmentId}><option value=''>{departmentId ? 'Choose position' : 'Choose department first'}</option>{availablePositions.map(position => <option key={position.id} value={position.id}>{position.name}</option>)}</select></Field>{form.formState.errors.root ? <p className='form-error' role='alert'>{form.formState.errors.root.message}</p> : null}<button className='form-submit' disabled={mutation.isPending} type='submit'>{mutation.isPending ? <LoaderCircle aria-hidden='true' className='animate-spin' size={16} /> : null}{employee ? 'Confirm transfer' : 'Hire employee'}</button></form></section>
 }
