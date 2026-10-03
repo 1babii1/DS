@@ -39,12 +39,12 @@ The real `nginx.conf` in front of stub upstreams (`scripts/edge-limit-drill.sh`)
 | 20 GET /auth/login | 20 passed (only POSTs are limited there) |
 
 ## Consequences
-- **The client address is the BFF's.** The frontend's server calls the backend, so every user arrives from the same address
-  and shares one budget: 30 writes a minute for everyone together. The services' own limiters have the same property today
-  (nothing forwards the end user's address), so this is not new, but it was hidden behind the limit being per instance and
-  never hit. It needs the BFF to pass the user's address and nginx to trust it (`real_ip`); not done. Until then the numbers are a
-  bound on the whole application's write rate, which is too low for real use and fine for a demo. This is the main thing to fix before
-  anyone relies on this, and it is raised in the frontend issue.
+- **The client address is the one the BFF forwards.** The frontend's server calls the backend, so without help every user shares the
+  BFF's address and one budget. The BFF now passes the user's address in `X-Forwarded-For` and nginx takes it (`real_ip_header
+  X-Forwarded-For`, `real_ip_recursive on`) from private ranges only (10/8, 172.16/12, 192.168/16), so an outside caller cannot pick
+  its own address. Drill: user A's 50 writes got 11 through and 39 refused; user B, sent after, got all 5 through. Not verified: the
+  BFF's real forwarded value end to end (the drill sets the header by hand), and a deployment whose private ranges include untrusted
+  callers (the trust list then has to be narrowed). The services' own limiters still see nginx's address.
 - **A limit in nginx is invisible to the services' tests;** only the drill exercises it. It is not in CI.
 - **nginx is one process on one machine here;** a second nginx would have its own counters (the same problem one level up).
 

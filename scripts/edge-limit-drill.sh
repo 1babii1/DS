@@ -15,4 +15,11 @@ echo "100 POST /api/employees:       $(count POST /api/employees 100)"
 echo "100 POST /api/rewards (its own budget):  $(count POST /api/rewards 100)"
 echo "20 POST /auth/login:           $(count POST /auth/login 20)"
 echo "20 GET /auth/login (not a POST): $(count GET /auth/login 20)"
+xff() { # address n -> status counts of POSTs that claim to come from that user
+  docker run --rm --network edge-drill_default curlimages/curl:latest sh -c \
+    "for i in \$(seq 1 $2); do curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'X-Forwarded-For: $1' http://nginx/api/employees; done" 2>&1 | sort | uniq -c | tr '\n' ' '
+  echo
+}
+echo "user A, 50 POST via the BFF:   $(xff 203.0.113.7 50)"
+echo "user B, 5 POST (own budget):   $(xff 203.0.113.8 5)"
 $compose down -v >/dev/null 2>&1
