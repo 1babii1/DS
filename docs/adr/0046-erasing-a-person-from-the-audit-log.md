@@ -58,6 +58,7 @@ pass-through without a master key; the org history builds with an erased employe
 and refuses none and more than 50 subjects; the catalog equals the inventory. Mutation-checked: no sealing (seven tests fail), the
 key not emptied on erasure, the field name left out of the authenticated data.
 
-Not verified: the endpoint through HTTP with the real authorization and step-up (the controller is called directly, as for the other
-audit endpoints); the cost at the size of a real log; a master key change; the Auth events flowing through, since the stack does not
+Through HTTP on the running stack (dev admin, sign-in, e-mail step-up code, refreshed token): before step-up all three endpoints answer 403, after it 200 and a repeat 200 (Audit `newly` 1). Nothing to delete was seeded, so the counts of removed documents are 0; only the authorization path is shown.
+
+Not verified: the cost at the size of a real log; a master key change; the Auth events flowing through, since the stack does not
 subscribe to them.
