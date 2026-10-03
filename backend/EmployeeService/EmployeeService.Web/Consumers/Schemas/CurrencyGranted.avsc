@@ -1,0 +1,9 @@
+{
+  "type": "record",
+  "name": "CurrencyGranted",
+  "namespace": "ds.rewards",
+  "fields": [
+    { "name": "EmployeeId", "type": { "type": "string", "logicalType": "uuid" } },
+    { "name": "Source", "type": ["null", "string"], "default": null }
+  ]
+}

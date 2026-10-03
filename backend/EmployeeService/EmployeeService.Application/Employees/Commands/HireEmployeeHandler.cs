@@ -1,6 +1,7 @@
-﻿using CSharpFunctionalExtensions;
+using CSharpFunctionalExtensions;
 using EmployeeService.Application.Database;
 using EmployeeService.Application.Directory;
+using EmployeeService.Application.Employees;
 using EmployeeService.Application.Employees.Errors;
 using EmployeeService.Application.IntegrationEvents;
 using EmployeeService.Domain;
@@ -13,6 +14,9 @@ public class HireEmployeeHandler(
     IEmployeeRepository repository,
     IDirectoryLookupClient directoryLookupClient,
     IOutboxWriter outboxWriter,
+    IHireSagaRepository sagas,
+    Microsoft.Extensions.Options.IOptions<HireSagaOptions> sagaOptions,
+    TimeProvider clock,
     ILogger<HireEmployeeHandler> logger)
 {
     public async Task<Result<Guid, Error>> Handle(HireEmployeeCommand command, CancellationToken cancellationToken)
@@ -77,6 +81,9 @@ public class HireEmployeeHandler(
 
         var employee = employeeResult.Value;
         await repository.Add(employee, cancellationToken);
+
+        // The onboarding process starts with the hire, in the same transaction (ADR 0032).
+        await sagas.Add(HireSaga.Start(employee.Id, clock.GetUtcNow().UtcDateTime, sagaOptions.Value.OnboardingTimeout), cancellationToken);
 
         outboxWriter.Enqueue(
             EmployeeEventTypes.Hired,

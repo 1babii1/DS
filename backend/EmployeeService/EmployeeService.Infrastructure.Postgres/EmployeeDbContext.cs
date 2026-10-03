@@ -1,4 +1,4 @@
-﻿using EmployeeService.Application.Database;
+using EmployeeService.Application.Database;
 using EmployeeService.Domain;
 using Microsoft.EntityFrameworkCore;
 using Shared.Kafka;
@@ -9,6 +9,8 @@ namespace EmployeeService.Infrastructure.Postgres;
 public class EmployeeDbContext(DbContextOptions<EmployeeDbContext> options) : DbContext(options), IReadDbContext, IHasDeadLetters
 {
     public DbSet<Employee> Employees => Set<Employee>();
+
+    public DbSet<HireSaga> HireSagas => Set<HireSaga>();
 
     public DbSet<DeadLetterEntry> DeadLetters => Set<DeadLetterEntry>();
 
@@ -46,6 +48,22 @@ public class EmployeeDbContext(DbContextOptions<EmployeeDbContext> options) : Db
             // SaveChanges checks it was unchanged since this row was read: two concurrent
             // transfers of the same employee now produce a lost-update conflict instead of
             // the second write silently overwriting the first.
+            entity.Property<uint>("xmin").IsRowVersion();
+        });
+
+        builder.Entity<HireSaga>(entity =>
+        {
+            entity.ToTable("hire_sagas");
+            entity.HasKey(e => e.EmployeeId);
+
+            entity.Property(e => e.State).HasConversion<string>().HasMaxLength(30);
+            entity.Property(e => e.CompensationReason).HasMaxLength(500);
+
+            // The deadline worker asks "which are still waiting and past due".
+            entity.HasIndex(e => new { e.State, e.Deadline });
+
+            // Two steps arriving for one process at once (the account and the bonus within the same moment) must not overwrite
+            // each other: the second to commit is told, re-reads and decides again.
             entity.Property<uint>("xmin").IsRowVersion();
         });
 

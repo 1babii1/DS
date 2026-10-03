@@ -1,0 +1,9 @@
+{
+  "type": "record",
+  "name": "HireCompensationRequested",
+  "namespace": "ds.employee",
+  "fields": [
+    { "name": "EmployeeId", "type": { "type": "string", "logicalType": "uuid" } },
+    { "name": "ReverseBonus", "type": "boolean" }
+  ]
+}

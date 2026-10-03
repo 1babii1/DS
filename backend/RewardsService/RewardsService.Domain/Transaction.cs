@@ -5,6 +5,9 @@ public enum TransactionSource
     ManualGrant,
     WelcomeBonus,
     AgentGrant,
+
+    // The undo of a welcome bonus when the hire's onboarding was abandoned (ADR 0032). A negative adjustment, never a deletion.
+    WelcomeBonusReversal,
 }
 
 // Append-only ledger: rows are never updated or deleted, unlike Wallet.Balance which is
@@ -36,9 +39,10 @@ public class Transaction
         decimal amount,
         string reason,
         TransactionSource source,
-        Guid? grantedByAccountId) => new()
+        Guid? grantedByAccountId,
+        Guid? id = null) => new()
         {
-            Id = Guid.CreateVersion7(),
+            Id = id ?? Guid.CreateVersion7(),
             EmployeeId = employeeId,
             Amount = amount,
             Reason = reason,
