@@ -61,7 +61,13 @@ kind cluster, with a Postgres of its own:
 Run: lint, schema validation, EmployeeService alone on kind (install with the migration hook, a second install with it, three
 rollouts, the zero-failure poll, the node drain with and without the budget), and the Kafka-health tests.
 
-Not verified: **the HPA** (it renders and validates but the cluster had no metrics server, so nothing scaled); the other six
+**The HPA, run later** on a kind cluster with a metrics server (with `--kubelet-insecure-tls`, as kind needs): six load pods hitting
+`/health/live` took the two EmployeeService pods to 312% of their 100m CPU request and the autoscaler went from 2 to 4 replicas
+(its maximum) within 90 s. After the load was removed it stayed at 4 for the 300 s stabilisation window and went back to 2 at
+about 6 minutes: up fast, down slowly, as configured. The small CPU request is why a handful of curl loops was enough; it is a
+guess, not a measurement of the service.
+
+Not verified: the other six
 services (they share the template and nothing else was run); the whole platform in a cluster; the ingress; a real Postgres
 operator and its failover; the migration Job against a database that already holds the history of a docker-compose installation;
 resource requests and limits (they are guesses).
