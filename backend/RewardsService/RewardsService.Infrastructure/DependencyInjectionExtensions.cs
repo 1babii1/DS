@@ -35,6 +35,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<CurrencyGrantWriter>();
         Shared.Avro.AvroDecoderServiceCollectionExtensions.AddEventAvroDecoder(services, configuration, typeof(WelcomeBonusConsumer).Assembly);
         services.AddHostedService<WelcomeBonusConsumer>();
+        services.AddHostedService<WalletInvariantReporter>();
         services.AddKafkaHealthCheck(bootstrapServers, security);
 
         return services;

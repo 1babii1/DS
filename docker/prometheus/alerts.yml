@@ -54,3 +54,16 @@ groups:
         annotations:
           summary: "Confirmed agent plans keep failing"
           description: "More than 3 confirmed plans failed a step in 30 minutes. Look at which step (agent_steps_total) and which service is refusing."
+
+  - name: ledger
+    rules:
+      # The balance of a wallet must equal the sum of its ledger rows and of its history. Any disagreement is a lost or invented
+      # amount of money (docs/postmortems/2026-10-03-wallet-lost-updates.md); there is no acceptable number above zero.
+      - alert: WalletOutOfBalance
+        expr: rewards_wallets_out_of_balance > 0
+        for: 6m
+        labels:
+          severity: page
+        annotations:
+          summary: "{{ $value }} wallet(s) disagree with their ledger or history"
+          description: "Rewards' balance projection no longer matches the events it is derived from. Rebuild the projections (WalletProjections.RebuildAsync) after finding out what wrote one without the others."
