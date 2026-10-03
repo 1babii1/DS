@@ -1,4 +1,4 @@
-﻿namespace EmployeeService.Application.Employees.Commands;
+namespace EmployeeService.Application.Employees.Commands;
 
 // HiredByAccountId is never trusted from the request body - the controller
 // always overwrites it with the caller's own "sub" claim before this reaches
@@ -10,4 +10,5 @@ public record HireEmployeeCommand(
     string Email,
     Guid DepartmentId,
     Guid PositionId,
-    Guid? HiredByAccountId = null);
+    Guid? HiredByAccountId = null,
+    string? IdempotencyKey = null);

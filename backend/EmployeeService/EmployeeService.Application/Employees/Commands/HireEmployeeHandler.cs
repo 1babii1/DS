@@ -15,12 +15,32 @@ public class HireEmployeeHandler(
     IDirectoryLookupClient directoryLookupClient,
     IOutboxWriter outboxWriter,
     IHireSagaRepository sagas,
+    IIdempotencyRepository idempotency,
     Microsoft.Extensions.Options.IOptions<HireSagaOptions> sagaOptions,
     TimeProvider clock,
     ILogger<HireEmployeeHandler> logger)
 {
+    public const string IdempotencyScope = "hire";
+
     public async Task<Result<Guid, Error>> Handle(HireEmployeeCommand command, CancellationToken cancellationToken)
     {
+        string? requestHash = null;
+        if (command.IdempotencyKey is not null)
+        {
+            if (command.IdempotencyKey.Length is 0 or > 200)
+            {
+                return EmployeeErrors.IdempotencyKeyInvalid();
+            }
+
+            // A retry of a hire that went through: answer with that hire, before doing anything else (no directory call, no write).
+            requestHash = HashOf(command);
+            var earlier = await idempotency.Find(IdempotencyScope, command.IdempotencyKey, cancellationToken);
+            if (earlier is not null)
+            {
+                return earlier.RequestHash == requestHash ? earlier.ResultId : EmployeeErrors.IdempotencyKeyReused();
+            }
+        }
+
         AssignmentValidationResult validation;
         try
         {
@@ -96,12 +116,42 @@ public class HireEmployeeHandler(
                 employee.PositionId,
                 employee.HiredByAccountId));
 
+        if (command.IdempotencyKey is not null)
+        {
+            await idempotency.Add(
+                IdempotencyRecord.Create(IdempotencyScope, command.IdempotencyKey, requestHash!, employee.Id, clock.GetUtcNow().UtcDateTime),
+                cancellationToken);
+        }
+
         var saveResult = await repository.Save(cancellationToken);
+        if (saveResult.IsFailure && command.IdempotencyKey is not null && LostToAnEarlierRequest(saveResult.Error))
+        {
+            // A request with the same key committed first, and nothing of this one was written. Which unique index reports the
+            // collision first (the key's, or the email's, since a retry carries the same email) is not something to rely on, so
+            // both are read as "someone got there first" and the record decides: if it is there, its result is the answer.
+            idempotency.DiscardPending();
+            var winner = await idempotency.Find(IdempotencyScope, command.IdempotencyKey, cancellationToken);
+            if (winner is not null)
+            {
+                return winner.RequestHash == requestHash ? winner.ResultId : EmployeeErrors.IdempotencyKeyReused();
+            }
+        }
+
         if (saveResult.IsFailure)
         {
             return saveResult.Error;
         }
 
         return employee.Id;
+    }
+
+    private static bool LostToAnEarlierRequest(Error error) =>
+        error.Messages[0].Code is EmployeeErrors.IdempotencyRaceCode or "employee.email.already_exists";
+
+    // Everything the caller chose, nothing the server adds (the actor comes from the token, not the body).
+    private static string HashOf(HireEmployeeCommand command)
+    {
+        var canonical = $"{command.FullName}|{command.Email}|{command.DepartmentId:D}|{command.PositionId:D}";
+        return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(canonical)));
     }
 }

@@ -25,13 +25,8 @@ public sealed class FakeDirectoryLookupClient : IDirectoryLookupClient
     /// <summary>When set, every call fails the way the real client does when DirectoryService cannot be used.</summary>
     public DirectoryLookupFailure? FailWith { get; set; }
 
-    private void ThrowIfFailing()
-    {
-        if (FailWith is { } failure)
-        {
-            throw new DirectoryLookupException(failure, "DirectoryService is not usable (test double)");
-        }
-    }
+    /// <summary>Holds every assignment check for this long, so that concurrent requests are all inside the handler together.</summary>
+    public TimeSpan Delay { get; set; } = TimeSpan.Zero;
 
     public Task<DepartmentLookupResult> GetDepartmentAsync(Guid departmentId, CancellationToken cancellationToken) =>
         Task.FromResult(new DepartmentLookupResult(
@@ -41,12 +36,25 @@ public sealed class FakeDirectoryLookupClient : IDirectoryLookupClient
         Task.FromResult(new PositionLookupResult(
             NextValidation.PositionExists, NextValidation.PositionName, NextValidation.PositionActive));
 
-    public Task<AssignmentValidationResult> ValidateAssignmentAsync(
+    public async Task<AssignmentValidationResult> ValidateAssignmentAsync(
         Guid departmentId,
         Guid positionId,
         CancellationToken cancellationToken)
     {
         ThrowIfFailing();
-        return Task.FromResult(NextValidation);
+        if (Delay > TimeSpan.Zero)
+        {
+            await Task.Delay(Delay, cancellationToken);
+        }
+
+        return NextValidation;
+    }
+
+    private void ThrowIfFailing()
+    {
+        if (FailWith is { } failure)
+        {
+            throw new DirectoryLookupException(failure, "DirectoryService is not usable (test double)");
+        }
     }
 }
