@@ -35,8 +35,9 @@ story. That worked for the happy path and for one failure (the account cannot be
 - **Participants stay dumb and idempotent**: Auth finds the account locked and does nothing the second time; Rewards finds the
   reversal in the wallet's history, so a repeat and a simultaneous pair both end with exactly one reversal (the primary key of
   the events is the arbiter, as in 0031). Neither knows the deadline or the other service.
-- The reversal is **not published as news**: a negative `CurrencyGranted` would make Notification tell someone they received a
-  negative bonus.
+- The reversal is published as a `CurrencyGranted` with a negative amount and `Source = WelcomeBonusReversal`, so every reader
+  of the balance (the employee card, [0034](0034-employee-card-read-model.md)) hears of it; NotificationService recognises the
+  source and announces nothing, since the person never saw the bonus.
 
 Why orchestration here and not elsewhere: the process has a deadline, a compensation that depends on which steps happened, and
 a late-arrival case; those are state, and state wants one owner. The rest of the system stays choreographed (ADR 0003 stands for
@@ -58,7 +59,7 @@ failed account, a late step, idempotent repeats; 8 tests); the coordinator again
 the hire's transaction, completion undoes nothing, a missed deadline undoes the account and announces once, a late bonus is
 announced in a second event, a failed account, an unknown employee, and two simultaneous steps where `xmin` refuses the loser);
 Auth locks and revokes sessions, once, and leaves an account alone when it is not asked to; Rewards reverses the bonus in
-history, ledger and balance, exactly once among eight simultaneous requests on a wallet with history, and publishes nothing;
+history, ledger and balance, exactly once among eight simultaneous requests on a wallet with history, and publishes it marked as a reversal;
 all event contracts through the registry (producer and each consumer's own reader schema).
 
 Not verified: the whole chain live across the three services on Kafka with a deliberately stopped Auth (the unit and

@@ -61,6 +61,24 @@ public class GrantCurrencyTests : IClassFixture<RewardsTestWebFactory>, IAsyncLi
         Assert.Equal(2, await ReadInDb(db => db.Transactions.CountAsync(t => t.EmployeeId == employeeId)));
     }
 
+    // The caller learns where its write put the wallet's history, so a reader of a projection can wait for exactly that (ADR 0034).
+    [Fact]
+    public async Task A_grant_tells_the_caller_the_version_of_the_wallet_it_produced()
+    {
+        var employeeId = Guid.NewGuid();
+        await using var scope = _services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<RewardsDbContext>();
+        var controller = Controller(dbContext, Guid.NewGuid());
+
+        await controller.Grant(Guid.NewGuid().ToString(), new GrantCurrencyRequest(employeeId, 10, "First")).ExecuteAsync(controller.HttpContext);
+        Assert.Equal("1", controller.Response.Headers["X-Wallet-Version"].ToString());
+
+        await controller.Grant(Guid.NewGuid().ToString(), new GrantCurrencyRequest(employeeId, 10, "Second")).ExecuteAsync(controller.HttpContext);
+        Assert.Equal("2", controller.Response.Headers["X-Wallet-Version"].ToString());
+        var published = await ReadInDb(db => db.OutboxMessages.Where(m => m.AggregateId == employeeId.ToString()).Select(m => m.Payload).ToListAsync());
+        Assert.Contains(published, p => p.Contains("\"WalletVersion\": 2"));
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]

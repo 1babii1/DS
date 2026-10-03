@@ -68,6 +68,11 @@ builder.Services.Configure<EmployeeService.Application.Employees.HireSagaOptions
     builder.Configuration.GetSection(EmployeeService.Application.Employees.HireSagaOptions.SectionName));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<EmployeeService.Application.Employees.HireSagaCoordinator>();
+
+// The employee card (ADR 0034).
+builder.Services.Configure<EmployeeService.Application.Employees.Queries.EmployeeCardOptions>(
+    builder.Configuration.GetSection(EmployeeService.Application.Employees.Queries.EmployeeCardOptions.SectionName));
+builder.Services.AddScoped<EmployeeService.Application.Employees.Queries.GetEmployeeCardHandler>();
 builder.Services.AddHostedService<EmployeeService.Web.HireSagaDeadlineWorker>();
 
 builder.Services.AddScoped<HireEmployeeHandler>();

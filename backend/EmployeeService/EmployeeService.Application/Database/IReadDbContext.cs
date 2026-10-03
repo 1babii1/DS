@@ -1,8 +1,10 @@
-﻿using EmployeeService.Domain;
+using EmployeeService.Domain;
 
 namespace EmployeeService.Application.Database;
 
 public interface IReadDbContext
 {
     IQueryable<Employee> EmployeesRead { get; }
+
+    IQueryable<EmployeeWallet> EmployeeWalletsRead { get; }
 }

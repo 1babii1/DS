@@ -4,6 +4,8 @@
   "namespace": "ds.rewards",
   "fields": [
     { "name": "EmployeeId", "type": { "type": "string", "logicalType": "uuid" } },
-    { "name": "Source", "type": ["null", "string"], "default": null }
+    { "name": "NewBalance", "type": { "type": "bytes", "logicalType": "decimal", "precision": 18, "scale": 2 } },
+    { "name": "Source", "type": ["null", "string"], "default": null },
+    { "name": "WalletVersion", "type": ["null", "int"], "default": null }
   ]
 }
