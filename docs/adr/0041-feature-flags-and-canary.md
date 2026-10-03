@@ -54,6 +54,13 @@ provider; a missing file is not an error. Integration tests: the flag off makes 
 makes it hybrid, and an explicit mode is unaffected; the flag is asked about the caller from the token. The chart renders and
 validates (37 resources with a flag and a canary set; canary Deployment on its own track with its own image tag).
 
-Not verified: a ConfigMap edit reaching a running pod (the file reload is tested with a plain file; the cluster that could have
-shown the symlink case had already been removed); the canary taking traffic in proportion in a real cluster; the cost of the
-polling file watcher; nothing was run against the whole platform. Not built: automated canary analysis and rollback.
+**Run on a cluster afterwards** (kind, three nodes, EmployeeService):
+- **A ConfigMap edit reached a running process in about 46 seconds.** A small program using the same flag loading
+  (`tools/flag-probe`, `AddFeatureFlagsFile` and the OpenFeature provider) ran in a pod with the `feature-flags` ConfigMap mounted;
+  `kubectl patch` changed the flag from absent (default on) to disabled, and the probe printed the change 46 s later. The delay is
+  the kubelet's ConfigMap sync, not the watcher's.
+- **The canary took 19.2% of 1,000 requests** (192) with one canary pod beside four stable ones (20% expected by pod count; the
+  stable pods took 183 to 216 each). The Service divides by pods, not by anything finer.
+
+Not verified: the cost of the polling file watcher; the flag in SearchService itself in a cluster (the probe stands in for it);
+nothing was run against the whole platform. Not built: automated canary analysis and rollback.
