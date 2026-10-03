@@ -489,3 +489,4 @@ $RECYCLE.BIN/
 
 # Local GGUF model weights for the model-eval llama.cpp server (large, fetched on demand)
 .llm-models/
+tools/redis-failover-probe/out/

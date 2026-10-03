@@ -39,7 +39,7 @@ builder.Services.AddOpenApi();
 var redisConnectionString = builder.Configuration.GetConnectionString("Redis")
     ?? throw new InvalidOperationException("Connection string 'Redis' is not configured.");
 builder.Services.AddSignalR()
-    .AddStackExchangeRedis(redisConnectionString, options =>
+    .AddStackExchangeRedis(Shared.Redis.RedisConnectionString.Resilient(redisConnectionString), options =>
         options.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("notification-service"));
 
 builder.Services.AddFrameworkCors(builder.Configuration);

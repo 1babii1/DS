@@ -39,6 +39,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0031](0031-event-sourced-wallets.md) | Wallets are event-sourced |
 | [0037](0037-idempotency-key-on-hire.md) | Idempotency-Key on the hire |
 | [0035](0035-kafka-replication-and-broker-failure.md) | Kafka replication: three copies, two in sync, and what a broker failure costs |
+| [0036](0036-redis-failure-and-sentinel.md) | Redis is an accelerator: fail fast, stop asking, and fail over with Sentinel |
 | [0032](0032-orchestrated-hire-saga.md) | The hire is an orchestrated saga with a deadline and compensations |
 | [0033](0033-sharding-the-audit-log-with-citus.md) | Sharding the audit log: measured with Citus, not adopted |
 | [0034](0034-employee-card-read-model.md) | The employee card: a read model with a way to see your own write |
