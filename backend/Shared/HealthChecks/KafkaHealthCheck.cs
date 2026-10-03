@@ -26,7 +26,8 @@ public static class KafkaHealthCheckExtensions
 
 public sealed class KafkaHealthCheck(string bootstrapServers, KafkaSecurityOptions security) : IHealthCheck
 {
-    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(3);
+    // Shorter than a Kubernetes readiness probe's timeout (3 s), so the answer arrives in time to be read.
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(2);
 
     public async Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
@@ -43,7 +44,11 @@ public sealed class KafkaHealthCheck(string bootstrapServers, KafkaSecurityOptio
         }
         catch (Exception ex)
         {
-            return HealthCheckResult.Unhealthy("Kafka is not reachable", ex);
+            // Degraded, not unhealthy, and that is deliberate (ADR 0040). Readiness decides whether traffic is sent here, and no
+            // HTTP request of these services needs Kafka: writes land in the outbox and are published when the broker is back.
+            // Reporting unhealthy would take every instance of every service out of rotation the moment the broker went away,
+            // turning a delay in event delivery into a total outage. Degraded still answers 200 and shows up in the report.
+            return HealthCheckResult.Degraded("Kafka is not reachable; events will be delivered late", ex);
         }
     }
 }

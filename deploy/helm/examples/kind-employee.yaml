@@ -1,0 +1,29 @@
+# EmployeeService alone on a local kind cluster, against the throwaway Postgres in ../kind-postgres.yaml. Images are loaded into
+# the nodes by hand, so they are never pulled. Kafka, the schema registry and DirectoryService do not exist here: the service
+# starts and answers its health checks without them, which is part of what this tries.
+defaults:
+  image:
+    pullPolicy: Never
+  hpa:
+    enabled: false
+
+enabled:
+  directory: false
+  auth: false
+  employee: true
+  audit: false
+  rewards: false
+  notification: false
+  search: false
+
+services:
+  employee:
+    replicas: 2
+    image:
+      tag: k8s
+    envFromSecrets: [employee-env]
+    env:
+      SchemaRegistry__Url: http://schema-registry.invalid:8080/apis/ccompat/v7
+    migrations:
+      image: dsporfolio-employee_service
+      connectionSecret: {name: employee-migration, key: connection}

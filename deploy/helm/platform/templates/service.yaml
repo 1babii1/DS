@@ -1,0 +1,19 @@
+{{- range $name, $on := .Values.enabled }}
+{{- if $on }}
+{{- $s := include "platform.service" (dict "root" $ "name" $name) | fromYaml }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "platform.labels" (dict "root" $ "name" $name) | nindent 4 }}
+spec:
+  selector:
+    {{- include "platform.selector" (dict "root" $ "name" $name) | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $s.port }}
+      targetPort: http
+{{- end }}
+{{- end }}
