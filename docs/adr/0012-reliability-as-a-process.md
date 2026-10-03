@@ -1,8 +1,14 @@
-# 12. Reliability as a process: SLOs, canary delivery, chaos testing (not yet implemented)
+# 12. Reliability as a process: SLOs, canary delivery, chaos testing (partly implemented)
 
 ## Status
-Proposed - design only. Nothing here is live: there are no SLOs defined, no canary
-delivery pipeline, and no chaos testing today. Wave 3 of the reliability-roadmap planning
+Partly implemented since this was written. **Live:** SLOs on four journeys with
+multiwindow burn-rate alerts ([docs/slo.md](../slo.md), generated into
+`docker/prometheus/slo.yml`); a blameless postmortem written in that vocabulary
+([docs/postmortems/](../postmortems/)); failure drills and fault-injection tests with their
+results recorded in ADRs 0026, 0035 and 0036 and in the degradation matrix
+([docs/architecture/degradation-matrix.md](../architecture/degradation-matrix.md)).
+**Not live:** a canary delivery pipeline (Argo Rollouts) and an OpenFeature-based flag
+service. The text below is the original proposal, kept as written. Wave 3 of the reliability-roadmap planning
 artifact. Unlike Waves 1-2, this one needs no new stateful infrastructure to start - it
 needs a Kubernetes control plane for the delivery half (Argo CD/Rollouts), but the
 measurement half (SLOs, burn-rate alerting) can start on the current OTel/Prometheus stack
