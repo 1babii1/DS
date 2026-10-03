@@ -1,3 +1,4 @@
+using Shared.Resilience;
 using Shared.Redis;
 using Shared.Ops;
 using System.Threading.RateLimiting;
@@ -203,12 +204,16 @@ builder.Services.AddOpsPolicy();
 builder.Services.AddOpsMetrics<DirectoryServiceDbContext>("directory-service");
 builder.Services.AddStepUpPolicy();
 
+// Turn requests away quickly past capacity instead of answering all of them slowly (ADR 0038).
+builder.Services.AddLoadShedding(builder.Configuration);
+
 var app = builder.Build();
 
 app.UseProxyForwardedHeaders();
 
 app.UseRequestCorrelationId();
 app.UseExceptionMiddleware();
+app.UseLoadShedding();
 
 app.UseSerilogRequestLogging();
 
