@@ -8,9 +8,20 @@ namespace Shared.Outbox;
 // set both, since the broker only accepts SASL_PLAINTEXT connections there.
 public record KafkaSecurityOptions(string? SaslUsername, string? SaslPassword)
 {
+    // How the topics this platform creates are replicated (ADR 0035). They travel with the connection settings because that is
+    // what every caller that provisions topics already has in hand. One broker is the default and the development setup;
+    // against a cluster, set Kafka:TopicReplicationFactor (3) and Kafka:TopicMinInsyncReplicas (2).
+    public int TopicReplicationFactor { get; init; } = 1;
+
+    public int? TopicMinInsyncReplicas { get; init; }
+
     public static KafkaSecurityOptions FromConfiguration(IConfiguration configuration) => new(
         configuration["Kafka:SaslUsername"],
-        configuration["Kafka:SaslPassword"]);
+        configuration["Kafka:SaslPassword"])
+    {
+        TopicReplicationFactor = configuration.GetValue("Kafka:TopicReplicationFactor", 1),
+        TopicMinInsyncReplicas = configuration.GetValue<int?>("Kafka:TopicMinInsyncReplicas"),
+    };
 
     public void ApplyTo(ClientConfig config)
     {

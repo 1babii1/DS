@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using Confluent.Kafka.Admin;
 using Microsoft.Extensions.Logging;
 
@@ -27,18 +27,34 @@ public static class KafkaTopicProvisioner
 
         try
         {
-            await admin.CreateTopicsAsync(topics.Select(topic => new TopicSpecification
-            {
-                Name = topic,
-                NumPartitions = 1,
-                ReplicationFactor = 1,
-                Configs = new Dictionary<string, string> { ["retention.ms"] = DefaultRetentionMs.ToString() },
-            }));
+            await admin.CreateTopicsAsync(topics.Select(topic => SpecificationFor(topic, security)));
         }
         catch (CreateTopicsException ex) when (OnlyAlreadyExisted(ex.Results))
         {
             // Fine - another service instance created it first.
         }
+    }
+
+    /// <summary>
+    /// What a topic is created with. With a replication factor above one, <c>min.insync.replicas</c> is what makes an
+    /// acknowledged write mean "on several brokers": the leader refuses a write (rather than accept it alone) when fewer than
+    /// that many replicas are in sync. It is only set when asked for, so a single broker is not given a rule it cannot meet.
+    /// </summary>
+    public static TopicSpecification SpecificationFor(string topic, KafkaSecurityOptions security)
+    {
+        var configs = new Dictionary<string, string> { ["retention.ms"] = DefaultRetentionMs.ToString() };
+        if (security.TopicMinInsyncReplicas is { } minInsync)
+        {
+            configs["min.insync.replicas"] = minInsync.ToString();
+        }
+
+        return new TopicSpecification
+        {
+            Name = topic,
+            NumPartitions = 1,
+            ReplicationFactor = (short)security.TopicReplicationFactor,
+            Configs = configs,
+        };
     }
 
     /// <summary>
