@@ -1,0 +1,37 @@
+{
+  "_about": "Every field of an integration event that looks like personal data, and the decision about it. Checked by EventContracts.Tests/PiiInventoryTests: a new field that matches the pattern must be added here, as pii (with a category and a purpose) or as notPii (with the reason it is not). See ADR 0043.",
+  "pii": [
+    { "event": "EmployeeHired", "field": "FullName", "category": "identity", "purpose": "Search indexing and the audit trail of who was hired" },
+    { "event": "EmployeeHired", "field": "Email", "category": "contact", "purpose": "AuthService creates the login account from it; Search and Audit keep it" },
+    { "event": "AccountDeleted", "field": "Email", "category": "contact", "purpose": "The audit trail of an account deletion. Outlives the account it describes (ADR 0043)" },
+    { "event": "AccountDeleted", "field": "IpAddress", "category": "network", "purpose": "The audit trail of an account deletion. Outlives the account it describes (ADR 0043)" },
+    { "event": "AccountLockedOut", "field": "Email", "category": "contact", "purpose": "Security audit" },
+    { "event": "AccountLockedOut", "field": "IpAddress", "category": "network", "purpose": "Security audit" },
+    { "event": "AdminAccountLocked", "field": "TargetEmail", "category": "contact", "purpose": "Security audit of an administrator's action" },
+    { "event": "AdminAccountLocked", "field": "IpAddress", "category": "network", "purpose": "Security audit of an administrator's action" },
+    { "event": "AdminAccountUnlocked", "field": "TargetEmail", "category": "contact", "purpose": "Security audit of an administrator's action" },
+    { "event": "AdminAccountUnlocked", "field": "IpAddress", "category": "network", "purpose": "Security audit of an administrator's action" },
+    { "event": "AdminRolesChanged", "field": "TargetEmail", "category": "contact", "purpose": "Security audit of an administrator's action" },
+    { "event": "AdminRolesChanged", "field": "IpAddress", "category": "network", "purpose": "Security audit of an administrator's action" },
+    { "event": "AllSessionsRevoked", "field": "Email", "category": "contact", "purpose": "Security audit" },
+    { "event": "AllSessionsRevoked", "field": "IpAddress", "category": "network", "purpose": "Security audit" },
+    { "event": "EmailChanged", "field": "OldEmail", "category": "contact", "purpose": "Security audit of an email change" },
+    { "event": "EmailChanged", "field": "NewEmail", "category": "contact", "purpose": "Security audit of an email change" },
+    { "event": "EmailChanged", "field": "IpAddress", "category": "network", "purpose": "Security audit of an email change" },
+    { "event": "LoginFailed", "field": "Email", "category": "contact", "purpose": "Security audit; may name an address that is not an account" },
+    { "event": "LoginFailed", "field": "IpAddress", "category": "network", "purpose": "Security audit" },
+    { "event": "LoginSucceeded", "field": "Email", "category": "contact", "purpose": "Security audit" },
+    { "event": "LoginSucceeded", "field": "IpAddress", "category": "network", "purpose": "Security audit" },
+    { "event": "PasswordChanged", "field": "Email", "category": "contact", "purpose": "Security audit" },
+    { "event": "PasswordChanged", "field": "IpAddress", "category": "network", "purpose": "Security audit" }
+  ],
+  "notPii": [
+    { "event": "DepartmentCreated", "field": "Name", "reason": "The name of an organisational unit, not of a person" },
+    { "event": "DepartmentRenamed", "field": "Name", "reason": "The name of an organisational unit, not of a person" },
+    { "event": "PositionCreated", "field": "Name", "reason": "A job title, not a person" },
+    { "event": "LocationCreated", "field": "Name", "reason": "The name of an office" },
+    { "event": "LocationCreated", "field": "Street", "reason": "The address of an office, not of a person" },
+    { "event": "LocationCreated", "field": "City", "reason": "The address of an office, not of a person" },
+    { "event": "LocationCreated", "field": "Country", "reason": "The address of an office, not of a person" }
+  ]
+}
