@@ -67,5 +67,5 @@ controller took that for an idempotency race, and the request ended in an unhand
 | Regression tests: eight simultaneous grants to a new and to an existing wallet | Done |
 | A test that damages the projections and shows a rebuild restores them | Done |
 | Reconcile balance against ledger in the migration that introduced the events | Done (84 of 84 agreed on the dev database) |
-| A recurring check that every wallet's balance equals the sum of its ledger, as a metric or an alert | **Open.** Cheap to write; would have made this visible on day one |
+| A recurring check that every wallet's balance equals the sum of its ledger, as a metric or an alert | Done (PR #155): a check every five minutes, the gauge `rewards_wallets_out_of_balance`, and a page when it is above zero. Not yet seen firing in Prometheus |
 | A review question for any change that touches shared state: "what does a second concurrent writer to this row do?" | Open; recorded in AGENTS.md as the known-pitfall about race tests seeded against an aggregate with related rows |

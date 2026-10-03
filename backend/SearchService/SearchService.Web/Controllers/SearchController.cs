@@ -29,8 +29,17 @@ public static class SearchModes
 [Route("api/search")]
 [Authorize]
 public class SearchController(
-    SearchIndexClient indexClient, SemanticSearch semanticSearch, ILogger<SearchController> logger) : ControllerBase
+    SearchIndexClient indexClient,
+    SemanticSearch semanticSearch,
+    ILogger<SearchController> logger,
+    Shared.FeatureFlags.IFeatureFlags? flags = null) : ControllerBase
 {
+    /// <summary>
+    /// Decides what a search with no explicit mode does. On (the default, also when the flag is not configured) it is hybrid; off it is
+    /// keyword only, which is the kill switch for the model-dependent path and, at a percentage, a gradual rollout (ADR 0041).
+    /// </summary>
+    public const string HybridByDefaultFlag = "search-hybrid-default";
+
     private const int DefaultLimit = 8;
     private const int MaxLimit = 20;
 
@@ -50,7 +59,9 @@ public class SearchController(
         [FromQuery] string? mode,
         CancellationToken cancellationToken)
     {
-        var requestedMode = string.IsNullOrWhiteSpace(mode) ? SearchModes.Hybrid : mode.Trim().ToLowerInvariant();
+        var requestedMode = string.IsNullOrWhiteSpace(mode)
+            ? await DefaultModeAsync(cancellationToken)
+            : mode.Trim().ToLowerInvariant();
         if (requestedMode is not (SearchModes.Keyword or SearchModes.Semantic or SearchModes.Hybrid))
         {
             return Result.Failure<SearchResponse, Error>(Error.Validation(
@@ -89,6 +100,19 @@ public class SearchController(
             SearchModes.Semantic => await SemanticAsync(query, kinds, size, cancellationToken),
             _ => await HybridAsync(query, kinds, size, cancellationToken),
         };
+    }
+
+    private async Task<string> DefaultModeAsync(CancellationToken cancellationToken)
+    {
+        if (flags is null)
+        {
+            return SearchModes.Hybrid;
+        }
+
+        var user = User.FindFirst("sub")?.Value;
+        return await flags.IsEnabledAsync(HybridByDefaultFlag, user, defaultValue: true, cancellationToken)
+            ? SearchModes.Hybrid
+            : SearchModes.Keyword;
     }
 
     private async Task<Result<SearchResponse, Error>> KeywordAsync(
