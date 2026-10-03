@@ -122,7 +122,8 @@ public class BulkheadTests(ITestOutputHelper output)
 
             Assert.True(withoutWall.Shed > 0 || withoutWall.P95Ms > 100, "without a class the slow flood did not hurt the quick requests; the experiment shows nothing");
             Assert.Equal(0, withWall.Shed);
-            Assert.True(withWall.P95Ms < 80, $"quick p95 {withWall.P95Ms:F0} ms with the class");
+            // Relative, not absolute: a loaded CI runner is several times slower than a workstation, the comparison between the two services is what holds.
+            Assert.True(withWall.P95Ms < withoutWall.P95Ms / 2, $"quick p95 {withWall.P95Ms:F0} ms with the class against {withoutWall.P95Ms:F0} ms without");
             Assert.True(shed.GetValueOrDefault("reports") > 0, "the reports class turned nothing away");
             Assert.Equal(0, shed.GetValueOrDefault(LoadShedder.Overall));
         }
