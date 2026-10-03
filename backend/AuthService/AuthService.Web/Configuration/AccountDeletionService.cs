@@ -18,6 +18,7 @@ public class AccountDeletionService(
     UserManager<Account> userManager,
     AuthDbContext dbContext,
     IOpenIddictAuthorizationManager authorizationManager,
+    IOpenIddictTokenManager tokenManager,
     SignInManager<Account> signInManager,
     SecurityAuditService securityAudit)
 {
@@ -27,6 +28,8 @@ public class AccountDeletionService(
         WrongPassword,
         LastAdmin,
         DeletionFailed,
+        NotFound,
+        CannotEraseSelf,
     }
 
     public async Task<Outcome> DeleteAsync(Account user, string password, string? ipAddress, CancellationToken cancellationToken)
@@ -49,9 +52,50 @@ public class AccountDeletionService(
             }
         }
 
-        var accountId = user.Id;
-        var email = user.Email!;
+        var outcome = await RemoveAsync(user, ipAddress, cancellationToken);
+        if (outcome != Outcome.Success)
+        {
+            return outcome;
+        }
 
+        await signInManager.SignOutAsync();
+
+        return Outcome.Success;
+    }
+
+    /// <summary>
+    /// Erasure on an operator's say-so (ADR 0049): the same removal, without the password, because the person may no longer be
+    /// reachable. Not the operator's own account (that is what self-service is for), and never the last admin.
+    /// </summary>
+    public async Task<Outcome> EraseAsync(Guid targetId, Guid performedBy, string? ipAddress, CancellationToken cancellationToken)
+    {
+        if (targetId == performedBy)
+        {
+            return Outcome.CannotEraseSelf;
+        }
+
+        var user = await userManager.FindByIdAsync(targetId.ToString());
+        if (user is null)
+        {
+            return Outcome.NotFound;
+        }
+
+        if (await userManager.IsInRoleAsync(user, RoleNames.Admin) && (await userManager.GetUsersInRoleAsync(RoleNames.Admin)).Count <= 1)
+        {
+            return Outcome.LastAdmin;
+        }
+
+        return await RemoveAsync(user, ipAddress, cancellationToken);
+    }
+
+    // What both paths remove. The tokens are revoked as well as the authorizations: a refresh token must stop working the moment the
+    // account is gone, not when its authorization is next looked at. The event that records the deletion names the account by id and
+    // carries neither the address nor the IP (ADR 0049): it is published to a bus that keeps it, and the person asked not to be kept.
+    private async Task<Outcome> RemoveAsync(Account user, string? ipAddress, CancellationToken cancellationToken)
+    {
+        var accountId = user.Id;
+
+        await tokenManager.RevokeBySubjectAsync(accountId.ToString());
         await authorizationManager.RevokeBySubjectAsync(accountId.ToString());
         await dbContext.PasskeyCredentials.Where(c => c.AccountId == accountId).ExecuteDeleteAsync(cancellationToken);
         await dbContext.AuthSessions.Where(s => s.AccountId == accountId).ExecuteDeleteAsync(cancellationToken);
@@ -62,9 +106,7 @@ public class AccountDeletionService(
             return Outcome.DeletionFailed;
         }
 
-        await securityAudit.RecordAccountDeletedAsync(accountId, email, ipAddress, cancellationToken);
-        await signInManager.SignOutAsync();
-
+        await securityAudit.RecordAccountDeletedAsync(accountId, cancellationToken);
         return Outcome.Success;
     }
 }

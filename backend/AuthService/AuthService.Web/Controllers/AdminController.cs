@@ -24,7 +24,8 @@ namespace AuthService.Web.Controllers;
 [RequireAdmin]
 public class AdminController(
     UserManager<Account> userManager,
-    AdminAccountService adminAccounts)
+    AdminAccountService adminAccounts,
+    AccountDeletionService accountDeletion)
     : ControllerBase
 {
     private string? ClientIpAddress => HttpContext.Connection.RemoteIpAddress?.ToString();
@@ -77,6 +78,25 @@ public class AdminController(
     {
         var outcome = await adminAccounts.RevokeSessionsAsync(id, await CurrentAccountIdAsync(), ClientIpAddress, cancellationToken);
         return ToResult(outcome);
+    }
+
+    // Erasure of an account on an operator's say-so (ADR 0049): no password, the person may be gone. Irreversible, so step-up.
+    [HttpPost("{id:guid}/erase")]
+    [RequireStepUp]
+    [EnableRateLimiting("auth")]
+    public async Task<IResult> Erase(Guid id, CancellationToken cancellationToken)
+    {
+        var outcome = await accountDeletion.EraseAsync(id, await CurrentAccountIdAsync(), ClientIpAddress, cancellationToken);
+        return outcome switch
+        {
+            AccountDeletionService.Outcome.Success => Results.NoContent(),
+            AccountDeletionService.Outcome.NotFound => Results.NotFound(),
+            AccountDeletionService.Outcome.CannotEraseSelf => new ErrorResult(Error.Validation(
+                "admin.cannot_erase_own_account", "You cannot erase your own account here; use account deletion", "id")),
+            AccountDeletionService.Outcome.LastAdmin => new ErrorResult(Error.Validation(
+                "admin.cannot_erase_last_admin", "The last administrator cannot be erased", "id")),
+            _ => new ErrorResult(Error.Failure("admin.erase_failed", "The account could not be erased")),
+        };
     }
 
     private async Task<Guid> CurrentAccountIdAsync() =>
