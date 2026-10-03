@@ -1,0 +1,18 @@
+# The real docker/nginx/nginx.conf in front of stub upstreams, for the edge rate-limit drill (ADR 0039).
+name: edge-drill
+
+services:
+  employee_service:
+    image: nginx:alpine
+    volumes:
+      - ./stub.conf:/etc/nginx/nginx.conf:ro
+  auth_service:
+    image: nginx:alpine
+    volumes:
+      - ./stub.conf:/etc/nginx/nginx.conf:ro
+  nginx:
+    image: nginx:alpine
+    container_name: edge_nginx
+    volumes:
+      - ../nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on: [employee_service, auth_service]
