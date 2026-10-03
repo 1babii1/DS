@@ -41,6 +41,13 @@ public class EmployeeEventsConsumer(
             return Task.CompletedTask;
         }
 
+        if (messageType == HireCompensationRequestedEvent.MessageType)
+        {
+            var compensation = JsonSerializer.Deserialize<HireCompensationRequestedEvent>(result.Message.Value)
+                ?? throw new InvalidOperationException($"Could not deserialize {HireCompensationRequestedEvent.MessageType} payload");
+            return RevokeAccountAsync(compensation, cancellationToken);
+        }
+
         if (messageType != EmployeeHiredEvent.MessageType)
         {
             // Nothing else on employee.events needs a login account provisioned.
@@ -128,6 +135,34 @@ public class EmployeeEventsConsumer(
         }
 
         return Task.CompletedTask;
+    }
+
+    // The undo of "provision an account" in the onboarding process (ADR 0032): the account is locked for good and every session
+    // it already has is revoked (a lock alone would leave an issued refresh token working). Idempotent: a repeat finds it
+    // locked and does nothing; an account that never got made (the event raced ahead, or it failed) is nothing to undo.
+    private async Task RevokeAccountAsync(HireCompensationRequestedEvent compensation, CancellationToken cancellationToken)
+    {
+        if (!compensation.RevokeAccount)
+        {
+            return;
+        }
+
+        using var scope = ScopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<Account>>();
+        var recovery = scope.ServiceProvider.GetRequiredService<AccountRecoveryService>();
+
+        var account = await dbContext.Users.SingleOrDefaultAsync(a => a.EmployeeId == compensation.EmployeeId, cancellationToken);
+        if (account is null || account.LockoutEnd == DateTimeOffset.MaxValue)
+        {
+            return;
+        }
+
+        await userManager.SetLockoutEnabledAsync(account, true);
+        await userManager.SetLockoutEndDateAsync(account, DateTimeOffset.MaxValue);
+        await recovery.RevokeAllSessionsAsync(account, null, cancellationToken);
+        Logger.LogWarning(
+            "Locked the account of employee {EmployeeId}: onboarding was undone ({Reason})", compensation.EmployeeId, compensation.Reason);
     }
 
     private static string GenerateTemporaryPassword()

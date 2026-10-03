@@ -1,4 +1,4 @@
-﻿using CSharpFunctionalExtensions;
+using CSharpFunctionalExtensions;
 using Shared;
 
 namespace EmployeeService.Domain;
@@ -125,6 +125,21 @@ public class Employee
 
         Status = EmployeeStatus.ProvisioningFailed;
         ProvisioningFailureReason = reason;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    // Called when the onboarding process (HireSaga, ADR 0032) gives up on a hire: the account or the welcome bonus did not
+    // arrive in time. From any state except Terminated (a person already let go stays that way); idempotent, as every step of
+    // this process has to be.
+    public void CompensateOnboarding(string reason)
+    {
+        if (Status is EmployeeStatus.Terminated or EmployeeStatus.ProvisioningFailed)
+        {
+            return;
+        }
+
+        Status = EmployeeStatus.ProvisioningFailed;
+        ProvisioningFailureReason = reason.Length > 500 ? reason[..500] : reason;
         UpdatedAt = DateTime.UtcNow;
     }
 
