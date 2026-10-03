@@ -1,4 +1,5 @@
-﻿using Shared.Ops;
+using Shared.Resilience;
+using Shared.Ops;
 using AuditService.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Serilog;
@@ -35,10 +36,14 @@ builder.Services.AddDatabaseHealthCheck<AuditDbContext>();
 builder.Services.AddOpsPolicy();
 builder.Services.AddOpsMetrics<AuditDbContext>("audit-service");
 
+// Turn requests away quickly past capacity instead of answering all of them slowly (ADR 0038).
+builder.Services.AddLoadShedding(builder.Configuration);
+
 var app = builder.Build();
 
 app.UseRequestCorrelationId();
 app.UseExceptionMiddleware();
+app.UseLoadShedding();
 
 app.UseSerilogRequestLogging();
 
