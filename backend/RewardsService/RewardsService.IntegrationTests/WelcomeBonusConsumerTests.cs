@@ -149,8 +149,12 @@ public class WelcomeBonusConsumerTests : IClassFixture<RewardsTestWebFactory>, I
         Assert.Equal([TransactionSource.WelcomeBonus, TransactionSource.WelcomeBonusReversal], ledger.Select(t => t.Source));
         Assert.Equal(-100, ledger[1].Amount);
         Assert.Equal(2, await ExecuteInDb(db => db.WalletEvents.CountAsync(e => e.StreamId == employeeId)));
-        // The reversal is bookkeeping, not news: nothing is published about it.
-        Assert.Equal(outboxBefore, await ExecuteInDb(db => db.OutboxMessages.CountAsync(m => m.AggregateId == employeeId.ToString())));
+        // Readers of the balance must hear of it, marked so that nobody announces it, and carrying the wallet's version.
+        var messages = await ExecuteInDb(db => db.OutboxMessages.Where(m => m.AggregateId == employeeId.ToString()).ToListAsync());
+        Assert.Equal(outboxBefore + 1, messages.Count);
+        var reversal = messages.Single(m => m.Payload.Contains("WelcomeBonusReversal"));
+        Assert.Contains("\"WalletVersion\": 2", reversal.Payload);
+        Assert.Contains("\"NewBalance\": 0", reversal.Payload);
     }
 
     [Fact]

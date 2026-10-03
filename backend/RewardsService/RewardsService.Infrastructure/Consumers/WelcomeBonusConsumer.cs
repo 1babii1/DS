@@ -113,7 +113,7 @@ public class WelcomeBonusConsumer(
 
         using var scope = ScopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<RewardsDbContext>();
-        new CurrencyGrantWriter(dbContext).ReverseWelcomeBonus(compensation.EmployeeId);
+        new CurrencyGrantWriter(dbContext, scope.ServiceProvider.GetService<Shared.Avro.IEventAvroEncoder>()).ReverseWelcomeBonus(compensation.EmployeeId);
         dbContext.SaveChanges();
     }
 

@@ -10,11 +10,15 @@ public class EmployeeDbContext(DbContextOptions<EmployeeDbContext> options) : Db
 {
     public DbSet<Employee> Employees => Set<Employee>();
 
+    public DbSet<EmployeeWallet> EmployeeWallets => Set<EmployeeWallet>();
+
     public DbSet<HireSaga> HireSagas => Set<HireSaga>();
 
     public DbSet<DeadLetterEntry> DeadLetters => Set<DeadLetterEntry>();
 
     public IQueryable<Employee> EmployeesRead => Employees.AsNoTracking();
+
+    public IQueryable<EmployeeWallet> EmployeeWalletsRead => EmployeeWallets.AsNoTracking();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -49,6 +53,13 @@ public class EmployeeDbContext(DbContextOptions<EmployeeDbContext> options) : Db
             // transfers of the same employee now produce a lost-update conflict instead of
             // the second write silently overwriting the first.
             entity.Property<uint>("xmin").IsRowVersion();
+        });
+
+        builder.Entity<EmployeeWallet>(entity =>
+        {
+            entity.ToTable("employee_wallets");
+            entity.HasKey(e => e.EmployeeId);
+            entity.Property(e => e.Balance).HasPrecision(18, 2);
         });
 
         builder.Entity<HireSaga>(entity =>
