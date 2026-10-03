@@ -1,4 +1,4 @@
-﻿using AuditService.Domain;
+using AuditService.Domain;
 using AuditService.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -49,10 +49,14 @@ public record DeadLetterDto(
     int AttemptCount,
     DateTime FailedAt);
 
+public record EraseSubjectsRequest(string[]? Subjects);
+
+public record EraseSubjectsResponse(int Requested, int Newly);
+
 [ApiController]
 [Route("api/audit")]
 [Authorize]
-public class AuditController(AuditDbContext dbContext, IOptions<OrgChartOptions>? orgChartOptions = null) : ControllerBase
+public class AuditController(AuditDbContext dbContext, PiiVault vault, IOptions<OrgChartOptions>? orgChartOptions = null) : ControllerBase
 {
     private readonly int _maxEvents = orgChartOptions?.Value.MaxEvents ?? OrgChartOptions.DefaultMaxEvents;
 
@@ -91,7 +95,7 @@ public class AuditController(AuditDbContext dbContext, IOptions<OrgChartOptions>
 
         var first = await relevant.MinAsync(e => (DateTime?)e.OccurredAt, cancellationToken);
         var snapshot = OrgReplay.At(
-            asOf, events.Select((e, i) => new HistoricEvent(e.EventType, e.Payload, e.OccurredAt, i)));
+            asOf, events.Select((e, i) => new HistoricEvent(e.EventType, vault.Reveal(e.Payload), e.OccurredAt, i)));
 
         return new OrgChartResponse(snapshot.At, first, snapshot.Departments, snapshot.Unplaced, snapshot.SkippedEvents);
     }
@@ -157,17 +161,53 @@ public class AuditController(AuditDbContext dbContext, IOptions<OrgChartOptions>
             .OrderByDescending(e => e.OccurredAt)
             .Skip((currentPage - 1) * size)
             .Take(size)
-            .Select(e => new AuditEntryDto(
-                e.Id,
-                e.SourceService,
-                e.EventType,
-                e.AggregateId,
-                includePayload ? e.Payload : null,
-                e.OccurredAt,
-                e.ReceivedAt))
             .ToListAsync(cancellationToken);
 
-        return new PagedResponse<AuditEntryDto>(entries, currentPage, size, total);
+        // The payload is read back through the vault: personal fields are opened for an administrator, and are the erased marker where the person was erased.
+        var dtos = entries.Select(e => new AuditEntryDto(
+            e.Id,
+            e.SourceService,
+            e.EventType,
+            e.AggregateId,
+            includePayload ? vault.Reveal(e.Payload) : null,
+            e.OccurredAt,
+            e.ReceivedAt)).ToList();
+
+        return new PagedResponse<AuditEntryDto>(dtos, currentPage, size, total);
+    }
+
+    /// <summary>
+    /// Erases the personal data the log holds about these subjects (accounts, employees, an address that tried to sign in): their keys
+    /// are destroyed, so every personal field stored under them becomes unreadable at once, in every partition and backup, and shows
+    /// as the erased marker. The rest of the entry (what happened, when, to which id) stays. Idempotent. The act itself is recorded in the log
+    /// with a hash of each subject, never the subject. See ADR 0046 for what this does not reach.
+    /// </summary>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    [HttpPost("subjects/erase")]
+    [Authorize(Policy = "IsAdmin")]
+    [RequireStepUp]
+    public async Task<ActionResult<EraseSubjectsResponse>> EraseSubjects(
+        [FromBody] EraseSubjectsRequest request, CancellationToken cancellationToken)
+    {
+        var subjects = (request.Subjects ?? []).Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()).Distinct().ToArray();
+        if (subjects.Length is 0 or > 50)
+        {
+            return BadRequest(new { detail = "Name between 1 and 50 subjects." });
+        }
+
+        var erased = await vault.EraseAsync(subjects, cancellationToken);
+
+        var hashes = subjects.Select(s => Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(s)))).ToArray();
+        dbContext.Entries.Add(AuditEntry.Create(
+            Guid.NewGuid(),
+            "audit",
+            "SubjectsErased",
+            "pii-erasure",
+            System.Text.Json.JsonSerializer.Serialize(new { count = subjects.Length, subjectHashes = hashes, requestedBy = User.FindFirst("sub")?.Value }),
+            DateTime.UtcNow));
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return new EraseSubjectsResponse(subjects.Length, erased);
     }
 
     /// <summary>
