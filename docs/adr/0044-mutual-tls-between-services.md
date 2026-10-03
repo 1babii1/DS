@@ -68,12 +68,12 @@ from this code, beside the stack's own, with the real gRPC client, its retry and
 EmployeeService ran on a database of its own and with no Kafka, so its hires did not reach the real stack; the three reference
 rows the hire chain needs (location, department, position) were added to the development database, as the k6 hire chain does.
 
-**A thing found on the way, not explained:** `./efbundle` of the EmployeeService image, run with `docker run` against a fresh database,
-exits 1 and applies nothing: the host it starts runs the outbox publisher, whose startup check ("SchemaRegistry:Url must be set") aborts
-it before the migrations; with the registry configured the process never exits. The same image's bundle migrated successfully in the
-Kubernetes run (ADR 0040), and the stack's own migration container has been exiting 0 against an already-migrated database. Whether a
-`docker compose up` on an empty database has the same problem was not tested (it would change the development schema). The drill therefore
-applies the migrations as SQL (`dotnet ef migrations script`) instead. This deserves its own look.
+**A thing found on the way, since explained:** `./efbundle` of the EmployeeService image, run as `docker run image ./efbundle ...`, exited 1 and
+applied nothing. The image's `ENTRYPOINT` is `dotnet EmployeeService.Web.dll`, so that command started the web host with a stray argument, and
+the host's outbox publisher aborted on "SchemaRegistry:Url must be set". It was a wrong invocation, not a defect: with `--entrypoint ./efbundle`
+the same image applies all migrations to an empty database and exits 0 (7 tables, checked), and a second run says it is up to date. Compose
+overrides `entrypoint` for its migration container and Kubernetes did the same, which is why those worked. The drill still applies the migrations
+as SQL, which is fine but no longer needed for this reason.
 
 Not verified: NotificationService, the MCP server and the other callers, which are not covered; certificate rotation; revocation;
 the compose override file itself (the drill starts containers with the same settings but not through it).
