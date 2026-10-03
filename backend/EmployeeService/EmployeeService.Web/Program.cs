@@ -79,6 +79,7 @@ builder.Services.AddHostedService<EmployeeService.Web.HireSagaDeadlineWorker>();
 builder.Services.AddScoped<HireEmployeeHandler>();
 builder.Services.AddScoped<TransferEmployeeHandler>();
 builder.Services.AddScoped<TerminateEmployeeHandler>();
+builder.Services.AddScoped<EraseEmployeeHandler>();
 builder.Services.AddScoped<GetEmployeeByIdHandler>();
 builder.Services.AddScoped<ListEmployeesHandler>();
 

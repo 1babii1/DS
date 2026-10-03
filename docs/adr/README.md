@@ -45,6 +45,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0045](0045-bulkheads-and-measured-limits.md) | Bulkheads, and what a real service's limit looks like when measured |
 | [0046](0046-erasing-a-person-from-the-audit-log.md) | Erasing a person from the audit log: a key per subject, destroyed on request |
 | [0047](0047-erasing-a-person-from-search-and-notifications.md) | Erasing a person from search and notifications |
+| [0048](0048-erasing-a-person-at-the-employee-record.md) | Erasing a person at the employee record |
 | [0038](0038-load-shedding.md) | Load shedding: turn requests away quickly instead of answering all of them slowly |
 | [0039](0039-rate-limiting-at-the-edge.md) | Rate limits at the one ingress, not in Redis |
 | [0037](0037-idempotency-key-on-hire.md) | Idempotency-Key on the hire |
