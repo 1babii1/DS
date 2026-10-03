@@ -44,8 +44,11 @@ a stale server rather than reporting it).
 ## Consequences
 - **The staleness is bounded and visible, not removed.** After a grant, a plain card read can show the old balance for the length
   of the outbox-to-consumer path; a read that passes the version never shows it, at the cost of waiting up to the same path.
-- **The frontend must carry the header.** The BFF route's allow-list and the grant call have to pass `X-Wallet-Version` through
-  to the next card read; that wiring is not done (the backend contract is). Without it the card is simply eventually consistent.
+- **The frontend carries the header.** The BFF route passes `X-Min-Wallet-Version` to the backend and `X-Wallet-Version` and
+  `X-Card-Consistent` back (`shared/api/proxy-headers.ts`, named in one place so a test can check them); the grant form remembers the version the
+  grant answered with (per employee, in memory, never lowered by a late answer) and the next card read sends it. The selected person on the People
+  page shows the balance with the time it is as of, "No balance yet" for a null balance, and "updating" while the card is behind, looking again every
+  2 s up to five times.
 - **Another reason `CurrencyGranted` is a contract:** three consumers now read it with their own reader schemas
   (Notification, Employee, and the saga's use of `Source`), each checked against the producer by the contract tests.
 - **Events from before `WalletVersion` existed are not applied** (they cannot be ordered); the next change brings the copy
@@ -78,5 +81,7 @@ exceeds 2 s). A first run of the same measure, with the load generator granting 
 it had locked itself to the cycle and measured the cycle, which is why the shipped script pauses randomly. Delivery through Debezium
 (ADR 0030) would remove the polling and is not measured here.
 
-Not verified: the frontend passing the header, several EmployeeService instances consuming (the statement is safe by construction, nothing ran
-two), and the replay of a long history.
+Frontend: unit tests for the version store (per employee, never lowered, junk headers ignored), the header lists of the BFF, the polling rule for a
+card that comes back behind, and the words shown for a balance; lint, type check and a production build pass. Not verified: the page in a browser
+against the running stack (the Playwright suite needs a signed-in session), several EmployeeService instances consuming (the statement is safe by
+construction, nothing ran two), and the replay of a long history.

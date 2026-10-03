@@ -7,9 +7,11 @@ import { useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
+import { employeeCardKey } from '@/entities/employees/api/use-employee-card'
 import { rewardsApi } from '@/entities/rewards/api/rewards.api'
 import { mutationErrorMessage } from '@/shared/api/mutation-error'
 import { idempotencyKeyFor } from '@/shared/api/idempotency-key'
+import { rememberWalletVersion } from '@/shared/api/wallet-version'
 import { useNotice } from '@/shared/ui/notice-provider'
 
 const schema = z.object({ amount: z.number().positive('Enter a positive number of credits.').max(100_000, 'The maximum grant is 100,000 credits.'), reason: z.string().trim().min(3, 'Explain the reason in at least 3 characters.').max(500, 'Keep the reason under 500 characters.') })
@@ -21,7 +23,7 @@ export function RewardGrantForm({ employeeId, employeeName, onClose }: { employe
 	const grantKey = useRef<ReturnType<typeof idempotencyKeyFor> | null>(null)
 	const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { amount: 100, reason: '' } })
 	useEffect(() => { form.setFocus('amount') }, [form])
-	const grant = useMutation({ mutationFn: (values: Values) => { const input = { ...values, employeeId }; const key = idempotencyKeyFor(grantKey.current, input, crypto.randomUUID); grantKey.current = key; return rewardsApi.grant(input, key.key) }, onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['rewards'] }); showSuccess(`Reward granted to ${employeeName}.`); onClose() }, onError: error => form.setError('root', { message: mutationErrorMessage(error, 'Reward grant') }) })
+	const grant = useMutation({ mutationFn: (values: Values) => { const input = { ...values, employeeId }; const key = idempotencyKeyFor(grantKey.current, input, crypto.randomUUID); grantKey.current = key; return rewardsApi.grant(input, key.key) }, onSuccess: async response => { rememberWalletVersion(employeeId, response.headers['x-wallet-version']); await Promise.all([queryClient.invalidateQueries({ queryKey: ['rewards'] }), queryClient.invalidateQueries({ queryKey: employeeCardKey(employeeId) })]); showSuccess(`Reward granted to ${employeeName}.`); onClose() }, onError: error => form.setError('root', { message: mutationErrorMessage(error, 'Reward grant') }) })
 
 	return <section aria-labelledby='reward-grant-title' className='employee-form-panel'><div className='employee-form-panel__heading'><div><p className='eyebrow'>Recognition</p><h2 id='reward-grant-title'>Reward {employeeName}</h2></div><button aria-label='Close reward form' className='icon-button' onClick={onClose} type='button'>×</button></div><form className='employee-form' onSubmit={form.handleSubmit(values => grant.mutate(values))}><label className='form-field'><span>Credits</span><input {...form.register('amount', { valueAsNumber: true })} aria-describedby={form.formState.errors.amount ? 'reward-amount-error' : undefined} aria-invalid={Boolean(form.formState.errors.amount)} inputMode='decimal' min='0.01' step='0.01' type='number' />{form.formState.errors.amount ? <small id='reward-amount-error' role='alert'>{form.formState.errors.amount.message}</small> : null}</label><label className='form-field'><span>Reason</span><input {...form.register('reason')} aria-describedby={form.formState.errors.reason ? 'reward-reason-error' : undefined} aria-invalid={Boolean(form.formState.errors.reason)} placeholder='Recognized for excellent project delivery' />{form.formState.errors.reason ? <small id='reward-reason-error' role='alert'>{form.formState.errors.reason.message}</small> : null}</label>{form.formState.errors.root ? <p className='form-error' role='alert'>{form.formState.errors.root.message}</p> : null}<button className='form-submit' disabled={grant.isPending} type='submit'>{grant.isPending ? <LoaderCircle aria-hidden='true' className='animate-spin' size={16} /> : null}Grant reward</button></form></section>
 }
