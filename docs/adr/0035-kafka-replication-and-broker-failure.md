@@ -66,6 +66,10 @@ Run against the real cluster: the leader-kill table above (one safe run, three w
 Unit tests for the configuration: a single broker gets RF 1 and no minimum, the cluster settings give 3 and 2, they are read from
 configuration, the outbox producer has `acks=all` and idempotence on. Mutation-checked: `acks=1`, a hard-coded replication factor.
 
+Seen afterwards, on a single broker configured like the stack's (card-lag drill, ADR 0034): the real services with the idempotent producer
+publish normally; at start the producer logs "Failed to acquire idempotence PID ... Coordinator load in progress: retrying" until the broker's
+transaction coordinator is up, then 200 of 200 events were delivered. The warning is noise on a fresh broker, not a stall.
+
 Not verified: the platform's services running against the cluster (their SASL setup, the `Kafka__` settings in compose, and the
 consumers' behaviour across a leader change were not exercised; the drill used console tools and the perf-test); more than one
 partition; the producer's behaviour with `delivery.timeout.ms` shorter than an election; Debezium on the cluster; the latency cost.
