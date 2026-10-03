@@ -1,3 +1,4 @@
+using Shared.Redis;
 using Shared.Ops;
 using System.Threading.RateLimiting;
 using DirectoryService.Application.Database;
@@ -153,10 +154,15 @@ builder.Services.AddScoped<GetSubtreeHandler>();
 
 builder.Services.AddScoped<SoftDeleteDepartmentHandler>();
 
+// Redis is an accelerator here (ADR 0036): fail fast when it is gone, and after a few failures in a row stop asking it for a
+// while, so that a dead Redis costs a request nothing instead of the time each call takes to fail.
 builder.Services.AddStackExchangeRedisCache(setup =>
 {
-    setup.Configuration = builder.Configuration.GetConnectionString("Redis");
+    setup.Configuration = Shared.Redis.RedisConnectionString.Resilient(
+        builder.Configuration.GetConnectionString("Redis")
+        ?? throw new InvalidOperationException("Connection string 'Redis' is not configured."));
 });
+builder.Services.AddCircuitBreakerToDistributedCache();
 
 builder.Services.AddHybridCache(options => options.DefaultEntryOptions = new HybridCacheEntryOptions
 {
