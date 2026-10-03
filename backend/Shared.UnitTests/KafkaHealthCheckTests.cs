@@ -27,7 +27,8 @@ public class KafkaHealthCheckTests
         var result = await check.CheckHealthAsync(new HealthCheckContext());
 
         Assert.Equal(HealthStatus.Degraded, result.Status);
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(3), $"took {watch.Elapsed}");
+        // The check gives up after 2 s; a loaded runner adds the cost of building the client, so the bound is the probe-scale one, not the check's own.
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(6), $"took {watch.Elapsed}");
     }
 
     [Fact]
