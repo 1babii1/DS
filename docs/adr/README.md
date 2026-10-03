@@ -37,6 +37,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0029](0029-expand-contract-migrations.md) | Schema changes that never break the version running before them |
 | [0030](0030-change-data-capture-with-debezium.md) | Change data capture with Debezium instead of the polling publisher |
 | [0031](0031-event-sourced-wallets.md) | Wallets are event-sourced |
+| [0036](0036-redis-failure-and-sentinel.md) | Redis is an accelerator: fail fast, stop asking, and fail over with Sentinel |
 | [0032](0032-orchestrated-hire-saga.md) | The hire is an orchestrated saga with a deadline and compensations |
 | [0033](0033-sharding-the-audit-log-with-citus.md) | Sharding the audit log: measured with Citus, not adopted |
 
