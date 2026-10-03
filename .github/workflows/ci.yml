@@ -73,6 +73,8 @@ jobs:
           - EmployeeService
           - McpServer
           - NotificationService
+          - RewardsService
+          - SearchService
 
     steps:
       - uses: actions/checkout@v4
@@ -119,3 +121,25 @@ jobs:
 
       - name: Check schema compatibility against the base branch
         run: python3 scripts/check_schemas.py --registry http://localhost:8081/apis/ccompat/v7 --base origin/${{ github.base_ref || 'main' }}
+
+  # The Helm chart (ADR 0040) is rendered in the shapes people use it and every rendered resource is checked against the Kubernetes
+  # schemas. A chart nobody renders in CI drifts from the services it describes.
+  chart:
+    name: Helm chart
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.17.3
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Lint and validate
+        run: scripts/check-chart.sh
