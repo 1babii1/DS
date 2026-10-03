@@ -78,7 +78,11 @@ builder.Services.AddSingleton(sp =>
     return new HubTicketService(Options.Create(options), sp.GetRequiredService<TimeProvider>());
 });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("IsAdmin", policy => policy.RequireRole(RoleNames.Admin));
+
+// [RequireStepUp] on the erase endpoint (ADR 0047) names this policy; it has to be registered here.
+builder.Services.AddStepUpPolicy();
 
 builder.Services.AddNotificationInfrastructure(builder.Configuration);
 

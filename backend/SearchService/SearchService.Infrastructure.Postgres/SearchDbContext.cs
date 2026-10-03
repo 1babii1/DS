@@ -9,11 +9,20 @@ public class SearchDbContext(DbContextOptions<SearchDbContext> options) : DbCont
 {
     public DbSet<DeadLetterEntry> DeadLetters => Set<DeadLetterEntry>();
 
+    public DbSet<ErasedSubject> ErasedSubjects => Set<ErasedSubject>();
+
     public DbSet<DocumentEmbedding> DocumentEmbeddings => Set<DocumentEmbedding>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
         builder.HasDefaultSchema("search");
+
+        builder.Entity<ErasedSubject>(entity =>
+        {
+            entity.ToTable("erased_subjects");
+            entity.HasKey(e => e.SubjectId);
+            entity.Property(e => e.SubjectId).HasMaxLength(200);
+        });
 
         builder.Entity<DocumentEmbedding>(entity =>
         {

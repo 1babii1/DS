@@ -129,6 +129,26 @@ public class SearchIndexClient
         }
     }
 
+    /// <summary>
+    /// Deletes the audit-kind documents whose text contains this subject as a phrase (the text of such a document is the message key and
+    /// the event type, and the key of some events is a person's address). Returns how many went. Used when a person is erased (ADR 0047).
+    /// </summary>
+    public async Task<long> DeleteAuditDocumentsMentioningAsync(string subject, CancellationToken cancellationToken)
+    {
+        var response = await _client.DeleteByQueryAsync<SearchDocument>(
+            _indexName,
+            d => d.Refresh(true).Query(q => q.Bool(b => b
+                .Filter(f => f.Term(t => t.Field(x => x.Kind).Value(SearchKind.Audit)))
+                .Must(m => m.MatchPhrase(p => p.Field(x => x.SearchText).Query(subject))))),
+            cancellationToken);
+        if (!response.IsValidResponse)
+        {
+            throw new InvalidOperationException($"Elasticsearch delete failed: {response.DebugInformation}");
+        }
+
+        return response.Deleted ?? 0;
+    }
+
     public Task DeleteAsync(string id, CancellationToken cancellationToken) =>
         _client.DeleteAsync(new DeleteRequest(_indexName, id), cancellationToken);
 
