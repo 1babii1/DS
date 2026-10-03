@@ -1,11 +1,26 @@
 'use client'
 
+import { backpressureEvent } from '@/shared/api/backpressure'
 import { AlertCircle, Check, X } from 'lucide-react'
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import {
+	createContext,
+	useCallback,
+	useContext,
+	useEffect,
+	useMemo,
+	useState
+} from 'react'
 import type { ReactNode } from 'react'
 
-type Notice = { id: number; message: string; tone: 'error' | 'success' }
-type NoticeContextValue = { showError: (message: string) => void; showSuccess: (message: string) => void }
+type Notice = {
+	id: number
+	message: string
+	tone: 'error' | 'info' | 'success'
+}
+type NoticeContextValue = {
+	showError: (message: string) => void
+	showSuccess: (message: string) => void
+}
 
 const NoticeContext = createContext<NoticeContextValue | null>(null)
 
@@ -18,28 +33,70 @@ export function NoticeProvider({ children }: { children: ReactNode }) {
 		return () => window.clearTimeout(timeout)
 	}, [notice])
 
+	useEffect(() => {
+		const onBackpressure = (event: Event) => {
+			if (
+				event instanceof CustomEvent &&
+				typeof event.detail === 'string'
+			)
+				setNotice({
+					id: Date.now(),
+					message: event.detail,
+					tone: 'info'
+				})
+		}
+		window.addEventListener(backpressureEvent, onBackpressure)
+		return () =>
+			window.removeEventListener(backpressureEvent, onBackpressure)
+	}, [])
+
 	const showSuccess = useCallback((message: string) => {
 		setNotice({ id: Date.now(), message, tone: 'success' })
 	}, [])
 	const showError = useCallback((message: string) => {
 		setNotice({ id: Date.now(), message, tone: 'error' })
 	}, [])
-	const value = useMemo(() => ({ showError, showSuccess }), [showError, showSuccess])
+	const value = useMemo(
+		() => ({ showError, showSuccess }),
+		[showError, showSuccess]
+	)
 
 	return (
 		<NoticeContext.Provider value={value}>
 			{children}
-			{notice ? <div aria-atomic='true' aria-live='polite' className={notice.tone === 'error' ? 'success-notice success-notice--error' : 'success-notice'} role={notice.tone === 'error' ? 'alert' : 'status'}>
-				{notice.tone === 'error' ? <AlertCircle aria-hidden='true' size={17} /> : <Check aria-hidden='true' size={17} />}
-				<span>{notice.message}</span>
-				<button aria-label='Dismiss notification' onClick={() => setNotice(null)} type='button'><X aria-hidden='true' size={16} /></button>
-			</div> : null}
+			{notice ? (
+				<div
+					aria-atomic='true'
+					aria-live='polite'
+					className={
+						notice.tone === 'error'
+							? 'success-notice success-notice--error'
+							: 'success-notice'
+					}
+					role={notice.tone === 'error' ? 'alert' : 'status'}
+				>
+					{notice.tone === 'error' ? (
+						<AlertCircle aria-hidden='true' size={17} />
+					) : (
+						<Check aria-hidden='true' size={17} />
+					)}
+					<span>{notice.message}</span>
+					<button
+						aria-label='Dismiss notification'
+						onClick={() => setNotice(null)}
+						type='button'
+					>
+						<X aria-hidden='true' size={16} />
+					</button>
+				</div>
+			) : null}
 		</NoticeContext.Provider>
 	)
 }
 
 export function useNotice() {
 	const context = useContext(NoticeContext)
-	if (!context) throw new Error('useNotice must be used within NoticeProvider')
+	if (!context)
+		throw new Error('useNotice must be used within NoticeProvider')
 	return context
 }
