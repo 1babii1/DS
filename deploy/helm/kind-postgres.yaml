@@ -1,0 +1,43 @@
+# A throwaway Postgres for trying the chart on a local kind cluster (docs/runbooks/kubernetes.md). Not for anything else: one
+# replica, no volume, no backup. The password comes from a Secret created by hand. The schemas must exist before the first migration
+# runs (docker/postgres/init-databases.sql, as in docker-compose): the migration history table is created before the service's own
+# schema and would otherwise land in `public` and be shadowed on the next run (ADR 0040).
+#   kubectl -n platform create configmap postgres-init --from-file=init-databases.sql=docker/postgres/init-databases.sql
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: postgres}
+  template:
+    metadata:
+      labels: {app: postgres}
+    spec:
+      volumes:
+        - name: init
+          configMap: {name: postgres-init}
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg18
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef: {name: postgres}
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+          readinessProbe:
+            exec: {command: ["pg_isready", "-U", "postgres"]}
+            periodSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector: {app: postgres}
+  ports:
+    - port: 5432

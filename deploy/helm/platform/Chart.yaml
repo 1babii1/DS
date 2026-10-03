@@ -1,0 +1,6 @@
+apiVersion: v2
+name: platform
+description: The .NET services of the org-management platform (ADR 0040). Infrastructure (Postgres, Kafka, Redis, Elasticsearch) is not part of this chart; see docs/runbooks/kubernetes.md.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

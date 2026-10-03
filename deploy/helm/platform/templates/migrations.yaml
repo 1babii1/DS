@@ -1,0 +1,46 @@
+{{- range $name, $on := .Values.enabled }}
+{{- if $on }}
+{{- $s := include "platform.service" (dict "root" $ "name" $name) | fromYaml }}
+{{- if $s.migrations }}
+---
+# Runs before the new version is rolled out (and before the first install), once per release: the schema is always ahead of or
+# equal to the code that is about to start, never behind it. The change must therefore be backward compatible with the version still
+# running during the rollout: expand, then contract (docs/runbooks/zero-downtime-migrations.md).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}-migrations
+  labels:
+    {{- include "platform.labels" (dict "root" $ "name" $name) | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: {{ include "platform.image" (dict "root" $ "repository" $s.migrations.image "tag" $s.image.tag) }}
+          imagePullPolicy: {{ $s.image.pullPolicy }}
+          # The connection string comes from a Secret and goes to the migration tool as an argument it reads from the environment,
+          # never written into the chart.
+          command: ["/bin/sh", "-c", "./efbundle --connection \"$MIGRATION_CONNECTION\""]
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Docker
+          {{- with $s.migrations.connectionSecret }}
+            - name: MIGRATION_CONNECTION
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .name }}
+                  key: {{ .key }}
+          {{- end }}
+          securityContext:
+            {{- toYaml $s.securityContext | nindent 12 }}
+{{- end }}
+{{- end }}
+{{- end }}

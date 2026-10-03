@@ -1,0 +1,91 @@
+{{- range $name, $on := .Values.enabled }}
+{{- if $on }}
+{{- $s := include "platform.service" (dict "root" $ "name" $name) | fromYaml }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "platform.labels" (dict "root" $ "name" $name) | nindent 4 }}
+spec:
+  # With an autoscaler the replica count is its to decide; setting it here too would reset it on every upgrade.
+  {{- if not $s.hpa.enabled }}
+  replicas: {{ $s.replicas }}
+  {{- end }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: {{ $s.strategy.maxUnavailable }}
+      maxSurge: {{ $s.strategy.maxSurge }}
+  selector:
+    matchLabels:
+      {{- include "platform.selector" (dict "root" $ "name" $name) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "platform.labels" (dict "root" $ "name" $name) | nindent 8 }}
+    spec:
+      terminationGracePeriodSeconds: {{ $s.terminationGracePeriodSeconds }}
+      # Spread replicas over nodes where there is more than one, so that a node going away does not take them all.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "platform.selector" (dict "root" $ "name" $name) | nindent 14 }}
+      containers:
+        - name: {{ $name }}
+          image: {{ include "platform.image" (dict "root" $ "repository" $s.image.repository "tag" $s.image.tag) }}
+          imagePullPolicy: {{ $s.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ $s.port }}
+          env:
+            - name: ASPNETCORE_URLS
+              value: "http://*:{{ $s.port }}"
+            {{- range $k, $v := $s.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+          {{- with $s.envFromSecrets }}
+          envFrom:
+            {{- range . }}
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
+          {{- end }}
+          # Started: the first start can be slow (migrations ran before it, but the JIT and the first connections are not free);
+          # nothing else is checked until it has passed. Live: the process answers at all, and checks no dependency (restarting
+          # a service because its database is down helps no one). Ready: the dependencies it needs are reachable.
+          startupProbe:
+            httpGet: {path: {{ $s.probes.liveness }}, port: http}
+            periodSeconds: 2
+            failureThreshold: 60
+          livenessProbe:
+            httpGet: {path: {{ $s.probes.liveness }}, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: {path: {{ $s.probes.readiness }}, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "{{ $s.preStopSleepSeconds }}"]
+          resources:
+            {{- toYaml $s.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml $s.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}
+{{- end }}
