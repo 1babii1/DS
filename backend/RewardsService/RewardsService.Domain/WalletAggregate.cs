@@ -76,6 +76,10 @@ public sealed class WalletAggregate
 
     public bool HasWelcomeBonus { get; private set; }
 
+    public bool HasWelcomeBonusReversal { get; private set; }
+
+    private decimal _welcomeBonusAmount;
+
     public static WalletAggregate Rehydrate(Guid employeeId, IEnumerable<WalletEvent> events)
     {
         var wallet = new WalletAggregate(employeeId);
@@ -107,6 +111,28 @@ public sealed class WalletAggregate
         return @event;
     }
 
+    /// <summary>
+    /// Undoes the welcome bonus (ADR 0032) by appending its opposite. Returns null when there is nothing to undo: no bonus was
+    /// ever granted, or it was already reversed. That makes a repeated request, and the race of two of them, harmless: the loser
+    /// of the race collides on the events' key, re-reads, and finds it already done.
+    /// </summary>
+    public WalletEvent? ReverseWelcomeBonus(Guid transactionId)
+    {
+        if (!HasWelcomeBonus || HasWelcomeBonusReversal)
+        {
+            return null;
+        }
+
+        var @event = WalletEvent.Adjusted(
+            EmployeeId,
+            Version + 1,
+            new WalletAdjustedData(
+                transactionId, -_welcomeBonusAmount, "Welcome bonus reversed: onboarding did not complete",
+                nameof(TransactionSource.WelcomeBonusReversal), null));
+        Apply(@event);
+        return @event;
+    }
+
     private void Apply(WalletEvent @event)
     {
         var data = @event.ReadAdjusted();
@@ -115,6 +141,11 @@ public sealed class WalletAggregate
         if (data.Source == nameof(TransactionSource.WelcomeBonus))
         {
             HasWelcomeBonus = true;
+            _welcomeBonusAmount = data.Amount;
+        }
+        else if (data.Source == nameof(TransactionSource.WelcomeBonusReversal))
+        {
+            HasWelcomeBonusReversal = true;
         }
     }
 }

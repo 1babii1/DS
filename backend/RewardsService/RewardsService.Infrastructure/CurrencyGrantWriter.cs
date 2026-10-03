@@ -15,6 +15,30 @@ namespace RewardsService.Infrastructure;
 // unique violation of the events' key, for the caller to retry.
 public class CurrencyGrantWriter(RewardsDbContext dbContext, IEventAvroEncoder? avro = null)
 {
+    /// <summary>
+    /// Undoes the welcome bonus. Returns null when there is nothing to undo. Tells nobody: the reversal is the wallet's own
+    /// bookkeeping, and a notification would tell the person about a bonus they never saw (the same caller commits).
+    /// </summary>
+    public Transaction? ReverseWelcomeBonus(Guid employeeId)
+    {
+        var history = dbContext.WalletEvents.AsNoTracking().Where(e => e.StreamId == employeeId).OrderBy(e => e.Version).ToList();
+        var aggregate = WalletAggregate.Rehydrate(employeeId, history);
+
+        var transactionId = Guid.CreateVersion7();
+        var @event = aggregate.ReverseWelcomeBonus(transactionId);
+        if (@event is null)
+        {
+            return null;
+        }
+
+        dbContext.WalletEvents.Add(@event);
+        var data = @event.ReadAdjusted();
+        var transaction = Transaction.Create(employeeId, data.Amount, data.Reason, TransactionSource.WelcomeBonusReversal, null, transactionId);
+        dbContext.Transactions.Add(transaction);
+        dbContext.Wallets.Single(w => w.EmployeeId == employeeId).SetBalance(aggregate.Balance);
+        return transaction;
+    }
+
     public Transaction Grant(Guid employeeId, decimal amount, string reason, TransactionSource source, Guid? grantedByAccountId)
     {
         // The wallet as its history says it is, not as the cached row says: the cached row is what this is about to update.
@@ -34,7 +58,7 @@ public class CurrencyGrantWriter(RewardsDbContext dbContext, IEventAvroEncoder? 
         wallet.SetBalance(aggregate.Balance);
         dbContext.Transactions.Add(transaction);
 
-        var @event = new CurrencyGrantedEvent(employeeId, amount, reason, aggregate.Balance);
+        var @event = new CurrencyGrantedEvent(employeeId, amount, reason, aggregate.Balance, source.ToString());
         var message = OutboxMessage.Create(
             RewardsEventTypes.CurrencyGranted,
             employeeId.ToString(),

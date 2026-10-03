@@ -131,7 +131,57 @@ public class EmployeeEventsConsumerTests : IClassFixture<AuthTestWebFactory>, IA
         Assert.Equal(1, count);
     }
 
+    [Fact]
+    public async Task A_compensation_locks_the_account_and_revokes_its_sessions_and_a_repeat_changes_nothing()
+    {
+        var employeeId = Guid.NewGuid();
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(
+            BuildHiredResult(Guid.NewGuid(), employeeId, "Undone Hire", $"undone-{Guid.NewGuid():N}@test.local"), CancellationToken.None));
+        var stampBefore = (await ExecuteInDb(db => db.Users.SingleAsync(a => a.EmployeeId == employeeId))).SecurityStamp;
+
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(BuildCompensationResult(employeeId, revokeAccount: true), CancellationToken.None));
+        var locked = await ExecuteInDb(db => db.Users.SingleAsync(a => a.EmployeeId == employeeId));
+        Assert.Equal(DateTimeOffset.MaxValue, locked.LockoutEnd);
+        Assert.NotEqual(stampBefore, locked.SecurityStamp);
+
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(BuildCompensationResult(employeeId, revokeAccount: true), CancellationToken.None));
+        Assert.Equal(locked.SecurityStamp, (await ExecuteInDb(db => db.Users.SingleAsync(a => a.EmployeeId == employeeId))).SecurityStamp);
+    }
+
+    [Fact]
+    public async Task A_compensation_that_does_not_ask_for_the_account_leaves_it_alone()
+    {
+        var employeeId = Guid.NewGuid();
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(
+            BuildHiredResult(Guid.NewGuid(), employeeId, "Kept Hire", $"kept-{Guid.NewGuid():N}@test.local"), CancellationToken.None));
+
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(BuildCompensationResult(employeeId, revokeAccount: false), CancellationToken.None));
+
+        Assert.Null((await ExecuteInDb(db => db.Users.SingleAsync(a => a.EmployeeId == employeeId))).LockoutEnd);
+    }
+
+    [Fact]
+    public void A_compensation_for_an_account_that_was_never_made_is_nothing_to_undo()
+    {
+        Assert.True(_sut.HandleWithRetryAndDeadLetter(BuildCompensationResult(Guid.NewGuid(), revokeAccount: true), CancellationToken.None));
+    }
+
     public Task InitializeAsync() => Task.CompletedTask;
+
+    private static ConsumeResult<string, string> BuildCompensationResult(Guid employeeId, bool revokeAccount)
+    {
+        var headers = new Headers
+        {
+            { "message-id", Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) },
+            { "message-type", Encoding.UTF8.GetBytes("HireCompensationRequested") },
+        };
+        var payload = JsonSerializer.Serialize(new { EmployeeId = employeeId, Reason = "deadline", RevokeAccount = revokeAccount, ReverseBonus = false });
+        return new ConsumeResult<string, string>
+        {
+            Topic = "employee.events",
+            Message = new Message<string, string> { Key = employeeId.ToString(), Value = payload, Headers = headers },
+        };
+    }
 
     public async Task DisposeAsync() => await _resetDatabase();
 

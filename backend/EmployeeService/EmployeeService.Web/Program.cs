@@ -1,4 +1,4 @@
-﻿using Shared.Ops;
+using Shared.Ops;
 using System.Threading.RateLimiting;
 using EmployeeService.Application.Database;
 using EmployeeService.Application.Employees.Commands;
@@ -62,6 +62,13 @@ builder.Services.Configure<EmployeeConsumerOptions>(options =>
 });
 builder.Services.AddEventAvroDecoder(builder.Configuration, typeof(EmployeeService.Web.Consumers.AuthEventsConsumer).Assembly);
 builder.Services.AddHostedService<AuthEventsConsumer>();
+
+// The onboarding process (ADR 0032).
+builder.Services.Configure<EmployeeService.Application.Employees.HireSagaOptions>(
+    builder.Configuration.GetSection(EmployeeService.Application.Employees.HireSagaOptions.SectionName));
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<EmployeeService.Application.Employees.HireSagaCoordinator>();
+builder.Services.AddHostedService<EmployeeService.Web.HireSagaDeadlineWorker>();
 
 builder.Services.AddScoped<HireEmployeeHandler>();
 builder.Services.AddScoped<TransferEmployeeHandler>();
