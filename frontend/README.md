@@ -80,3 +80,5 @@ Playwright covers browser-visible BFF and session behavior. It starts the Next.j
 ```
 
 The first, deliberately narrow UI smoke check proves an anonymous visitor gets a prompt sign-in state on a protected workspace route. Failed browser checks retain a screenshot and trace in `playwright-report/` and `test-results/`; do not commit those artifacts because an authenticated future scenario could contain session-specific data.
+
+The sign-in journey creates, confirms, and deletes a one-time viewer through local Mailpit. It must run against a clean AuthService rate-limit window: the application deliberately permits only five auth requests per client IP in 60 seconds, so wait for that window to expire before repeating the journey locally.
