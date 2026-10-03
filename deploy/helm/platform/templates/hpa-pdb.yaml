@@ -1,0 +1,46 @@
+{{- range $name, $on := .Values.enabled }}
+{{- if $on }}
+{{- $s := include "platform.service" (dict "root" $ "name" $name) | fromYaml }}
+{{- if $s.hpa.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "platform.labels" (dict "root" $ "name" $name) | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $name }}
+  minReplicas: {{ $s.hpa.minReplicas }}
+  maxReplicas: {{ $s.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $s.hpa.cpuUtilization }}
+  behavior:
+    # Scale up quickly, down slowly: a burst should not be met with a shrinking fleet a minute later.
+    scaleDown:
+      stabilizationWindowSeconds: 300
+{{- end }}
+{{- if $s.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "platform.labels" (dict "root" $ "name" $name) | nindent 4 }}
+spec:
+  minAvailable: {{ $s.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "platform.selector" (dict "root" $ "name" $name) | nindent 6 }}
+{{- end }}
+{{- end }}
+{{- end }}

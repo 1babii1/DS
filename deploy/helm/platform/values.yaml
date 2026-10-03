@@ -1,0 +1,95 @@
+# Values shared by every service; a service entry below overrides any of it.
+defaults:
+  replicas: 2
+  image:
+    tag: latest
+    pullPolicy: IfNotPresent
+  # Rolling updates never take capacity away before replacement capacity is ready.
+  strategy:
+    maxUnavailable: 0
+    maxSurge: 1
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {memory: 512Mi}
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    cpuUtilization: 70
+  pdb:
+    enabled: true
+    minAvailable: 1
+  probes:
+    liveness: /health/live
+    readiness: /health/ready
+  # Time for the load balancer to stop sending traffic before the process is told to stop, then time for requests to finish.
+  preStopSleepSeconds: 5
+  terminationGracePeriodSeconds: 30
+  # The aspnet base image's own unprivileged user.
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1654
+    allowPrivilegeEscalation: false
+    capabilities: {drop: [ALL]}
+  env:
+    ASPNETCORE_ENVIRONMENT: Docker
+  # Names of Secrets that already exist in the namespace and hold {key: value} environment variables for the container.
+  # The chart never contains a secret value; create them with whatever the cluster uses for secrets.
+  envFromSecrets: []
+
+# One entry per service. `port` is the container port; `migrations.image` enables the pre-install/pre-upgrade migration Job.
+services:
+  directory:
+    image: {repository: dsporfolio-directory_service}
+    port: 5129
+    ingressPrefix: /api/departments
+    extraIngressPrefixes: [/api/positions, /api/locations]
+    migrations: {image: dsporfolio-directory_service_migrations}
+  auth:
+    image: {repository: dsporfolio-auth_service}
+    port: 5130
+    ingressPrefix: /auth
+    extraIngressPrefixes: [/connect, /.well-known]
+    migrations: {image: dsporfolio-auth_service_migrations}
+  employee:
+    image: {repository: dsporfolio-employee_service}
+    port: 5131
+    ingressPrefix: /api/employees
+    migrations: {image: dsporfolio-employee_service}
+  audit:
+    image: {repository: dsporfolio-audit_service}
+    port: 5132
+    ingressPrefix: /api/audit
+    migrations: {image: dsporfolio-audit_service_migrations}
+  rewards:
+    image: {repository: dsporfolio-rewards_service}
+    port: 5134
+    ingressPrefix: /api/rewards
+    migrations: {image: dsporfolio-rewards_service_migrations}
+  notification:
+    image: {repository: dsporfolio-notification_service}
+    port: 5133
+    ingressPrefix: /api/notifications
+    extraIngressPrefixes: [/hubs]
+    migrations: {image: dsporfolio-notification_service_migrations}
+  search:
+    image: {repository: dsporfolio-search_service}
+    port: 5135
+    ingressPrefix: /api/search
+    migrations: {image: dsporfolio-search_service_migrations}
+
+# Set to turn a service off for a release (for example to run only some of them).
+enabled:
+  directory: true
+  auth: true
+  employee: true
+  audit: true
+  rewards: true
+  notification: true
+  search: true
+
+# Only one `host` rule, the same routes nginx has in docker-compose. Off by default: choose an ingress controller first.
+ingress:
+  enabled: false
+  className: nginx
+  host: ""

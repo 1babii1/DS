@@ -2,7 +2,9 @@
 
 ## Status
 Proposed - design only. `docker-compose.yml` remains the actual deployment; nothing in
-this ADR is live. This documents Wave 1 of the reliability-roadmap planning artifact's
+this ADR is live. (A Helm chart has since been written and tried on a local cluster; see
+[0040](0040-kubernetes-helm-chart.md), which departs from this ADR by writing it by hand
+instead of generating it from an Aspire AppHost.) This documents Wave 1 of the reliability-roadmap planning artifact's
 migration path, ahead of building it, so the shape is agreed before infrastructure work
 starts rather than discovered mid-migration.
 
