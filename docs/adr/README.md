@@ -37,6 +37,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0029](0029-expand-contract-migrations.md) | Schema changes that never break the version running before them |
 | [0030](0030-change-data-capture-with-debezium.md) | Change data capture with Debezium instead of the polling publisher |
 | [0031](0031-event-sourced-wallets.md) | Wallets are event-sourced |
+| [0039](0039-rate-limiting-at-the-edge.md) | Rate limits at the one ingress, not in Redis |
 | [0037](0037-idempotency-key-on-hire.md) | Idempotency-Key on the hire |
 | [0035](0035-kafka-replication-and-broker-failure.md) | Kafka replication: three copies, two in sync, and what a broker failure costs |
 | [0036](0036-redis-failure-and-sentinel.md) | Redis is an accelerator: fail fast, stop asking, and fail over with Sentinel |
