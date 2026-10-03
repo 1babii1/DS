@@ -40,6 +40,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0040](0040-kubernetes-helm-chart.md) | Kubernetes: a hand-written Helm chart, tried on a real cluster |
 | [0041](0041-feature-flags-and-canary.md) | Feature flags with OpenFeature, and a canary track in the chart |
 | [0042](0042-row-level-security-multi-tenancy.md) | Row-level security for multi-tenancy: what it gives, what bypasses it, the pooler trap (drilled, not applied) |
+| [0043](0043-personal-data-inventory.md) | Personal data: an inventory that is checked, and the erasure problem it exposes |
 | [0038](0038-load-shedding.md) | Load shedding: turn requests away quickly instead of answering all of them slowly |
 | [0039](0039-rate-limiting-at-the-edge.md) | Rate limits at the one ingress, not in Redis |
 | [0037](0037-idempotency-key-on-hire.md) | Idempotency-Key on the hire |
