@@ -1,3 +1,4 @@
+using Shared.FeatureFlags;
 using Shared.Resilience;
 using Shared.Avro;
 using Shared.Ops;
@@ -74,6 +75,8 @@ builder.Services.AddOpsMetrics<SearchDbContext>("search-service");
 
 // Turn requests away quickly past capacity instead of answering all of them slowly (ADR 0038).
 builder.Services.AddLoadShedding(builder.Configuration);
+builder.Configuration.AddFeatureFlagsFile();
+builder.Services.AddFeatureFlags(builder.Configuration);
 
 var app = builder.Build();
 

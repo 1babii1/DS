@@ -1,0 +1,15 @@
+# Feature flags (ADR 0041): one ConfigMap read by every service as a file. Edit it to change a flag in running pods, no deploy.
+# An empty list renders an empty file and every flag takes the default its code gave it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: feature-flags
+  labels:
+    app.kubernetes.io/part-of: platform
+data:
+  flags.json: |
+    {{- $flags := dict }}
+    {{- range $name, $f := .Values.featureFlags }}
+    {{- $_ := set $flags $name (dict "Enabled" $f.enabled "Percentage" (default 100 $f.percentage)) }}
+    {{- end }}
+    {{ dict "FeatureFlags" $flags | toJson }}
