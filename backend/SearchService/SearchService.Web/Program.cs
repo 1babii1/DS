@@ -7,6 +7,7 @@ using SearchService.Infrastructure.Elasticsearch;
 using Microsoft.Extensions.Options;
 using SearchService.Infrastructure.Postgres;
 using SearchService.Infrastructure.Postgres.Embeddings;
+using SearchService.Web;
 using SearchService.Web.Consumers;
 using Serilog;
 using Shared.Cors;
@@ -36,7 +37,12 @@ builder.Services.AddFrameworkCors(builder.Configuration);
 
 builder.Services.AddPlatformJwtAuthentication(builder.Configuration, builder.Environment);
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("IsAdmin", policy => policy.RequireRole(RoleNames.Admin));
+
+// [RequireStepUp] on the erase endpoint (ADR 0047) names this policy; it has to be registered here.
+builder.Services.AddStepUpPolicy();
+builder.Services.AddScoped<SubjectErasure>();
 
 builder.Services.AddSearchPostgresInfrastructure(builder.Configuration);
 builder.Services.AddSearchElasticsearchInfrastructure(builder.Configuration);

@@ -8,6 +8,8 @@ public class NotificationDbContext(DbContextOptions<NotificationDbContext> optio
 {
     public DbSet<Notification> Notifications => Set<Notification>();
 
+    public DbSet<ErasedSubject> ErasedSubjects => Set<ErasedSubject>();
+
     public DbSet<AccountLookup> AccountLookups => Set<AccountLookup>();
 
     public DbSet<DeadLetterEntry> DeadLetters => Set<DeadLetterEntry>();
@@ -32,6 +34,13 @@ public class NotificationDbContext(DbContextOptions<NotificationDbContext> optio
             entity.HasIndex(e => new { e.RecipientAccountId, e.CreatedAt });
             entity.HasIndex(e => new { e.RecipientAccountId, e.IsRead });
             entity.HasIndex(e => e.SourceMessageId).IsUnique();
+        });
+
+        builder.Entity<ErasedSubject>(entity =>
+        {
+            entity.ToTable("erased_subjects");
+            entity.HasKey(e => e.SubjectId);
+            entity.Property(e => e.SubjectId).HasMaxLength(200);
         });
 
         builder.Entity<AccountLookup>(entity =>
