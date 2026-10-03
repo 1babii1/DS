@@ -72,6 +72,27 @@ public class SearchModesTests : IClassFixture<SearchTestWebFactory>, IAsyncLifet
         Assert.Contains(hybrid.Value.Results, r => r.Id == billing);
     }
 
+    // The flag decides what a search with no explicit mode does (ADR 0041); a caller that names a mode is not affected by it.
+    [Fact]
+    public async Task With_the_flag_off_a_search_without_a_mode_is_keyword_only_and_with_it_on_hybrid()
+    {
+        await Department("Billing team", "bill-desk");
+        await Embed();
+
+        var off = new Flag(on: false);
+        var onFlag = new Flag(on: true);
+        var withoutFlag = await SearchRaw("invoices", mode: null);
+        var killed = await SearchRaw("invoices", mode: null, flags: off);
+        var enabled = await SearchRaw("invoices", mode: null, flags: onFlag);
+        var explicitUnderKill = await SearchRaw("invoices", mode: "hybrid", flags: off);
+
+        Assert.Equal("hybrid", withoutFlag.Value!.Mode);
+        Assert.Equal("keyword", killed.Value!.Mode);
+        Assert.Equal("hybrid", enabled.Value!.Mode);
+        Assert.Equal("hybrid", explicitUnderKill.Value!.Mode);
+        Assert.Equal("user-1", off.AskedAbout);
+    }
+
     [Fact]
     public async Task With_both_halves_down_hybrid_is_unavailable()
     {
@@ -279,11 +300,36 @@ public class SearchModesTests : IClassFixture<SearchTestWebFactory>, IAsyncLifet
         new ElasticsearchClient(new ElasticsearchClientSettings(new Uri("http://127.0.0.1:1")).RequestTimeout(TimeSpan.FromSeconds(2))),
         Options.Create(new ElasticsearchOptions { IndexName = "search-entries", Uri = "http://127.0.0.1:1" }));
 
-    private async Task<Outcome> SearchRaw(string query, string? mode, string? types = null, SearchIndexClient? index = null)
+    private sealed class Flag(bool on) : Shared.FeatureFlags.IFeatureFlags
+    {
+        public string? AskedAbout { get; private set; }
+
+        public ValueTask<bool> IsEnabledAsync(string flag, string? userKey, bool defaultValue, CancellationToken cancellationToken = default)
+        {
+            AskedAbout = userKey;
+            return ValueTask.FromResult(on);
+        }
+    }
+
+    private async Task<Outcome> SearchRaw(
+        string query, string? mode, string? types = null, SearchIndexClient? index = null, Shared.FeatureFlags.IFeatureFlags? flags = null)
     {
         await using var scope = _services.CreateAsyncScope();
         var controller = new SearchController(
-            index ?? _indexClient, scope.ServiceProvider.GetRequiredService<SemanticSearch>(), NullLogger<SearchController>.Instance);
+            index ?? _indexClient,
+            scope.ServiceProvider.GetRequiredService<SemanticSearch>(),
+            NullLogger<SearchController>.Instance,
+            flags)
+        {
+            ControllerContext = new Microsoft.AspNetCore.Mvc.ControllerContext
+            {
+                HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext
+                {
+                    User = new System.Security.Claims.ClaimsPrincipal(
+                        new System.Security.Claims.ClaimsIdentity([new System.Security.Claims.Claim("sub", "user-1")], "test")),
+                },
+            },
+        };
         var endpoint = await controller.Search(query, types, 20, mode, CancellationToken.None);
 
         // EndpointResult is an IResult: running it is the real contract, so the answer is read from the response.

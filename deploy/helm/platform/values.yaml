@@ -93,3 +93,12 @@ ingress:
   enabled: false
   className: nginx
   host: ""
+
+# Feature flags (ADR 0041): name -> {enabled, percentage}. Changing one is an edit to the feature-flags ConfigMap; running pods see
+# it without a restart. A flag that is not listed takes the default its code gave it.
+featureFlags: {}
+#  search-hybrid-default: {enabled: true, percentage: 100}
+
+# Canary (ADR 0041): under a service, `canary: {enabled: true, replicas: 1, tag: <new tag>}` adds a second Deployment of the new
+# version beside the stable one. The Service sends traffic to both, in proportion to the number of pods, so 1 canary pod beside 9
+# stable pods is roughly 10%. It is not finer than that; weights per request need an ingress or a mesh that supports them.
