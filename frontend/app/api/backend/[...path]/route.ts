@@ -8,6 +8,7 @@ import {
 	readCookie
 } from '@/shared/api/consistency-token'
 import { forwardedForFromIncomingHeaders } from '@/shared/api/forwarded-address'
+import { forwardedRequestHeaders, forwardedResponseHeaders } from '@/shared/api/proxy-headers'
 import {
 	AuthenticationRequiredError,
 	getAccessToken
@@ -29,8 +30,6 @@ const allowedPrefixes = [
 	'/api/notifications',
 	'/mcp/plans'
 ]
-const forwardedRequestHeaders = ['accept', 'content-type', 'if-match', 'idempotency-key']
-const forwardedResponseHeaders = ['content-type', 'location', 'etag', 'retry-after']
 
 function isAllowedPath(path: string): boolean {
 	return allowedPrefixes.some(
