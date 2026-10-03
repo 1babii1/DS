@@ -38,6 +38,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0030](0030-change-data-capture-with-debezium.md) | Change data capture with Debezium instead of the polling publisher |
 | [0031](0031-event-sourced-wallets.md) | Wallets are event-sourced |
 | [0032](0032-orchestrated-hire-saga.md) | The hire is an orchestrated saga with a deadline and compensations |
+| [0034](0034-employee-card-read-model.md) | The employee card: a read model with a way to see your own write |
 
 Not yet written up, though each decision is already live in the codebase and explained
 in its own commit messages: gRPC for internal calls, local JWT validation via JWKS,

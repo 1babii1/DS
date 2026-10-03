@@ -211,6 +211,11 @@ public class AvroEncodingTests(RegistryFixture registry) : IClassFixture<Registr
             return 1234.56m;
         }
 
+        if (t == typeof(int))
+        {
+            return 7;
+        }
+
         if (t == typeof(bool))
         {
             return true;
