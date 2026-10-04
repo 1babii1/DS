@@ -76,9 +76,9 @@ A full browser sign-in, refresh, and logout check requires the project vault and
 Playwright covers browser-visible BFF and session behavior. It starts the Next.js application through the vault runner; it never reads or writes an `.env` file. Start the backend dependencies first with the normal project runtime, then run:
 
 ```bash
-~/.local/bin/secrets-run ds-portfolio-dev -- npm run test:e2e
+~/.local/bin/secrets-run ds-portfolio-dev -- npm run test:e2e:local
 ```
 
 The first, deliberately narrow UI smoke check proves an anonymous visitor gets a prompt sign-in state on a protected workspace route. Failed browser checks retain a screenshot and trace in `playwright-report/` and `test-results/`; do not commit those artifacts because an authenticated future scenario could contain session-specific data.
 
-The sign-in journey creates, confirms, and deletes a one-time viewer through local Mailpit. It must run against a clean AuthService rate-limit window: the application deliberately permits only five auth requests per client IP in 60 seconds, so wait for that window to expire before repeating the journey locally.
+The local suite uses an isolated runner to create and remove short-lived `e2e-*@test.local` viewer/editor accounts. The runner has no HTTP endpoint, is enabled only by the local test command, and rejects a non-loopback database. Browser login still uses the normal OIDC flow, so Auth.js sessions and the BFF are exercised without consuming the public registration rate-limit budget.
