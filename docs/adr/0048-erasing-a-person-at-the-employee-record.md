@@ -36,8 +36,10 @@ would have to be stored and replayable; also an ask-first contract change).
 ## What is and is not verified
 Against the real database through the real handler: a terminated employee loses name and e-mail, the row and the status stay; an active
 employee is refused and unchanged; erasing twice succeeds; two erased people do not collide on the unique address; an unknown id is not found.
-The tests were watched failing against a handler that did nothing. Not verified: the endpoint through HTTP with a real token (same step-up
-path as the one verified for 0046/0047), the dead-letter table of this service, backups.
+The tests were watched failing against a handler that did nothing. Live on the rebuilt stack through nginx with a real token: an active employee is refused (409); after terminating, the erase answers 200 and the record reads `[erased]` with `erased-<id>@erased.invalid`.
+
+Not verified: the 403 without a step-up on this endpoint live (the same attribute as terminating; the live administrator token was inside an earlier step-up
+window), the dead-letter table of this service, backups.
 
 **Not done, and why:** AuthService's account (deletion exists in `AccountDeletionService`; whether it satisfies erasure, with the security events
 already published, is a question for that service) and RewardsService's ledger, which is kept for accounting and where erasure is a legal question
