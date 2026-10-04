@@ -29,8 +29,8 @@ const allowedPrefixes = [
 	'/api/notifications',
 	'/mcp/plans'
 ]
-const forwardedRequestHeaders = ['accept', 'content-type', 'if-match', 'idempotency-key']
-const forwardedResponseHeaders = ['content-type', 'location', 'etag', 'retry-after']
+const forwardedRequestHeaders = ['accept', 'content-type', 'if-match', 'idempotency-key', 'x-min-wallet-version']
+const forwardedResponseHeaders = ['content-type', 'location', 'etag', 'retry-after', 'x-wallet-version', 'x-card-consistent']
 
 function isAllowedPath(path: string): boolean {
 	return allowedPrefixes.some(
