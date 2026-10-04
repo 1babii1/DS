@@ -14,6 +14,10 @@ using Shared.Middlewares;
 using Shared.Observability;
 using Shared.Outbox;
 using Shared.Security;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
+using NotificationService.Domain;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -127,6 +131,23 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+if (app.Environment.IsEnvironment("Docker"))
+{
+    // Local browser evidence only: this route is not mapped in Production, can notify only
+    // its authenticated caller, and exercises the same persisted-row + hub push shape as the consumer.
+    app.MapPost("/api/notifications/test/push", [Authorize] async (
+        ClaimsPrincipal user,
+        NotificationDbContext db,
+        IHubContext<NotificationsHub> hub) =>
+    {
+        var accountId = Guid.Parse(user.FindFirstValue("sub")!);
+        var notification = Notification.Create(Guid.NewGuid(), accountId, "BrowserFixture", "Browser fixture", "A local browser test triggered this notification.");
+        db.Notifications.Add(notification);
+        await db.SaveChangesAsync();
+        await hub.Clients.Group(accountId.ToString()).SendAsync("notification", new { notification.Id });
+        return Results.NoContent();
+    });
+}
 app.MapDeadLetterOps<NotificationDbContext>("/api/notifications/ops");
 app.MapHub<NotificationsHub>("/hub/notifications");
 app.MapDefaultHealthChecks();
