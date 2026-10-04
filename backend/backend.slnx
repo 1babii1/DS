@@ -6,6 +6,7 @@
     <Project Path="AuditService/AuditService.Web/AuditService.Web.csproj" />
   </Folder>
   <Folder Name="/AuthService/">
+    <Project Path="AuthService/AuthService.BrowserFixtures/AuthService.BrowserFixtures.csproj" />
     <Project Path="AuthService/AuthService.Application/AuthService.Application.csproj" />
     <Project Path="AuthService/AuthService.ArchitectureTests/AuthService.ArchitectureTests.csproj" />
     <Project Path="AuthService/AuthService.Contracts/AuthService.Contracts.csproj" />
