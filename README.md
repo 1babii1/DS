@@ -53,7 +53,7 @@ Three things worth your time, in this order, each with its evidence next to it:
 Run it yourself with `scripts/demo.sh up` (see [Running it](#running-it)); a 40-second captioned overview is
 [`docs/demo/video/portfolio-overview.mp4`](docs/demo/video/portfolio-overview.mp4), and the complete interactive
 walkthrough is scripted in [`docs/demo/storyboard.md`](docs/demo/storyboard.md). The reasoning behind every decision is in
-[`docs/adr/`](docs/adr/): 28 short records of the actual trade-offs, written the way I'd defend them in a design review,
+[`docs/adr/`](docs/adr/): 50 short records of the actual trade-offs, written the way I'd defend them in a design review,
 not backfilled to sound tidy. What is not done is listed plainly in [Honest status](#honest-status).
 
 ## Proof, not claims
@@ -409,12 +409,12 @@ What is verified, and what is not, said plainly rather than glossed over:
 - **There is no hosted demo, on purpose.** The assistant needs a local GPU model, and a hosted LLM would be a running
   cost and someone else's free API. Everything runs locally (`scripts/demo.sh`); a shot list for a walkthrough is in
   [`docs/demo/storyboard.md`](docs/demo/storyboard.md).
-- **Live notification push is built but has not been run end to end.** The browser opens the SignalR hub with a
+- **Live notification push has a browser test that runs locally, not in CI.** The browser opens the SignalR hub with a
   60-second ticket the BFF fetches for it, never the OAuth token ([ADR 0022](docs/adr/0022-hub-tickets.md)); the bell
-  refetches when a push arrives and keeps polling as a fallback. The ticket service, the hub handshake and the unit
-  logic of the client are tested; a real browser connecting through nginx and receiving a push was not run (it needs a
-  signed-in session). A ticket cannot be revoked inside its minute, and several instances need the same signing key.
-- **The assistant can still be talked into proposing.** The measurement says what is guaranteed (readable, bounded,
+  refetches when a push arrives and keeps polling as a fallback. A Playwright test (`frontend/e2e/notification-push.spec.ts`)
+  drives a signed-in browser through nginx and checks the bell refetches and no credential is exposed. It needs the running
+  stack and a vault, so CI does not run it. A ticket cannot be revoked inside its minute, and several instances need the
+  same signing key.- **The assistant can still be talked into proposing.** The measurement says what is guaranteed (readable, bounded,
   applied only on a click) and what is not (a planted instruction can still produce a valid bounded card). The eval is
   3 runs of 9 tasks against one local model: direction, not rates. The assistant now has a tool that lists a department's
   positions (`list_positions_by_department`), added after that measurement, so the eval was run without it and has not
@@ -428,8 +428,22 @@ What is verified, and what is not, said plainly rather than glossed over:
 - **The org history starts when the audit log did**, entries stored before the event's own time travelled with the
   message keep their receive time, and the domain has no "head of department", so "who led it in March" cannot be
   answered.
-- **The browser pages (assistant, org history) are covered by lint, type checks, a production build and unit tests of
-  their logic, not by an automated browser test.** The same is true of the frontend generally.
+- **Browser coverage is real but thin, and local.** Playwright tests cover sign-in with a viewer, the viewer's restriction notice,
+  creating a department as an editor, the protected-route redirect, the history page rendering seeded data, the notification
+  bell and the upstream-backpressure notice. They use accounts created by a local fixture and need the running stack, so
+  they are not in CI. The assistant page, the employee card with its balance (wait-for-version reads,
+  [ADR 0034](docs/adr/0034-employee-card-read-model.md)) and most forms are covered by lint, type checks, a production build and
+  unit tests of their logic, not by a browser test.
+- **Erasing a person is a documented procedure, not a button, and has known gaps** ([runbook](docs/runbooks/erase-a-person.md)).
+  The record, the account, the ledger (anonymised, amounts kept) and the copies in audit, search and notifications each have an
+  endpoint ([ADR 0046](docs/adr/0046-erasing-a-person-from-the-audit-log.md) to [0050](docs/adr/0050-anonymising-the-ledger.md)).
+  Dead-letter tables, backups, logs, Kafka retention, and amounts and dates that can still single someone out are not covered,
+  and whether this meets a legal obligation is not an engineering question.
+- **Reliability and scale claims are measured on one machine.** Kafka replication and a broker kill, Redis failure, load
+  shedding, bulkheads, a Kubernetes chart tried on kind, mutual TLS on the one gRPC call, row-level security as a drill, and
+  Citus for the audit log (measured, not adopted) are in ADRs [0029](docs/adr/0029-expand-contract-migrations.md) to
+  [0045](docs/adr/0045-bulkheads-and-measured-limits.md). Three brokers, one Postgres and a laptop are not a production fleet,
+  and each ADR lists what it did not verify.
 - The observability stack (Tempo/Loki/Prometheus/Grafana) is wired and working but optional by design
   (`--profile obs`) — traces and metrics exist, dashboards are minimal. A bearer token passed in a query string is not
   recorded in trace attributes: the incoming-request span redacts every query value, and a test pins that (it fails
