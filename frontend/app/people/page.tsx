@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react'
 
 import { directoryCatalogApi } from '@/entities/directory/api/catalog.api'
 import { employeesApi } from '@/entities/employees/api/employees.api'
+import { needsProvisioningRefresh, pendingProvisioningRefreshMs, provisioningFailureMessage } from '@/entities/employees/lib/provisioning-status'
 import type { Employee } from '@/entities/employees/types/employee.types'
 import { CatalogPagination } from '@/features/catalog-pagination/ui/catalog-pagination'
 import { EmployeeForm } from '@/features/employee-lifecycle/ui/employee-form'
@@ -21,11 +22,12 @@ function initials(name: string) {
 	return name.split(' ').map(part => part[0]).slice(0, 2).join('').toUpperCase()
 }
 
-function PersonCard({ canEdit, employee, onGrant, onTransfer }: { canEdit: boolean; employee: Employee; onGrant: (employee: Employee) => void; onTransfer: (employee: Employee) => void }) {
+export function PersonCard({ canEdit, employee, onGrant, onTransfer }: { canEdit: boolean; employee: Employee; onGrant: (employee: Employee) => void; onTransfer: (employee: Employee) => void }) {
+	const failureReason = provisioningFailureMessage(employee)
 	return <article className='person-card'>
 		<div className='person-card__avatar'>{initials(employee.fullName)}</div>
 		<div className='person-card__top'><div><h2>{employee.fullName}</h2><a href={`mailto:${employee.email}`}>{employee.email}</a></div><span className='status-badge'>{employee.status}</span></div>
-		<dl><div><dt>Position</dt><dd>{employee.positionName}</dd></div><div><dt>Department</dt><dd>{employee.departmentName}</dd></div><div><dt>Joined</dt><dd>{new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(employee.hiredAt))}</dd></div></dl>
+		<dl><div><dt>Position</dt><dd>{employee.positionName}</dd></div><div><dt>Department</dt><dd>{employee.departmentName}</dd></div><div><dt>Joined</dt><dd>{new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(employee.hiredAt))}</dd></div>{failureReason ? <div><dt>Onboarding issue</dt><dd className='person-card__failure-reason'>{failureReason}</dd></div> : null}</dl>
 		{canEdit ? <div className='person-card__actions'><button className='person-card__action' onClick={() => onTransfer(employee)} type='button'><Repeat2 aria-hidden='true' size={15} />Transfer</button><button className='person-card__action' onClick={() => onGrant(employee)} type='button'>Grant reward</button></div> : null}
 	</article>
 }
@@ -41,8 +43,8 @@ export default function PeoplePage() {
 	const employeeId = params.get('employeeId') ?? ''
 	const [form, setForm] = useState<{ employee?: Employee } | null>(null)
 	const [rewardEmployee, setRewardEmployee] = useState<Employee | null>(null)
-	const people = useQuery({ queryKey: ['employees', departmentId, page], queryFn: () => employeesApi.list(departmentId || undefined, page) })
-	const selectedEmployee = useQuery({ queryKey: ['employees', employeeId], queryFn: () => employeesApi.get(employeeId), enabled: Boolean(employeeId) })
+	const people = useQuery({ queryKey: ['employees', departmentId, page], queryFn: () => employeesApi.list(departmentId || undefined, page), refetchInterval: query => needsProvisioningRefresh(query.state.data?.items) ? pendingProvisioningRefreshMs : false })
+	const selectedEmployee = useQuery({ queryKey: ['employees', employeeId], queryFn: () => employeesApi.get(employeeId), enabled: Boolean(employeeId), refetchInterval: query => needsProvisioningRefresh(query.state.data ? [query.state.data] : undefined) ? pendingProvisioningRefreshMs : false })
 	const positions = useQuery({ queryKey: ['positions', 'active'], queryFn: () => directoryCatalogApi.positions({ isActive: true, size: 200 }) })
 	const departments = useMemo(() => Array.from(new Map((positions.data?.items ?? []).flatMap(position => position.departments).map(department => [department.id, department])).values()).sort((a, b) => a.name.localeCompare(b.name)), [positions.data])
 	const visiblePeople = useMemo(() => people.data?.items.filter(person => !positionId || person.positionId === positionId) ?? [], [people.data, positionId])
