@@ -47,5 +47,7 @@ folds to the same balance and rebuilding the projections gives the same wallets;
 data and the quota counters; an account id finds the employee through the link and the link goes; a repeat is harmless; a welcome-bonus event after
 the erasure creates nothing; over HTTP, an unauthenticated caller, a non-admin and an admin without a step-up cannot (nothing touched), an admin with
 one can, a later grant is refused, and zero or more than 50 subjects is a bad request. The five tests that need the behaviour were watched failing
-against an implementation that did nothing. Not verified: against the live stack, concurrent grants arriving during an erasure beyond what the table
+against an implementation that did nothing. Live on the rebuilt stack through nginx: after a hire and a grant, the erase answers with one wallet and two ledger rows anonymised, a repeat finds nothing, and a later grant to that person is refused (409).
+
+Not verified: concurrent grants arriving during an erasure beyond what the table
 lock guarantees, an erased subject's dead letters, and backups.

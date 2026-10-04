@@ -81,6 +81,9 @@ exceeds 2 s). A first run of the same measure, with the load generator granting 
 it had locked itself to the cycle and measured the cycle, which is why the shipped script pauses randomly. Delivery through Debezium
 (ADR 0030) would remove the polling and is not measured here.
 
+**Through nginx on the rebuilt stack** (a hire, a grant answered with `X-Wallet-Version: 2`, then the card read with `X-Min-Wallet-Version: 2`): the read
+waited between 0.1 s and 1.9 s over three runs and came back consistent with the right balance. The BFF in a browser was not part of that run.
+
 Frontend: unit tests for the version store (per employee, never lowered, junk headers ignored), the header lists of the BFF, the polling rule for a
 card that comes back behind, and the words shown for a balance; lint, type check and a production build pass. Not verified: the page in a browser
 against the running stack (the Playwright suite needs a signed-in session), several EmployeeService instances consuming (the statement is safe by

@@ -37,5 +37,6 @@ Alternatives: **a new event type for erasure** (a contract change, with no consu
 ## What is and is not verified
 Against the real database and the real token flow (158 tests in the service pass): an erased account is gone and its refresh token no longer
 works; the deletion event's stored payload does not contain the address; erasing needs a fresh step-up (403 without); an operator cannot erase
-themselves, and an unknown id is a 404. The first three of the new tests were watched failing against an endpoint that answered 501. Not verified
-here: the last-administrator refusal on this path (the same check the self-service path has, covered there), and the live stack.
+themselves, and an unknown id is a 404. The first three of the new tests were watched failing against an endpoint that answered 501. Live on the rebuilt stack: a registered and confirmed account erased by an administrator with a step-up (204), and its refresh token then refused (400). The call is made on the compose network because nginx does not route `/admin`. The 403 without a step-up is covered by the integration test only: the live run's administrator token was still inside an earlier step-up window.
+
+Not verified: the last-administrator refusal on this path (the same check the self-service path has, covered there).
