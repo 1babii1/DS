@@ -10,7 +10,7 @@
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
 		"migrate:auth-db": "node scripts/migrate-auth-db.mjs",
-		"test": "tsx --test features/assistant/lib/*.test.ts shared/auth/*.test.ts features/notifications/lib/*.test.ts features/rewards/lib/*.test.ts entities/employees/api/*.test.ts shared/api/*.test.ts",
+		"test": "tsx --test app/people/*.test.tsx features/assistant/lib/*.test.ts shared/auth/*.test.ts features/notifications/lib/*.test.ts features/rewards/lib/*.test.ts entities/employees/api/*.test.ts entities/employees/lib/*.test.ts shared/api/*.test.ts",
 		"test:e2e": "playwright test"
 	},
 	"dependencies": {
