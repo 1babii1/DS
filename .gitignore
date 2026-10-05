@@ -485,7 +485,6 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
-.claude/
 
 # Local GGUF model weights for the model-eval llama.cpp server (large, fetched on demand)
 .llm-models/
