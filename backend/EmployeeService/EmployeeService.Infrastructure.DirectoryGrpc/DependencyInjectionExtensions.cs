@@ -41,25 +41,7 @@ public static class DependencyInjectionExtensions
 
             // Retries and circuit-breaking on a call that crosses a network boundary:
             // DirectoryService being briefly unavailable shouldn't fail every hire attempt outright.
-            .AddResilienceHandler("directory-grpc", builder =>
-            {
-                builder.AddRetry(new()
-                {
-                    MaxRetryAttempts = 3,
-                    Delay = TimeSpan.FromMilliseconds(200),
-                    BackoffType = Polly.DelayBackoffType.Exponential,
-                });
-
-                builder.AddCircuitBreaker(new()
-                {
-                    FailureRatio = 0.5,
-                    SamplingDuration = TimeSpan.FromSeconds(30),
-                    MinimumThroughput = 5,
-                    BreakDuration = TimeSpan.FromSeconds(15),
-                });
-
-                builder.AddTimeout(TimeSpan.FromSeconds(5));
-            });
+            .AddResilienceHandler("directory-grpc", builder => DirectoryGrpcResilience.Configure(builder));
 
         services.AddScoped<IDirectoryLookupClient, DirectoryLookupClient>();
 
