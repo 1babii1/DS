@@ -51,7 +51,7 @@ public static class KafkaTopicProvisioner
         return new TopicSpecification
         {
             Name = topic,
-            NumPartitions = 1,
+            NumPartitions = security.TopicPartitions,
             ReplicationFactor = (short)security.TopicReplicationFactor,
             Configs = configs,
         };

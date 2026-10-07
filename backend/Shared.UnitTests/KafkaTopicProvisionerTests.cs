@@ -50,6 +50,24 @@ public class KafkaTopicProvisionerTests
     }
 
     [Fact]
+    public void A_topic_has_one_partition_unless_more_are_asked_for_and_then_it_has_that_many()
+    {
+        Assert.Equal(1, KafkaTopicProvisioner.SpecificationFor("t", new KafkaSecurityOptions(null, null)).NumPartitions);
+        Assert.Equal(6, KafkaTopicProvisioner.SpecificationFor("t", new KafkaSecurityOptions(null, null) { TopicPartitions = 6 }).NumPartitions);
+    }
+
+    [Fact]
+    public void The_number_of_partitions_is_read_from_configuration()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Kafka:TopicPartitions"] = "6" })
+            .Build();
+
+        Assert.Equal(6, KafkaSecurityOptions.FromConfiguration(configuration).TopicPartitions);
+        Assert.Equal(1, KafkaSecurityOptions.FromConfiguration(new ConfigurationBuilder().Build()).TopicPartitions);
+    }
+
+    [Fact]
     public void The_cluster_settings_are_read_from_configuration()
     {
         var configuration = new ConfigurationBuilder()
