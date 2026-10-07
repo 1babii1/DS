@@ -50,6 +50,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0050](0050-anonymising-the-ledger.md) | Anonymising the ledger |
 | [0051](0051-network-faults-between-employee-and-directory.md) | A slow or broken network between two services, measured with Toxiproxy |
 | [0052](0052-directory-call-deadlines-and-fast-rejection.md) | The Directory call gets a deadline, and an open breaker refuses at once |
+| [0053](0053-directory-call-policy-at-the-call-level.md) | The Directory call's policy sits on the call, and the breaker is told how far back to look |
 | [0038](0038-load-shedding.md) | Load shedding: turn requests away quickly instead of answering all of them slowly |
 | [0039](0039-rate-limiting-at-the-edge.md) | Rate limits at the one ingress, not in Redis |
 | [0037](0037-idempotency-key-on-hire.md) | Idempotency-Key on the hire |

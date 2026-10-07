@@ -51,7 +51,8 @@ latency rises; a fixed arrival rate would queue instead).
 
 ## Consequences
 - Items 2 and 3 are defects of the policy as configured, not of the network, and are fixed and re-measured in [0052](0052-directory-call-deadlines-and-fast-rejection.md).
-- Items 1, 4 and 5 are properties to know and to state, not to fix here: a limit on concurrent calls to one dependency (a bulkhead, 0045) is
+- Item 4 (a refused connection never reaching the policy) is fixed in [0053](0053-directory-call-policy-at-the-call-level.md).
+- Items 1 and 5 are properties to know and to state, not to fix here: a limit on concurrent calls to one dependency (a bulkhead, 0045) is
   the answer to item 1 and has not been applied to this call.
 - Toxiproxy's latency toxic delays the downstream direction only (replies); a symmetric delay or a bandwidth limit was not tried, nor packet loss
   (a TCP proxy cannot drop packets, only stall and reset).

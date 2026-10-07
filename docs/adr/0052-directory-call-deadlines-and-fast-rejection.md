@@ -1,7 +1,7 @@
 # 52. The call to DirectoryService gets a deadline of its own, and an open breaker refuses at once
 
 ## Status
-Accepted. Follows [0051](0051-network-faults-between-employee-and-directory.md), which measured what the policy did and found two defects.
+Accepted. Amended by [0053](0053-directory-call-policy-at-the-call-level.md): the policy now sits on the call, with a shorter memory and open time; the 8 s, 3 s and no-retry-of-a-refusal here stay. Follows [0051](0051-network-faults-between-employee-and-directory.md), which measured what the policy did and found two defects.
 
 ## Context
 With Toxiproxy on the gRPC call between EmployeeService and DirectoryService, 0051 found that at 6 s of added latency the first hires waited

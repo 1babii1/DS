@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using DirectoryService.Grpc;
 using EmployeeService.Application.Directory;
 using Microsoft.Extensions.Configuration;
@@ -13,7 +14,8 @@ public static class DependencyInjectionExtensions
 {
     public static IServiceCollection AddDirectoryGrpcClient(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        DirectoryGrpcResilienceSettings? resilienceSettings = null)
     {
         var address = configuration["Directory:GrpcAddress"]
             ?? throw new InvalidOperationException("Configuration 'Directory:GrpcAddress' is not set.");
@@ -37,11 +39,13 @@ public static class DependencyInjectionExtensions
             grpc.ConfigurePrimaryHttpMessageHandler(() => Shared.Security.MutualTls.CreateClientHandler(mutualTls));
         }
 
-        grpc
-
-            // Retries and circuit-breaking on a call that crosses a network boundary:
-            // DirectoryService being briefly unavailable shouldn't fail every hire attempt outright.
-            .AddResilienceHandler("directory-grpc", builder => DirectoryGrpcResilience.Configure(builder));
+        // Retry, circuit breaker and deadlines on a call that crosses a network boundary, applied to the call and not to the HTTP requests under
+        // it (ADR 0053). The pipeline holds the breaker's state, so it is one instance for the process.
+        var resilience = resilienceSettings ?? new DirectoryGrpcResilienceSettings();
+        services.AddSingleton(resilience);
+        services.AddSingleton(provider => new DirectoryGrpcResilienceInterceptor(
+            DirectoryGrpcResilience.CreatePipeline(resilience, provider.GetService<ILoggerFactory>()?.CreateLogger("DirectoryGrpcResilience")), resilience));
+        grpc.AddInterceptor<DirectoryGrpcResilienceInterceptor>();
 
         services.AddScoped<IDirectoryLookupClient, DirectoryLookupClient>();
 
