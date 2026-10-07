@@ -20,6 +20,8 @@ public static class DependencyInjectionExtensions
             options.BootstrapServers = bootstrapServers;
             options.Security = KafkaSecurityOptions.FromConfiguration(configuration);
             options.Topic = topic;
+            options.BatchSize = configuration.GetValue("Outbox:BatchSize", options.BatchSize);
+            options.PollInterval = configuration.GetValue("Outbox:PollInterval", options.PollInterval);
         });
 
         if (configuration.OutboxMode() == OutboxMode.Cdc)

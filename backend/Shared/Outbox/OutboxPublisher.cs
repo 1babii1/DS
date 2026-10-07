@@ -44,13 +44,21 @@ public class OutboxPublisher<TContext>(
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            var published = 0;
             try
             {
-                await PublishPendingAsync(stoppingToken);
+                published = await PublishPendingAsync(stoppingToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogError(ex, "Outbox publish cycle failed for topic {Topic}", _options.Topic);
+            }
+
+            // A full batch means there is probably more waiting: go again at once instead of sleeping, so that the pause bounds the
+            // latency of a quiet outbox and not the throughput of a busy one (it used to cap a publisher at BatchSize per PollInterval).
+            if (published >= _options.BatchSize)
+            {
+                continue;
             }
 
             // Отмена при остановке - это штатное завершение, а не сбой: вылетевшее
@@ -66,10 +74,17 @@ public class OutboxPublisher<TContext>(
         }
     }
 
-    private async Task PublishPendingAsync(CancellationToken cancellationToken)
+    private async Task<int> PublishPendingAsync(CancellationToken cancellationToken)
     {
         using var scope = scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<TContext>();
+
+        // Only one instance publishes at a time (ADR 0055); the others skip the cycle and look again at the next poll.
+        await using var cycle = await OutboxLeadership.TryBeginCycleAsync(dbContext, cancellationToken);
+        if (cycle is null)
+        {
+            return 0;
+        }
 
         var pending = await dbContext.Set<OutboxMessage>()
             .Where(m => m.ProcessedAt == null && m.ParkedAt == null)
@@ -79,7 +94,7 @@ public class OutboxPublisher<TContext>(
 
         if (pending.Count == 0)
         {
-            return;
+            return 0;
         }
 
         var result = await OutboxBatch.ProcessAsync(
@@ -99,8 +114,11 @@ public class OutboxPublisher<TContext>(
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        await cycle.CommitAsync(cancellationToken);
+
         logger.LogInformation(
             "Published {Succeeded}/{Total} outbox message(s) to {Topic}", result.Succeeded, pending.Count, _options.Topic);
+        return pending.Count;
     }
 
     public override void Dispose()
