@@ -12,6 +12,17 @@
 #   STEPS=baseline,lat6 scripts/toxiproxy-drill.sh   # only these steps: baseline, lat500, lat2, lat6, reset, down, recovered
 #   OUTAGE_SECS=90 scripts/toxiproxy-drill.sh   # the "unreachable" step lasts longer (the gRPC channel's reconnect back-off grows with it)
 set -euo pipefail
+
+# When a drill stops for any reason, say where and show what the services it started last said: a failure on a CI runner is otherwise a bare exit code.
+set -E
+trap 'echo "the drill stopped at line $LINENO: $BASH_COMMAND" >&2' ERR
+show_logs() {
+  for c in toxiproxy dir_tox emp_tox pg_tox; do
+    docker inspect "$c" >/dev/null 2>&1 || continue
+    echo "--- $c ($(docker inspect -f '{{.State.Status}}' "$c"))" >&2
+    docker logs --tail 25 "$c" 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | cut -c1-220 >&2
+  done
+}
 cd "$(dirname "$0")/.."
 secs="${1:-30}"
 outage="${OUTAGE_SECS:-$secs}"
@@ -22,7 +33,7 @@ tox_image=ghcr.io/shopify/toxiproxy:2.12.0
 api=http://localhost:18474
 
 cleanup() { docker rm -f toxiproxy dir_tox emp_tox pg_tox >/dev/null 2>&1 || true; }
-[ -n "${KEEP:-}" ] || trap cleanup EXIT
+[ -n "${KEEP:-}" ] || trap 'status=$?; [ "$status" = 0 ] || show_logs; cleanup' EXIT
 cleanup
 
 docker run -d --name pg_tox --network $net -e POSTGRES_PASSWORD=toxpw -e POSTGRES_DB=platform pgvector/pgvector:pg18 >/dev/null

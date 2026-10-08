@@ -12,6 +12,17 @@
 #   scripts/temporal-drill.sh                 # all three cases
 #   CASES=workflow,saga scripts/temporal-drill.sh   # a subset: workflow, saga, server-down, precision
 set -euo pipefail
+
+# When a drill stops for any reason, say where and show what the services it started last said: a failure on a CI runner is otherwise a bare exit code.
+set -E
+trap 'echo "the drill stopped at line $LINENO: $BASH_COMMAND" >&2' ERR
+show_logs() {
+  for c in dir_tp temporal_tp emp_tp_a emp_tp_b; do
+    docker inspect "$c" >/dev/null 2>&1 || continue
+    echo "--- $c ($(docker inspect -f '{{.State.Status}}' "$c"))" >&2
+    docker logs --tail 25 "$c" 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | cut -c1-220 >&2
+  done
+}
 cd "$(dirname "$0")/.."
 cases="${CASES:-workflow,saga,server-down,precision}"
 net=dsporfolio_default
@@ -20,7 +31,7 @@ dir_image="${DIR_IMAGE:-dsporfolio-directory_service:latest}"
 timeout_secs=30
 
 cleanup() { docker rm -f pg_tp dir_tp temporal_tp emp_tp_a emp_tp_b >/dev/null 2>&1 || true; }
-[ -n "${KEEP:-}" ] || trap cleanup EXIT
+[ -n "${KEEP:-}" ] || trap 'status=$?; [ "$status" = 0 ] || show_logs; cleanup' EXIT
 cleanup
 
 docker run -d --name pg_tp --network $net -e POSTGRES_PASSWORD=tppw -e POSTGRES_DB=platform pgvector/pgvector:pg18 >/dev/null

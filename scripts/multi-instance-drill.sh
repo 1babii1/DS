@@ -9,6 +9,17 @@
 #   PARTITIONS=1 scripts/multi-instance-drill.sh      # topics with this many partitions (created up front)
 #   DURATION=60 EMPLOYEES=300 PACE=0.4 KILL=1 ...      # KILL=0 runs without killing anything
 set -euo pipefail
+
+# When a drill stops for any reason, say where and show what the services it started last said: a failure on a CI runner is otherwise a bare exit code.
+set -E
+trap 'echo "the drill stopped at line $LINENO: $BASH_COMMAND" >&2' ERR
+show_logs() {
+  for c in rewards_a rewards_b rewards_c employee_a employee_b employee_c kafka_mi registry_mi; do
+    docker inspect "$c" >/dev/null 2>&1 || continue
+    echo "--- $c ($(docker inspect -f '{{.State.Status}}' "$c"))" >&2
+    docker logs --tail 25 "$c" 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | cut -c1-220 >&2
+  done
+}
 cd "$(dirname "$0")/.."
 partitions="${PARTITIONS:-1}"
 employees="${EMPLOYEES:-300}"
@@ -21,7 +32,7 @@ emp_image="${EMP_IMAGE:-dsporfolio-employee_service:latest}"
 names=(rewards_a rewards_b rewards_c employee_a employee_b employee_c)
 
 cleanup() { docker rm -f pg_mi kafka_mi registry_mi "${names[@]}" >/dev/null 2>&1 || true; docker network rm $net >/dev/null 2>&1 || true; rm -f load-tests/k6/.multi-ids.txt load-tests/k6/.multi-k6.log; }
-[ -n "${KEEP:-}" ] || trap cleanup EXIT
+[ -n "${KEEP:-}" ] || trap 'status=$?; [ "$status" = 0 ] || show_logs; cleanup' EXIT
 cleanup
 docker network create $net >/dev/null
 
