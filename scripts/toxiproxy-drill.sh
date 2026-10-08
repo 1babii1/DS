@@ -80,7 +80,7 @@ k6() { # extra docker -e arguments, then k6 reads the rest from the environment
     -e DIRECTORY_BASE_URL=http://localhost:5301 -e EMPLOYEE_BASE_URL=http://localhost:5311 "$@" grafana/k6 run --quiet toxiproxy-hire.js 2>&1
 }
 # One login and one set of reference data for all the steps (the sign-in has its own limit of five a minute).
-prep_out=$(k6 -e MODE=prepare || true)
+prep_out=$(k6 -e MODE=prepare; echo "[k6 exited with $?]")
 prep=$(echo "$prep_out" | grep -o 'PREPARED {.*}' | sed 's/^PREPARED //' | sed 's/\\"/"/g;s/}.*$/}/' || true)
 if [ -z "$prep" ]; then
   echo "the sign-in and the reference data could not be prepared; k6 said:" >&2
