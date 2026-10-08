@@ -65,7 +65,7 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p drill-logs
-          scripts/toxiproxy-drill.sh 20 2>&1 | tee drill-logs/toxiproxy.log
+          bash scripts/toxiproxy-drill.sh 20 2>&1 | tee drill-logs/toxiproxy.log
 
       - name: Several instances, one killed (ADR 0054, 0055)
         id: multi
@@ -73,7 +73,7 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p drill-logs
-          PARTITIONS=6 DURATION=45 scripts/multi-instance-drill.sh 2>&1 | tee drill-logs/multi-instance.log
+          PARTITIONS=6 DURATION=45 bash scripts/multi-instance-drill.sh 2>&1 | tee drill-logs/multi-instance.log
 
       - name: The hire as a Temporal workflow and as the saga (ADR 0056)
         id: temporal
@@ -81,7 +81,7 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p drill-logs
-          scripts/temporal-drill.sh 2>&1 | tee drill-logs/temporal.log
+          bash scripts/temporal-drill.sh 2>&1 | tee drill-logs/temporal.log
 
       - name: Department rights through OpenFGA (ADR 0057)
         id: fga
@@ -89,7 +89,7 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p drill-logs
-          scripts/fga-drill.sh 2>&1 | tee drill-logs/fga.log
+          bash scripts/fga-drill.sh 2>&1 | tee drill-logs/fga.log
 
       - name: What happened
         if: always()
@@ -108,7 +108,7 @@ jobs:
               echo
               echo "### $(basename "$log" .log)"
               echo '```'
-              grep -E "^(PASS|FAIL|ALL CHECKS|A CHECK|[0-9]+ CHECK|ALL PASSED|[0-9]+ FAILED|\|)" "$log" | tail -60
+              grep -E "^(PASS|FAIL|ALL CHECKS|A CHECK|[0-9]+ CHECK|ALL PASSED|[0-9]+ FAILED|\|)" "$log" | tail -60 || true
               echo '```'
             done
           } >> "$GITHUB_STEP_SUMMARY"
