@@ -1,0 +1,127 @@
+name: Drills
+
+# The measurements of the ADRs, run again against the code as it is (ADR 0058). Each drill starts real services against a real broker, database and
+# store, breaks something, and exits non-zero if what the ADR claimed no longer holds. Nightly, and on demand with a choice of drills.
+on:
+  schedule:
+    - cron: "30 1 * * *"
+  workflow_dispatch:
+    inputs:
+      drills:
+        description: "Which drills, comma separated: toxiproxy, multi-instance, temporal, fga"
+        default: "toxiproxy,multi-instance,temporal,fga"
+
+concurrency:
+  group: drills
+  cancel-in-progress: false
+
+jobs:
+  drills:
+    name: Drills
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      # The compose project is named after the checkout directory; the drills name the stack's network and images by the project this repo is developed under.
+      COMPOSE_PROJECT_NAME: dsporfolio
+      SELECTED: ${{ inputs.drills || 'toxiproxy,multi-instance,temporal,fga' }}
+      EMP_IMAGE: dsporfolio-employee_service:latest
+      REW_IMAGE: dsporfolio-rewards_service:latest
+      DIR_IMAGE: dsporfolio-directory_service:latest
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: A client secret for this run
+        run: echo "AUTH_OIDC_CLIENT_SECRET=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+
+      - name: Build the images the drills run
+        run: docker compose build auth_service directory_service employee_service rewards_service
+
+      - name: Start the part of the stack the drills share
+        run: |
+          docker compose up -d --wait --wait-timeout 600 postgres pgbouncer redis kafka schema_registry mailpit auth_service directory_service
+          docker compose up -d --no-deps nginx
+          for _ in $(seq 1 60); do
+            [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5130/health/ready)" = 200 ] && break
+            sleep 5
+          done
+          docker compose ps
+
+      - name: Toxiproxy on the Employee to Directory call (ADR 0051 to 0053)
+        id: toxiproxy
+        if: contains(env.SELECTED, 'toxiproxy')
+        continue-on-error: true
+        run: |
+          mkdir -p drill-logs
+          scripts/toxiproxy-drill.sh 20 2>&1 | tee drill-logs/toxiproxy.log
+
+      - name: Several instances, one killed (ADR 0054, 0055)
+        id: multi
+        if: contains(env.SELECTED, 'multi-instance')
+        continue-on-error: true
+        run: |
+          mkdir -p drill-logs
+          PARTITIONS=6 DURATION=45 scripts/multi-instance-drill.sh 2>&1 | tee drill-logs/multi-instance.log
+
+      - name: The hire as a Temporal workflow and as the saga (ADR 0056)
+        id: temporal
+        if: contains(env.SELECTED, 'temporal')
+        continue-on-error: true
+        run: |
+          mkdir -p drill-logs
+          scripts/temporal-drill.sh 2>&1 | tee drill-logs/temporal.log
+
+      - name: Department rights through OpenFGA (ADR 0057)
+        id: fga
+        if: contains(env.SELECTED, 'fga')
+        continue-on-error: true
+        run: |
+          mkdir -p drill-logs
+          scripts/fga-drill.sh 2>&1 | tee drill-logs/fga.log
+
+      - name: What happened
+        if: always()
+        run: |
+          {
+            echo "## Drills"
+            echo
+            echo "| drill | result |"
+            echo "|---|---|"
+            echo "| toxiproxy | ${{ steps.toxiproxy.outcome }} |"
+            echo "| multi-instance | ${{ steps.multi.outcome }} |"
+            echo "| temporal | ${{ steps.temporal.outcome }} |"
+            echo "| fga | ${{ steps.fga.outcome }} |"
+            for log in drill-logs/*.log; do
+              [ -f "$log" ] || continue
+              echo
+              echo "### $(basename "$log" .log)"
+              echo '```'
+              grep -E "^(PASS|FAIL|ALL CHECKS|A CHECK|[0-9]+ CHECK|ALL PASSED|[0-9]+ FAILED|\|)" "$log" | tail -60
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Logs of the services, if something failed
+        if: failure() || steps.toxiproxy.outcome == 'failure' || steps.multi.outcome == 'failure' || steps.temporal.outcome == 'failure' || steps.fga.outcome == 'failure'
+        run: docker compose logs --tail 150 auth_service directory_service kafka > drill-logs/stack.log 2>&1 || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: drill-logs
+          path: drill-logs/
+          if-no-files-found: ignore
+
+      - name: Verdict
+        if: always()
+        run: |
+          failed=0
+          for outcome in "${{ steps.toxiproxy.outcome }}" "${{ steps.multi.outcome }}" "${{ steps.temporal.outcome }}" "${{ steps.fga.outcome }}"; do
+            [ "$outcome" = failure ] && failed=1
+          done
+          exit $failed

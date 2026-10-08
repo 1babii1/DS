@@ -114,4 +114,27 @@ for r in rows:
     p = r["phase"]
     st = ", ".join(f"{k}: {v}" for k, v in r["statuses"].items())
     print(f"| {p} | {r['ok']} | {r['failed']} (fast {r['fastFail']}, slow {r['slowFail']}) | {st} | {r['p50']} | {r['p95']} | {r['p99']} | {r['max']} | {(str(round(r['firstOkMs']/1000,1))+' s') if r.get('firstOkMs') is not None else 'none'} | {e(p,'OnRetry')} | {e(p,'OnTimeout')} | {e(p,'OnCircuitOpened')} / {e(p,'OnCircuitHalfOpened')} / {e(p,'OnCircuitClosed')} |")
+
+# What the numbers have to be for the drill to count as passed (ADR 0058): generous, since a runner is slower and noisier than a laptop, and
+# aimed at what each ADR claimed, not at the exact figures.
+def row(prefix): return next((r for r in rows if r["phase"].startswith(prefix)), None)
+checks = []
+def need(label, ok): checks.append((label, bool(ok)))
+r = row("baseline")
+if r: need("baseline: no hire failed, and many succeeded", r["failed"] == 0 and r["ok"] > 100)
+for prefix in ("latency 500", "latency 2 s"):
+    r = row(prefix)
+    if r: need(f"{prefix}: a slow answer inside the limits still succeeds", r["failed"] == 0 and r["ok"] > 0)
+r = row("latency 6 s")
+if r: need("latency 6 s: hires are refused fast once the breaker is open (p50 <= 200 ms) and none waits past the 8 s deadline", r["ok"] == 0 and r["p50"] <= 200 and r["max"] <= 12000)
+r = row("connection reset")
+if r: need("connection reset: refused fast (p50 <= 200 ms)", r["p50"] <= 200)
+r = row("directory unreachable")
+if r: need("directory unreachable: refused fast, and mostly at once", r["p50"] <= 200 and r["fastFail"] >= 0.9 * max(r["failed"], 1))
+r = row("recovered")
+if r: need("recovered: hires succeed again within 15 s of the network returning", r["ok"] > 0 and r.get("firstOkMs") is not None and r["firstOkMs"] <= 15000)
+print()
+for label, ok in checks:
+    print(("PASS  " if ok else "FAIL  ") + label)
+sys.exit(0 if all(ok for _, ok in checks) else 1)
 PY

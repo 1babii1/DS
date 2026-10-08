@@ -142,5 +142,29 @@ echo "| rows still unpublished when the load ended / seconds to publish them | $
 echo "| messages on rewards.events.v2 for $outbox outbox rows | $onbus (x$(python3 -c "print(round($onbus/max($outbox,1),2))") per row) |"
 echo
 echo "== who consumes rewards.events.v2 (group employee-mi)"
-docker exec kafka_mi /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group employee-mi 2>/dev/null \
-  | awk 'NR>1 && $1 != "" && $2 == "rewards.events.v2" {print "partition " $3 "  member " substr($7,1,40) "  lag " $6}' | sort | head -12
+assignment=$(docker exec kafka_mi /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group employee-mi 2>/dev/null \
+  | awk 'NR>1 && $1 != "" && $2 == "rewards.events.v2" {print "partition " $3 "  member " substr($7,1,40) "  lag " $6}' | sort | head -12)
+echo "$assignment"
+members=$(echo "$assignment" | awk '{print $4}' | sort -u | grep -c . || true)
+
+# What has to hold for the drill to count as passed (ADR 0058).
+failed=0
+check() { # label ok|no
+  if [ "$2" = ok ]; then echo "PASS  $1"; else echo "FAIL  $1"; failed=1; fi
+}
+isnum() { [[ "$1" =~ ^[0-9]+$ ]]; }
+echo
+if isnum "$confirmed" && isnum "$unknown" && isnum "$rows"; then
+  check "every confirmed grant has a ledger row, and no more rows than there could be" "$([ "$rows" -ge "$confirmed" ] && [ "$rows" -le $((confirmed + unknown)) ] && echo ok || echo no)"
+else
+  check "the load generator reported its counts" no
+fi
+check "no key was counted twice" "$([ "$keys" = "$rows" ] && echo ok || echo no)"
+check "every wallet equals its ledger" "$([ "$badwallets" = 0 ] && echo ok || echo no)"
+check "the card's copy equals every wallet in balance and in version" "$([ "$badcards" = 0 ] && [ "$badversions" = 0 ] && echo ok || echo no)"
+check "the outbox is drained and nothing is parked" "$([ "$unprocessed" = 0 ] && [ "$parked" = 0 ] && echo ok || echo no)"
+check "each event went on the bus once (at most 5% over)" "$(python3 -c "print('ok' if $onbus <= 1.05 * max($outbox, 1) else 'no')")"
+if [ "$partitions" -ge 3 ]; then
+  check "the partitions are spread over every consumer ($members of 3)" "$([ "$members" = 3 ] && echo ok || echo no)"
+fi
+[ "$failed" = 0 ] && echo "ALL CHECKS PASSED" || { echo "A CHECK FAILED"; exit 1; }
