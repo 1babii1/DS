@@ -147,6 +147,9 @@ services:
       # Saga (default, ADR 0032) or Temporal, with `--profile temporal` (ADR 0056): what carries a hire through its onboarding.
       - HireOrchestration__Mode=${HIRE_ORCHESTRATION_MODE:-Saga}
       - HireOrchestration__Address=temporal:7233
+      # Roles (default) or Tree, with `--profile fga` (ADR 0057): whether a non-administrator may hire into a department only if they manage it or one above it.
+      - DepartmentAuthorization__Mode=${DEPARTMENT_AUTHORIZATION_MODE:-Roles}
+      - DepartmentAuthorization__OpenFgaUrl=http://openfga:8080
       - ASPNETCORE_URLS=http://*:5131
       - ConnectionStrings__EmployeeServiceDb=Server=pgbouncer;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=employee,public
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
@@ -711,6 +714,53 @@ services:
       registry_db_init:
         condition: service_completed_successfully
 
+  # OpenFGA, the authorization store of ADR 0057. Opt-in, `--profile fga`, together with DEPARTMENT_AUTHORIZATION_MODE=Tree. Its own Postgres
+  # (it owns a database, not a schema), migrated by a one-shot container, so that who manages what survives a restart.
+  fga_postgres:
+    container_name: fga_postgres
+    profiles: ["fga"]
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_USER: openfga
+      POSTGRES_PASSWORD: ${FGA_POSTGRES_PASSWORD:-openfga}
+      POSTGRES_DB: openfga
+    volumes:
+      - fga_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openfga -d openfga"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  fga_migrate:
+    container_name: fga_migrate
+    profiles: ["fga"]
+    image: openfga/openfga:v1.22.0
+    restart: "no"
+    command: ["migrate"]
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: postgres://openfga:${FGA_POSTGRES_PASSWORD:-openfga}@fga_postgres:5432/openfga?sslmode=disable
+    depends_on:
+      fga_postgres:
+        condition: service_healthy
+
+  openfga:
+    container_name: openfga
+    profiles: ["fga"]
+    image: openfga/openfga:v1.22.0
+    restart: always
+    command: ["run"]
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: postgres://openfga:${FGA_POSTGRES_PASSWORD:-openfga}@fga_postgres:5432/openfga?sslmode=disable
+    ports:
+      - "127.0.0.1:8090:8080"
+    depends_on:
+      fga_migrate:
+        condition: service_completed_successfully
+
   # Temporal's development server (ADR 0056). Opt-in, `--profile temporal`, together with HIRE_ORCHESTRATION_MODE=Temporal. This is the
   # single-process server with its state in memory: enough to run the workflow and to show it, not a deployment (that needs a cluster
   # and a database of its own).
@@ -876,6 +926,7 @@ configs:
       };
 
 volumes:
+  fga_data:
   postgres_data:
   postgres_replica_data:
   redis_data:

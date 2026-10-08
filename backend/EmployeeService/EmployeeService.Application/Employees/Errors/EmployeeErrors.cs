@@ -28,6 +28,12 @@ public static class EmployeeErrors
             "Position does not belong to the given department",
             "positionId");
 
+    public static Error NotDepartmentManager() =>
+        Error.Authorization("employee.department.not_manager", "You do not manage this department or any department above it", "departmentId");
+
+    public static Error AuthorizationUnavailable() =>
+        Error.Unavailable("employee.authorization.unavailable", "Authorization is temporarily unavailable; nothing was changed");
+
     public static Error DirectoryUnavailable() =>
         Error.Unavailable("employee.directory.unavailable", "DirectoryService is temporarily unavailable");
 

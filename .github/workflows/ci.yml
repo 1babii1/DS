@@ -143,3 +143,14 @@ jobs:
 
       - name: Lint and validate
         run: scripts/check-chart.sh
+
+  fga-model:
+    name: Authorization model
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test the model and check the JSON the service embeds against it
+        run: scripts/check-fga-model.sh

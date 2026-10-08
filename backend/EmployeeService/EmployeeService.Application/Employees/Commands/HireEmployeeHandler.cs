@@ -1,4 +1,5 @@
 using CSharpFunctionalExtensions;
+using EmployeeService.Application.Authorization;
 using EmployeeService.Application.Database;
 using EmployeeService.Application.Directory;
 using EmployeeService.Application.Employees;
@@ -15,6 +16,7 @@ public class HireEmployeeHandler(
     IDirectoryLookupClient directoryLookupClient,
     IOutboxWriter outboxWriter,
     IHireOrchestrator orchestrator,
+    IDepartmentAuthorization authorization,
     IIdempotencyRepository idempotency,
     TimeProvider clock,
     ILogger<HireEmployeeHandler> logger)
@@ -38,6 +40,15 @@ public class HireEmployeeHandler(
             {
                 return earlier.RequestHash == requestHash ? earlier.ResultId : EmployeeErrors.IdempotencyKeyReused();
             }
+        }
+
+        // Before the directory is asked anything: a caller who may not hire into a department is not told whether it exists (ADR 0057).
+        switch (await authorization.CanManageAsync(new Caller(command.HiredByAccountId, command.CallerIsAdmin), command.DepartmentId, cancellationToken))
+        {
+            case AccessDecision.Denied:
+                return EmployeeErrors.NotDepartmentManager();
+            case AccessDecision.Unavailable:
+                return EmployeeErrors.AuthorizationUnavailable();
         }
 
         AssignmentValidationResult validation;

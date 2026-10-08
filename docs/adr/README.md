@@ -54,6 +54,7 @@ descriptions as each phase shipped, not backfilled generically.
 | [0054](0054-several-instances-of-one-service.md) | Several instances of one service, one of them killed: what holds and what does not |
 | [0055](0055-one-outbox-publisher-and-configurable-partitions.md) | One outbox publisher at a time, configurable partitions, no sleep on a full batch |
 | [0056](0056-the-hire-as-a-temporal-workflow.md) | The hire's onboarding as a Temporal workflow, beside the saga it was compared with |
+| [0057](0057-department-rights-through-openfga.md) | Who may hire into a department: relationship-based authorization with OpenFGA |
 | [0038](0038-load-shedding.md) | Load shedding: turn requests away quickly instead of answering all of them slowly |
 | [0039](0039-rate-limiting-at-the-edge.md) | Rate limits at the one ingress, not in Redis |
 | [0037](0037-idempotency-key-on-hire.md) | Idempotency-Key on the hire |

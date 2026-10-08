@@ -1,0 +1,64 @@
+# Run with:  docker run --rm -v "$PWD/deploy/fga":/m openfga/cli model test --tests /m/tests.fga.yaml
+# The model is checked against the cases that matter, without a server: who may manage which department in a small organisation.
+#
+#   company
+#   |-- engineering
+#   |   |-- backend
+#   |   |   `-- platform
+#   |   `-- frontend
+#   `-- sales
+name: Who may manage which department
+model_file: ./model.fga
+
+tuples:
+  - { user: department:company, relation: parent, object: department:engineering }
+  - { user: department:company, relation: parent, object: department:sales }
+  - { user: department:engineering, relation: parent, object: department:backend }
+  - { user: department:engineering, relation: parent, object: department:frontend }
+  - { user: department:backend, relation: parent, object: department:platform }
+  - { user: user:anna, relation: manager, object: department:engineering }
+  - { user: user:boris, relation: manager, object: department:backend }
+  - { user: user:carla, relation: manager, object: department:sales }
+
+tests:
+  - name: A manager manages their own department
+    check:
+      - { user: user:anna, object: department:engineering, assertions: { can_manage: true } }
+      - { user: user:boris, object: department:backend, assertions: { can_manage: true } }
+
+  - name: A manager manages every department below theirs, however deep
+    check:
+      - { user: user:anna, object: department:backend, assertions: { can_manage: true } }
+      - { user: user:anna, object: department:frontend, assertions: { can_manage: true } }
+      - { user: user:anna, object: department:platform, assertions: { can_manage: true } }
+      - { user: user:boris, object: department:platform, assertions: { can_manage: true } }
+
+  - name: A manager does not manage the departments above or beside theirs
+    check:
+      - { user: user:boris, object: department:engineering, assertions: { can_manage: false } }
+      - { user: user:boris, object: department:frontend, assertions: { can_manage: false } }
+      - { user: user:anna, object: department:sales, assertions: { can_manage: false } }
+      - { user: user:anna, object: department:company, assertions: { can_manage: false } }
+
+  - name: Someone who manages nothing manages nothing
+    check:
+      - { user: user:dmitri, object: department:backend, assertions: { can_manage: false } }
+      - { user: user:dmitri, object: department:company, assertions: { can_manage: false } }
+
+  - name: A different branch is a different branch
+    check:
+      - { user: user:carla, object: department:sales, assertions: { can_manage: true } }
+      - { user: user:carla, object: department:engineering, assertions: { can_manage: false } }
+      - { user: user:carla, object: department:platform, assertions: { can_manage: false } }
+
+  - name: Everyone a manager can manage, listed
+    list_objects:
+      - user: user:anna
+        type: department
+        assertions: { can_manage: [department:engineering, department:backend, department:frontend, department:platform] }
+      - user: user:boris
+        type: department
+        assertions: { can_manage: [department:backend, department:platform] }
+      - user: user:dmitri
+        type: department
+        assertions: { can_manage: [] }
