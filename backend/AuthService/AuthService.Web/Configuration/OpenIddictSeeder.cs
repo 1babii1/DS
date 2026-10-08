@@ -1,6 +1,7 @@
 ﻿using AuthService.Application;
 using AuthService.Domain;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenIddict.Abstractions;
 using static OpenIddict.Abstractions.OpenIddictConstants;
@@ -116,26 +117,67 @@ public static class OpenIddictSeeder
     private static async Task SeedAdminUserAsync(IServiceProvider provider)
     {
         var options = provider.GetRequiredService<IOptions<AuthOptions>>().Value.SeedAdmin;
-        var userManager = provider.GetRequiredService<UserManager<Account>>();
+        var logger = provider.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(OpenIddictSeeder));
 
-        if (await userManager.FindByEmailAsync(options.Email) is not null)
+        var result = await EnsureAdminAsync(provider.GetRequiredService<UserManager<Account>>(), options.Email, options.Password);
+        switch (result.Status)
         {
-            return;
+            case AdminSeedStatus.Created:
+                logger.LogInformation("The seeded administrator {Email} was created", options.Email);
+                break;
+            case AdminSeedStatus.Refused:
+                // Said out loud, because the alternative was a stack that starts, looks healthy and has nobody who can sign in (the password
+                // never appears here, only what the validators called wrong with it).
+                logger.LogError(
+                    "The seeded administrator {Email} could not be created, so nobody can sign in as one: {Reasons}. Set Auth:SeedAdmin:Password to a password the platform accepts",
+                    options.Email,
+                    string.Join(", ", result.Reasons));
+                break;
+            case AdminSeedStatus.RoleNotGranted:
+                logger.LogError(
+                    "The seeded administrator {Email} was created but could not be given the administrator role: {Reasons}",
+                    options.Email,
+                    string.Join(", ", result.Reasons));
+                break;
+        }
+    }
+
+    /// <summary>Creates the administrator the platform starts with, once. The outcome says which of the three things happened; it never says the password.</summary>
+    public static async Task<AdminSeedResult> EnsureAdminAsync(UserManager<Account> userManager, string email, string password)
+    {
+        if (await userManager.FindByEmailAsync(email) is not null)
+        {
+            return new AdminSeedResult(AdminSeedStatus.AlreadyThere, []);
         }
 
         var admin = new Account
         {
-            UserName = options.Email,
-            Email = options.Email,
+            UserName = email,
+            Email = email,
             EmailConfirmed = true,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
         };
 
-        var result = await userManager.CreateAsync(admin, options.Password);
-        if (result.Succeeded)
+        var created = await userManager.CreateAsync(admin, password);
+        if (!created.Succeeded)
         {
-            await userManager.AddToRoleAsync(admin, RoleNames.Admin);
+            return new AdminSeedResult(AdminSeedStatus.Refused, created.Errors.Select(e => e.Code).ToList());
         }
+
+        var granted = await userManager.AddToRoleAsync(admin, RoleNames.Admin);
+        return granted.Succeeded
+            ? new AdminSeedResult(AdminSeedStatus.Created, [])
+            : new AdminSeedResult(AdminSeedStatus.RoleNotGranted, granted.Errors.Select(e => e.Code).ToList());
     }
 }
+
+public enum AdminSeedStatus
+{
+    Created,
+    AlreadyThere,
+    Refused,
+    RoleNotGranted,
+}
+
+public sealed record AdminSeedResult(AdminSeedStatus Status, IReadOnlyList<string> Reasons);
