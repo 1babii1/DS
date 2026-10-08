@@ -70,8 +70,14 @@ start_employee() {
 }
 
 for _ in $(seq 1 60); do [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5301/health/live)" = 200 ] && break; sleep 2; done
-prep=$(docker run --rm --network host -v "$PWD/load-tests/k6":/scripts -w /scripts -e MODE=prepare -e DIRECTORY_BASE_URL=http://localhost:5301 \
-  -e EMPLOYEE_BASE_URL=http://localhost:5311 grafana/k6 run --quiet toxiproxy-hire.js 2>&1 | grep -o 'PREPARED {.*}' | sed 's/^PREPARED //' | sed 's/\\"/"/g;s/}.*$/}/')
+prep_out=$(docker run --rm --network host -v "$PWD/load-tests/k6":/scripts -w /scripts -e MODE=prepare -e DIRECTORY_BASE_URL=http://localhost:5301 \
+  -e EMPLOYEE_BASE_URL=http://localhost:5311 grafana/k6 run --quiet toxiproxy-hire.js 2>&1 || true)
+prep=$(echo "$prep_out" | grep -o 'PREPARED {.*}' | sed 's/^PREPARED //' | sed 's/\\"/"/g;s/}.*$/}/' || true)
+if [ -z "$prep" ]; then
+  echo "the sign-in and the reference data could not be prepared; k6 said:" >&2
+  echo "$prep_out" | tail -15 | cut -c1-300 >&2
+  exit 1
+fi
 token=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["token"])' "$prep")
 dept=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["departmentId"])' "$prep")
 pos=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["positionId"])' "$prep")
