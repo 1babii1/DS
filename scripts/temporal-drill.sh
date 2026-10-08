@@ -83,6 +83,12 @@ wait_for_failed() { # id, max seconds -> prints seconds waited, or "never"
   echo never
 }
 
+failures=0
+# A drill that only prints is a measurement; one that exits non-zero when a number is wrong can run unattended (the nightly drills of ADR 0058).
+check() { # label ok|no
+  if [ "$2" = ok ]; then echo "PASS  $1"; else echo "FAIL  $1"; failures=$((failures + 1)); fi
+}
+
 kill_case() { # label mode port
   local label="$1" mode="$2" port="$3"
   echo "=== $label: the instance is killed with the timer running, the ${timeout_secs} s deadline passes with no instance alive"
@@ -103,6 +109,8 @@ kill_case() { # label mode port
   local waited
   waited=$(wait_for_failed "$id" 90)
   echo "[$((SECONDS - t0)) s] a new instance came up after ${up} s; the hire was undone ${waited} s after it was up (status $(status_of "$id"), compensation events $(undone_events "$id"))"
+  check "$label: the hire was undone within 20 s of a new instance being up" "$([ "$waited" != never ] && [ "$waited" -le 20 ] && echo ok || echo no)"
+  check "$label: it was undone exactly once" "$([ "$(undone_events "$id")" = 1 ] && echo ok || echo no)"
   if [ "$mode" = Temporal ]; then
     docker exec temporal_tp temporal workflow describe --address temporal_tp:7233 --workflow-id "hire-$(echo "$id" | tr -d -)" 2>/dev/null \
       | grep -E "^ *(Status|HistoryLength|TaskQueue|Type)" | sed 's/^ */  workflow: /' || true
@@ -133,6 +141,9 @@ if [[ ",$cases," == *",server-down,"* ]]; then
   docker start temporal_tp >/dev/null
   echo "[$((SECONDS - t0)) s] Temporal is back; the reconciler (every 15 s, for hires waiting longer than 10 s) has to start the workflow"
   waited=$(wait_for_failed "$id" 120)
+  check "TEMPORAL DOWN: the hire succeeded while Temporal was down" "$([ "$(status_of "$id")" != "" ] && echo ok || echo no)"
+  check "TEMPORAL DOWN: the reconciler got the hire undone within 50 s of the hire (30 s deadline counted from the hire, plus a reconciler pass)" "$([ "$waited" != never ] && [ $((SECONDS - t0)) -le 50 ] && echo ok || echo no)"
+  check "TEMPORAL DOWN: it was undone exactly once" "$([ "$(undone_events "$id")" = 1 ] && echo ok || echo no)"
   echo "[$((SECONDS - t0)) s] the hire was undone ${waited} s after Temporal returned (status $(status_of "$id"), compensation events $(undone_events "$id"))"
   docker logs emp_tp_a 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -m2 "workflow could not be started" | cut -c1-200 || true
 fi
@@ -159,11 +170,22 @@ precision_case() { # label mode port
     done
     sleep 0.5
   done
-  local report=""
+  local report="" max_late=0 late
   for i in $(seq 0 $((n - 1))); do
-    if [ -n "${done_at[$i]}" ]; then report="$report $((done_at[$i] - hired[$i] - timeout_secs))s"; else report="$report never"; fi
+    if [ -n "${done_at[$i]}" ]; then
+      late=$((done_at[$i] - hired[$i] - timeout_secs))
+      report="$report ${late}s"
+      [ "$late" -gt "$max_late" ] && max_late=$late
+    else
+      report="$report never"
+      max_late=999
+    fi
   done
   echo "  lateness of each hire after its deadline (seconds, resolution 1 s):$report"
+  # Temporal's timer is the server's; the saga's worker looks every 15 s.
+  local limit=20
+  [ "$mode" = Temporal ] && limit=4
+  check "$label: every hire undone within ${limit} s of its own deadline" "$([ "$max_late" -le "$limit" ] && echo ok || echo no)"
   docker rm -f emp_tp_a >/dev/null
 }
 
@@ -173,4 +195,12 @@ if [[ ",$cases," == *",precision,"* ]]; then
   precision_case "TEMPORAL" Temporal 5361
   docker rm -f temporal_tp >/dev/null
   precision_case "SAGA" Saga 5362
+fi
+
+echo
+if [ "$failures" -eq 0 ]; then
+  echo "ALL CHECKS PASSED"
+else
+  echo "$failures CHECK(S) FAILED"
+  exit 1
 fi
