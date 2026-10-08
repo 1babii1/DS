@@ -9,13 +9,24 @@
 #
 #   scripts/fga-drill.sh
 set -euo pipefail
+
+# When a drill stops for any reason, say where and show what the services it started last said: a failure on a CI runner is otherwise a bare exit code.
+set -E
+trap 'echo "the drill stopped at line $LINENO: $BASH_COMMAND" >&2' ERR
+show_logs() {
+  for c in fga_drill emp_fga; do
+    docker inspect "$c" >/dev/null 2>&1 || continue
+    echo "--- $c ($(docker inspect -f '{{.State.Status}}' "$c"))" >&2
+    docker logs --tail 25 "$c" 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | cut -c1-220 >&2
+  done
+}
 cd "$(dirname "$0")/.."
 net=dsporfolio_default
 emp_image="${EMP_IMAGE:-ds-employee:fga}"
 fga_image=openfga/openfga:v1.22.0
 
 cleanup() { docker rm -f emp_fga fga_drill fga_pg_drill pg_fga_drill >/dev/null 2>&1 || true; }
-[ -n "${KEEP:-}" ] || trap cleanup EXIT
+[ -n "${KEEP:-}" ] || trap 'status=$?; [ "$status" = 0 ] || show_logs; cleanup' EXIT
 cleanup
 
 docker run -d --name fga_pg_drill --network $net -e POSTGRES_USER=openfga -e POSTGRES_PASSWORD=fgapw -e POSTGRES_DB=openfga postgres:16 >/dev/null

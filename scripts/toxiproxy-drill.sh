@@ -12,6 +12,17 @@
 #   STEPS=baseline,lat6 scripts/toxiproxy-drill.sh   # only these steps: baseline, lat500, lat2, lat6, reset, down, recovered
 #   OUTAGE_SECS=90 scripts/toxiproxy-drill.sh   # the "unreachable" step lasts longer (the gRPC channel's reconnect back-off grows with it)
 set -euo pipefail
+
+# When a drill stops for any reason, say where and show what the services it started last said: a failure on a CI runner is otherwise a bare exit code.
+set -E
+trap 'echo "the drill stopped at line $LINENO: $BASH_COMMAND" >&2' ERR
+show_logs() {
+  for c in toxiproxy dir_tox emp_tox pg_tox; do
+    docker inspect "$c" >/dev/null 2>&1 || continue
+    echo "--- $c ($(docker inspect -f '{{.State.Status}}' "$c"))" >&2
+    docker logs --tail 25 "$c" 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | cut -c1-220 >&2
+  done
+}
 cd "$(dirname "$0")/.."
 secs="${1:-30}"
 outage="${OUTAGE_SECS:-$secs}"
@@ -22,7 +33,7 @@ tox_image=ghcr.io/shopify/toxiproxy:2.12.0
 api=http://localhost:18474
 
 cleanup() { docker rm -f toxiproxy dir_tox emp_tox pg_tox >/dev/null 2>&1 || true; }
-[ -n "${KEEP:-}" ] || trap cleanup EXIT
+[ -n "${KEEP:-}" ] || trap 'status=$?; [ "$status" = 0 ] || show_logs; cleanup' EXIT
 cleanup
 
 docker run -d --name pg_tox --network $net -e POSTGRES_PASSWORD=toxpw -e POSTGRES_DB=platform pgvector/pgvector:pg18 >/dev/null
@@ -66,10 +77,16 @@ clear_toxics() {
 results=$(mktemp)
 k6() { # extra docker -e arguments, then k6 reads the rest from the environment
   docker run --rm --network host -v "$PWD/load-tests/k6":/scripts -w /scripts \
-    -e DIRECTORY_BASE_URL=http://localhost:5301 -e EMPLOYEE_BASE_URL=http://localhost:5311 "$@" grafana/k6 run --quiet toxiproxy-hire.js 2>&1
+    -e DIRECTORY_BASE_URL=http://localhost:5301 -e EMPLOYEE_BASE_URL=http://localhost:5311 -e ADMIN_EMAIL -e ADMIN_PASSWORD "$@" grafana/k6 run --quiet toxiproxy-hire.js 2>&1
 }
 # One login and one set of reference data for all the steps (the sign-in has its own limit of five a minute).
-prep=$(k6 -e MODE=prepare | grep -o 'PREPARED {.*}' | sed 's/^PREPARED //' | sed 's/\\"/"/g;s/}.*$/}/')
+prep_out=$(k6 -e MODE=prepare; echo "[k6 exited with $?]")
+prep=$(echo "$prep_out" | grep -o 'PREPARED {.*}' | sed 's/^PREPARED //' | sed 's/\\"/"/g;s/}.*$/}/' || true)
+if [ -z "$prep" ]; then
+  echo "the sign-in and the reference data could not be prepared; k6 said:" >&2
+  echo "$prep_out" | tail -15 | cut -c1-300 >&2
+  exit 1
+fi
 token=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["token"])' "$prep")
 dept=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["departmentId"])' "$prep")
 pos=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["positionId"])' "$prep")
