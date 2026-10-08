@@ -38,6 +38,35 @@ public class HireSagaCoordinator(
         return due.Count;
     }
 
+    /// <summary>
+    /// What undoing a hire is: the employee's status and the request to the other services, in one transaction. Used by the saga's own steps
+    /// and by the Temporal workflow's activity (ADR 0056), so that the two carry out exactly the same compensation. Idempotent in effect; a
+    /// repeat after a lost acknowledgement publishes the request again, which the participants take idempotently (ADR 0032).
+    /// </summary>
+    public async Task ApplyCompensation(Guid employeeId, Compensation compensation, CancellationToken ct)
+    {
+        await Undo(employeeId, compensation, ct);
+        var saved = await employees.Save(ct);
+        if (saved.IsFailure)
+        {
+            throw new InvalidOperationException($"Could not record the undoing of the onboarding of {employeeId}: {saved.Error.Messages[0].Code}");
+        }
+    }
+
+    private async Task Undo(Guid employeeId, Compensation compensation, CancellationToken ct)
+    {
+        var employee = await employees.GetById(employeeId, ct);
+        if (employee.IsSuccess)
+        {
+            employee.Value.CompensateOnboarding(compensation.Reason);
+        }
+
+        outbox.Enqueue(
+            EmployeeEventTypes.HireCompensationRequested,
+            employeeId.ToString(),
+            new HireCompensationRequestedEvent(employeeId, compensation.Reason, compensation.RevokeAccount, compensation.ReverseBonus));
+    }
+
     private async Task Step(Guid employeeId, Func<HireSaga, DateTime, Compensation?> apply, CancellationToken ct)
     {
         var saga = await sagas.Get(employeeId, ct);
@@ -50,16 +79,7 @@ public class HireSagaCoordinator(
         var compensation = apply(saga, clock.GetUtcNow().UtcDateTime);
         if (compensation is not null)
         {
-            var employee = await employees.GetById(employeeId, ct);
-            if (employee.IsSuccess)
-            {
-                employee.Value.CompensateOnboarding(compensation.Reason);
-            }
-
-            outbox.Enqueue(
-                EmployeeEventTypes.HireCompensationRequested,
-                employeeId.ToString(),
-                new HireCompensationRequestedEvent(employeeId, compensation.Reason, compensation.RevokeAccount, compensation.ReverseBonus));
+            await Undo(employeeId, compensation, ct);
         }
 
         var saved = await employees.Save(ct);

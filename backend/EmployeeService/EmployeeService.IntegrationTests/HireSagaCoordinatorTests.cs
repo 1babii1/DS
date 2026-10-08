@@ -185,4 +185,24 @@ public class HireSagaCoordinatorTests : IClassFixture<EmployeeTestWebFactory>, I
         await WithCoordinator(clock, c => c.OnBonusGranted(employee, default));
         Assert.Equal(HireSagaState.Completed, (await Read(db => db.HireSagas.AsNoTracking().SingleAsync(s => s.EmployeeId == employee))).State);
     }
+
+    [Fact]
+    public async Task Undoing_a_hire_directly_marks_the_employee_and_announces_it_whatever_the_saga_thinks()
+    {
+        // The Temporal workflow's activity (ADR 0056) undoes a hire through this method, so that the two orchestrators mean the same by it.
+        var employee = await HireAsync();
+
+        await WithCoordinator(
+            new Clock(DateTimeOffset.UtcNow),
+            coordinator => coordinator.ApplyCompensation(employee, new Compensation("a test reason", RevokeAccount: true, ReverseBonus: false), CancellationToken.None));
+
+        Assert.Equal(EmployeeStatus.ProvisioningFailed, await Read(db => db.Set<Employee>().Where(e => e.Id == employee).Select(e => e.Status).SingleAsync()));
+        var announced = Assert.Single(await CompensationEvents(employee));
+        Assert.Equal("a test reason", announced.Reason);
+        Assert.True(announced.RevokeAccount);
+        Assert.False(announced.ReverseBonus);
+
+        // The saga's own row is not the business of this path.
+        Assert.Equal(HireSagaState.Started, await Read(db => db.Set<HireSaga>().Where(x => x.EmployeeId == employee).Select(x => x.State).SingleAsync()));
+    }
 }

@@ -38,7 +38,7 @@ public class AuthEventsConsumer(
 
         using var scope = ScopeFactory.CreateScope();
         var repository = scope.ServiceProvider.GetRequiredService<IEmployeeRepository>();
-        var saga = scope.ServiceProvider.GetRequiredService<HireSagaCoordinator>();
+        var saga = scope.ServiceProvider.GetRequiredService<IHireOrchestrator>();
 
         switch (messageType)
         {
@@ -47,7 +47,7 @@ public class AuthEventsConsumer(
                 var evt = JsonSerializer.Deserialize<AccountProvisionedEvent>(result.Message.Value)
                     ?? throw new InvalidOperationException($"Could not deserialize {AccountProvisionedEvent.MessageType} payload");
                 CompleteProvisioning(repository, evt.EmployeeId, cancellationToken);
-                saga.OnAccountProvisioned(evt.EmployeeId, cancellationToken).GetAwaiter().GetResult();
+                saga.AccountProvisionedAsync(evt.EmployeeId, cancellationToken).GetAwaiter().GetResult();
                 break;
             }
 
@@ -56,7 +56,7 @@ public class AuthEventsConsumer(
                 var evt = JsonSerializer.Deserialize<AccountProvisioningFailedEvent>(result.Message.Value)
                     ?? throw new InvalidOperationException($"Could not deserialize {AccountProvisioningFailedEvent.MessageType} payload");
                 FailProvisioning(repository, evt.EmployeeId, evt.Reason, cancellationToken);
-                saga.OnAccountProvisioningFailed(evt.EmployeeId, evt.Reason, cancellationToken).GetAwaiter().GetResult();
+                saga.AccountProvisioningFailedAsync(evt.EmployeeId, evt.Reason, cancellationToken).GetAwaiter().GetResult();
                 break;
             }
 
@@ -67,7 +67,7 @@ public class AuthEventsConsumer(
                 ProjectWallet(scope, evt, result, cancellationToken);
                 if (evt.Source == CurrencyGrantedEvent.WelcomeBonusSource)
                 {
-                    saga.OnBonusGranted(evt.EmployeeId, cancellationToken).GetAwaiter().GetResult();
+                    saga.BonusGrantedAsync(evt.EmployeeId, cancellationToken).GetAwaiter().GetResult();
                 }
 
                 break;
