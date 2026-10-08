@@ -144,6 +144,9 @@ services:
       # Polling (default) or Cdc, with `--profile cdc` (ADR 0030): who delivers the outbox to Kafka.
       - Outbox__Mode=${OUTBOX_MODE:-Polling}
       - SchemaRegistry__Url=${SCHEMA_REGISTRY_URL:-http://schema_registry:8080/apis/ccompat/v7}
+      # Saga (default, ADR 0032) or Temporal, with `--profile temporal` (ADR 0056): what carries a hire through its onboarding.
+      - HireOrchestration__Mode=${HIRE_ORCHESTRATION_MODE:-Saga}
+      - HireOrchestration__Address=temporal:7233
       - ASPNETCORE_URLS=http://*:5131
       - ConnectionStrings__EmployeeServiceDb=Server=pgbouncer;Port=5432;Database=platform;User Id=postgres;Password=${POSTGRES_PASSWORD:-postgres};Search Path=employee,public
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:-http://localhost:3000}
@@ -707,6 +710,19 @@ services:
     depends_on:
       registry_db_init:
         condition: service_completed_successfully
+
+  # Temporal's development server (ADR 0056). Opt-in, `--profile temporal`, together with HIRE_ORCHESTRATION_MODE=Temporal. This is the
+  # single-process server with its state in memory: enough to run the workflow and to show it, not a deployment (that needs a cluster
+  # and a database of its own).
+  temporal:
+    container_name: temporal
+    profiles: ["temporal"]
+    image: temporalio/temporal:latest
+    restart: always
+    command: ["server", "start-dev", "--ip", "0.0.0.0", "--port", "7233", "--ui-port", "8233"]
+    ports:
+      - "127.0.0.1:7233:7233"
+      - "127.0.0.1:8233:8233"
 
   # Change data capture of the outbox tables (ADR 0030). Opt-in, `--profile cdc`, together with OUTBOX_MODE=Cdc for the
   # four producing services: Debezium reads each outbox table's write-ahead log and produces its Avro bytes to the service's

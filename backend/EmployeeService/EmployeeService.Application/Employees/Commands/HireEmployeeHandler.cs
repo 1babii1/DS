@@ -14,9 +14,8 @@ public class HireEmployeeHandler(
     IEmployeeRepository repository,
     IDirectoryLookupClient directoryLookupClient,
     IOutboxWriter outboxWriter,
-    IHireSagaRepository sagas,
+    IHireOrchestrator orchestrator,
     IIdempotencyRepository idempotency,
-    Microsoft.Extensions.Options.IOptions<HireSagaOptions> sagaOptions,
     TimeProvider clock,
     ILogger<HireEmployeeHandler> logger)
 {
@@ -102,8 +101,8 @@ public class HireEmployeeHandler(
         var employee = employeeResult.Value;
         await repository.Add(employee, cancellationToken);
 
-        // The onboarding process starts with the hire, in the same transaction (ADR 0032).
-        await sagas.Add(HireSaga.Start(employee.Id, clock.GetUtcNow().UtcDateTime, sagaOptions.Value.OnboardingTimeout), cancellationToken);
+        // The onboarding process starts with the hire, in the same transaction when it keeps its state in this database (ADR 0032, 0056).
+        await orchestrator.BeginAsync(employee.Id, cancellationToken);
 
         outboxWriter.Enqueue(
             EmployeeEventTypes.Hired,
@@ -141,6 +140,8 @@ public class HireEmployeeHandler(
         {
             return saveResult.Error;
         }
+
+        await orchestrator.AfterCommitAsync(employee.Id, cancellationToken);
 
         return employee.Id;
     }
