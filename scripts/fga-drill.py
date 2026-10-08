@@ -9,8 +9,10 @@ import base64, hashlib, http.cookiejar, json, os, re, statistics, subprocess, sy
 
 NGINX = "http://localhost"
 EMPLOYEE = f"http://localhost:{os.environ.get('EMPLOYEE_PORT', '5361')}"
-ADMIN_EMAIL = "admin@portfolio.local"
-ADMIN_PASSWORD = "ChangeMe123!"  # the repository's committed development default
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@portfolio.local")
+# The seeded administrator's password: the repository's committed development default, unless the stack was started with another (the nightly
+# run does: the breached-password check refuses the default on a fresh database, and the administrator is then never created).
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "ChangeMe123!")
 VERIFIER = "k6-load-test-code-verifier-string-43-chars-min-xxxx"
 REDIRECT = "http://localhost:3000/auth/callback"
 NET = os.environ.get("STACK_NET", "dsporfolio_default")

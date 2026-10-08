@@ -105,7 +105,7 @@ k6out=load-tests/k6/.multi-k6.log
   fi
 ) &
 killer=$!
-docker run --rm --network host -v "$PWD/load-tests/k6":/scripts -w /scripts -e DURATION="${duration}s" -e VUS=4 -e PACE="${PACE:-0.4}" \
+docker run --rm --network host -v "$PWD/load-tests/k6":/scripts -w /scripts -e DURATION="${duration}s" -e VUS=4 -e PACE="${PACE:-0.4}" -e ADMIN_EMAIL -e ADMIN_PASSWORD \
   grafana/k6 run --quiet multi-grants.js 2>&1 | cat >"$k6out" || true
 wait $killer || true
 

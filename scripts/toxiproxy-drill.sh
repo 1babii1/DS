@@ -77,7 +77,7 @@ clear_toxics() {
 results=$(mktemp)
 k6() { # extra docker -e arguments, then k6 reads the rest from the environment
   docker run --rm --network host -v "$PWD/load-tests/k6":/scripts -w /scripts \
-    -e DIRECTORY_BASE_URL=http://localhost:5301 -e EMPLOYEE_BASE_URL=http://localhost:5311 "$@" grafana/k6 run --quiet toxiproxy-hire.js 2>&1
+    -e DIRECTORY_BASE_URL=http://localhost:5301 -e EMPLOYEE_BASE_URL=http://localhost:5311 -e ADMIN_EMAIL -e ADMIN_PASSWORD "$@" grafana/k6 run --quiet toxiproxy-hire.js 2>&1
 }
 # One login and one set of reference data for all the steps (the sign-in has its own limit of five a minute).
 prep_out=$(k6 -e MODE=prepare; echo "[k6 exited with $?]")

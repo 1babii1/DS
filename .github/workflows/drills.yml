@@ -36,8 +36,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: A client secret for this run
-        run: echo "AUTH_OIDC_CLIENT_SECRET=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+      - name: Secrets for this run
+        run: |
+          # The administrator is seeded with this; the committed development default is refused by the breached-password check on a fresh database.
+          password="Zq$(openssl rand -hex 16)!9"
+          {
+            echo "AUTH_OIDC_CLIENT_SECRET=$(openssl rand -hex 24)"
+            echo "SEED_ADMIN_PASSWORD=$password"
+            echo "ADMIN_PASSWORD=$password"
+          } >> "$GITHUB_ENV"
 
       - name: Build the images the drills run
         run: docker compose build auth_service directory_service employee_service rewards_service
