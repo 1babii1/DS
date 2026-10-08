@@ -31,8 +31,9 @@ fails the once-on-the-bus check (x2.33).
 Running on GitHub's machines, against a stack with no state and no developer's `.env`, found things the drills had been quietly depending on:
 - **The seeded administrator did not exist.** On a fresh database the seeder creates the account with the password in configuration, and if the creation is refused it does nothing and says
   nothing. The committed development default, `ChangeMe123!`, is refused by the breached-password check (the platform's own rule), so the first sign-in of every drill got a 401. On the laptop the
-  account had been created before that check existed. The run now starts the stack with a random strong password and the drills read it from the environment. A seeder that fails silently is a
-  defect of its own; it is not fixed here.
+  account had been created before that check existed. The run now starts the stack with a random strong password and the drills read it from the environment. A seeder that failed silently was a
+  defect of its own, and is fixed: the outcome is now returned (created, already there, refused with the validators' reasons, role not granted) and a refusal is logged as an error that says so and
+  what to set, never the password; a test fails against the old behaviour.
 - **A script that stops under `set -e` says nothing about where.** Every drill now prints the line it stopped on, and the last lines of the log of each container it started, when it exits non-zero.
 - **One drill script was not executable in git**, which only a fresh checkout could show.
 - **The compose project name**: the drills name the stack's network and images after the project the repository is developed under, so the run sets `COMPOSE_PROJECT_NAME`.
