@@ -1,4 +1,5 @@
 ﻿using CSharpFunctionalExtensions;
+using EmployeeService.Application.Authorization;
 using EmployeeService.Application.Database;
 using EmployeeService.Application.Directory;
 using EmployeeService.Application.Employees.Errors;
@@ -10,6 +11,7 @@ namespace EmployeeService.Application.Employees.Commands;
 
 public class TransferEmployeeHandler(
     IEmployeeRepository repository,
+    IDepartmentAuthorization authorization,
     IDirectoryLookupClient directoryLookupClient,
     IOutboxWriter outboxWriter,
     ILogger<TransferEmployeeHandler> logger)
@@ -20,6 +22,19 @@ public class TransferEmployeeHandler(
         if (employeeResult.IsFailure)
         {
             return employeeResult.Error;
+        }
+
+        // Moving someone takes them out of one department and into another, so it takes the right over both (ADR 0057).
+        var caller = new Caller(command.CallerAccountId, command.CallerIsAdmin);
+        foreach (var departmentId in new[] { employeeResult.Value.DepartmentId, command.DepartmentId }.Distinct())
+        {
+            switch (await authorization.CanManageAsync(caller, departmentId, cancellationToken))
+            {
+                case AccessDecision.Denied:
+                    return EmployeeErrors.NotDepartmentManager();
+                case AccessDecision.Unavailable:
+                    return EmployeeErrors.AuthorizationUnavailable();
+            }
         }
 
         AssignmentValidationResult validation;

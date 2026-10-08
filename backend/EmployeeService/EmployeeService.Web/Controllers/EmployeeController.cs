@@ -29,7 +29,7 @@ public class EmployeeController : ControllerBase
         // this" later (e.g. notifying them if account provisioning fails), not
         // as client-supplied data.
         var hiredBy = Guid.Parse(User.FindFirstValue("sub")!);
-        command = command with { HiredByAccountId = hiredBy, IdempotencyKey = idempotencyKey };
+        command = command with { HiredByAccountId = hiredBy, IdempotencyKey = idempotencyKey, CallerIsAdmin = User.IsInRole(RoleNames.Admin) };
         return await handler.Handle(command, cancellationToken);
     }
 
@@ -62,7 +62,12 @@ public class EmployeeController : ControllerBase
         [FromBody] TransferEmployeeRequest request,
         CancellationToken cancellationToken)
     {
-        var command = new TransferEmployeeCommand(employeeId, request.DepartmentId, request.PositionId);
+        var command = new TransferEmployeeCommand(
+            employeeId,
+            request.DepartmentId,
+            request.PositionId,
+            Guid.TryParse(User.FindFirstValue("sub"), out var caller) ? caller : null,
+            User.IsInRole(RoleNames.Admin));
         return await handler.Handle(command, cancellationToken);
     }
 

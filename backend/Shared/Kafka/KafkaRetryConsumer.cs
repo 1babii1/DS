@@ -39,6 +39,9 @@ public abstract class KafkaRetryConsumer<TDbContext> : BackgroundService
     /// <summary>Added to the headers a handler sees when the message was Avro: the id of the schema it was written with.</summary>
     public const string AvroSchemaIdHeader = "avro-schema-id";
 
+    // What AsText hands the handlers for an Avro message that can never be decoded: the bytes, in base64, behind this prefix.
+    private const string UndecodablePrefix = "avro-undecodable:";
+
     private static readonly TimeSpan[] RetryDelays = [TimeSpan.FromMilliseconds(200), TimeSpan.FromSeconds(1)];
 
     private readonly IServiceScopeFactory _scopeFactory;
@@ -285,7 +288,7 @@ public abstract class KafkaRetryConsumer<TDbContext> : BackgroundService
                 or Confluent.SchemaRegistry.SchemaRegistryException { Status: System.Net.HttpStatusCode.NotFound })
             {
                 undecodable = ex;
-                value = "avro-undecodable:" + Convert.ToBase64String(bytes);
+                value = UndecodablePrefix + Convert.ToBase64String(bytes);
             }
         }
         else
@@ -309,7 +312,8 @@ public abstract class KafkaRetryConsumer<TDbContext> : BackgroundService
         };
     }
 
-    private bool TryDeadLetter(ConsumeResult<string, string> result, Exception error)
+    /// <summary>Parks a message in the dead letters (once; a repeat is a no-op). False only when the database could not be written, which is the one case where the consumer should stall.</summary>
+    public bool TryDeadLetter(ConsumeResult<string, string> result, Exception error)
     {
         var messageId = GetHeader(result.Message.Headers, "message-id");
         if (messageId is null || !Guid.TryParse(messageId, out var messageGuid))
@@ -329,11 +333,17 @@ public abstract class KafkaRetryConsumer<TDbContext> : BackgroundService
                 return true;
             }
 
+            // The dead letters keep the payload as json. A message that could not be decoded has no json, only its bytes, which AsText hands over as
+            // "avro-undecodable:<base64>"; that is not json, and parking it failed, so such a message was asked for again for ever. As a json string it is.
+            var payload = result.Message.Value.StartsWith(UndecodablePrefix, StringComparison.Ordinal)
+                ? System.Text.Json.JsonSerializer.Serialize(result.Message.Value)
+                : result.Message.Value;
+
             dbContext.DeadLetters.Add(DeadLetterEntry.Create(
                 messageGuid,
                 result.Topic,
                 result.Message.Key,
-                result.Message.Value,
+                payload,
                 error.ToString(),
                 MaxAttempts));
 

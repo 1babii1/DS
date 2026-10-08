@@ -30,6 +30,7 @@
 
     <ItemGroup>
         <EmbeddedResource Include="Consumers\Schemas\*.avsc" />
+        <EmbeddedResource Include="Authorization\fga-model.json" LogicalName="fga-model.json" />
     </ItemGroup>
 
 </Project>

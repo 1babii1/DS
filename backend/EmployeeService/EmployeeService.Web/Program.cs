@@ -44,6 +44,7 @@ builder.Services.AddPlatformJwtAuthentication(builder.Configuration, builder.Env
 
 builder.Services.AddCanEditPolicy();
 builder.Services.AddStepUpPolicy();
+builder.Services.AddAuthorizationBuilder().AddPolicy("IsAdmin", policy => policy.RequireRole(Shared.Security.RoleNames.Admin));
 
 builder.Services.AddInfrastructurePostgres(builder.Configuration);
 builder.Services.AddDirectoryGrpcClient(builder.Configuration);
@@ -70,6 +71,7 @@ builder.Services.Configure<EmployeeService.Application.Employees.HireSagaOptions
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<EmployeeService.Application.Employees.HireSagaCoordinator>();
 EmployeeService.Web.Temporal.HireOrchestrationRegistration.AddHireOrchestration(builder.Services, builder.Configuration);
+EmployeeService.Web.Authorization.DepartmentAuthorizationRegistration.AddDepartmentAuthorization(builder.Services, builder.Configuration);
 
 // The employee card (ADR 0034).
 builder.Services.Configure<EmployeeService.Application.Employees.Queries.EmployeeCardOptions>(

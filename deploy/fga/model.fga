@@ -1,0 +1,15 @@
+model
+  schema 1.1
+
+type user
+
+type department
+  relations
+    # The department directly above this one. Written from DirectoryService's events (created, moved, deleted).
+    define parent: [department]
+
+    # An account that manages this department. Written by an administrator.
+    define manager: [user]
+
+    # Whoever manages a department, or any department above it, may hire into it and transfer people in and out of it (ADR 0057).
+    define can_manage: manager or can_manage from parent

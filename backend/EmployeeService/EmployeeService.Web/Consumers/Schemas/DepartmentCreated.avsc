@@ -1,0 +1,25 @@
+{
+  "type": "record",
+  "name": "DepartmentCreated",
+  "namespace": "ds.directory",
+  "fields": [
+    {
+      "name": "DepartmentId",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      }
+    },
+    {
+      "name": "ParentDepartmentId",
+      "type": [
+        "null",
+        {
+          "type": "string",
+          "logicalType": "uuid"
+        }
+      ],
+      "default": null
+    }
+  ]
+}
